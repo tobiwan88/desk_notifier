@@ -33,6 +33,9 @@ public:
     void apply(const engine::EyeCmd&, std::uint32_t now) noexcept;
     void tick(std::uint32_t now) noexcept;  // once per frame, before any CatView::next()
     static CatInfo info() noexcept;
+    static bool animating() noexcept;                  // a built-in animation is running
+    static void play_anim(int id) noexcept;            // start a built-in animation (ignores unusable ids)
+    static bool style_has_special() noexcept;
     bool save_pending() const noexcept { return save_pending_; }
     void saved() noexcept { save_pending_ = false; }
 

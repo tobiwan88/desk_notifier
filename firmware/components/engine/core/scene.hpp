@@ -2,12 +2,14 @@
 // Two fixed source kinds instead of a variant: no heap, no visit, same behaviour.
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <expected>
 #include <span>
 #include <string_view>
 
 #include "engine/core/command.hpp"
+#include "engine/core/pool.hpp"
 #include "eyes/core/cat.hpp"
 
 namespace engine {
@@ -37,7 +39,14 @@ public:
 
     void apply(const Command& cmd, std::uint32_t now) noexcept {
         if (const auto* e = std::get_if<EyeCmd>(&cmd)) {
-            model_.apply(*e, now);
+            if (e->play && *e->play == kPlayRandom) {  // one pick from the pool, right now
+                EyeCmd rest = *e;
+                rest.play.reset();
+                model_.apply(rest, now);
+                pick_now(now);
+            } else {
+                model_.apply(*e, now);
+            }
         } else if (const auto* p = std::get_if<PlayCmd>(&cmd)) {
             for (std::size_t i = 0; i < kEyes; ++i) {
                 if (p->clip[i].empty()) continue;
@@ -51,7 +60,13 @@ public:
         }
     }
 
-    void tick(std::uint32_t now) noexcept { model_.tick(now); }  // once per frame, before next()
+    void set_pool(const Pool& p) noexcept { pool_ = p; }
+    const Pool& pool() const noexcept { return pool_; }
+
+    void tick(std::uint32_t now) noexcept {  // once per frame, before next()
+        model_.tick(now);
+        schedule(now);
+    }
 
     FramePlan next(Eye e, std::uint32_t now) noexcept {
         const auto i = idx(e);
@@ -88,6 +103,35 @@ public:
     Clip& clip(Eye e) noexcept { return clips_[idx(e)]; }
 
 private:
+    // Random mode: when nothing is playing, wait a random pause, then pick one item from the pool.
+    void schedule(std::uint32_t now) noexcept {
+        if (!eye_info().auto_idle) { next_pick_ = 0; return; }
+        bool busy = eyes::CatModel::animating();
+        for (const auto a : active_) busy |= (a == Src::Playing);
+        if (busy) { next_pick_ = 0; return; }
+        if (next_pick_ == 0) {
+            const std::uint32_t lo = pool_.min_ds * 100u, hi = std::max<std::uint32_t>(pool_.max_ds * 100u, lo);
+            rng_ ^= rng_ << 13; rng_ ^= rng_ >> 17; rng_ ^= rng_ << 5;
+            next_pick_ = now + lo + rng_ % (hi - lo + 1);
+            if (next_pick_ == 0) next_pick_ = 1;
+            return;
+        }
+        if (static_cast<std::int32_t>(now - next_pick_) >= 0) { pick_now(now); next_pick_ = 0; }
+    }
+    void pick_now(std::uint32_t now) noexcept {
+        const Pick p = pick(pool_, rng_, last_key_, eyes::CatModel::style_has_special());
+        if (p.kind == Pick::Kind::Anim) {
+            eyes::CatModel::play_anim(p.index);
+            last_key_ = pick_key(p);
+        } else if (p.kind == Pick::Kind::Clip) {
+            PlayCmd c;
+            c.clip[0] = c.clip[1] = pool_.clips[static_cast<std::size_t>(p.index)];
+            c.then_eyes = true;
+            apply(Command{c}, now);  // a missing clip simply does not start
+            last_key_ = pick_key(p);
+        }
+    }
+
     enum class Src : std::uint8_t { Eyes, Playing };
     static constexpr std::size_t idx(Eye e) noexcept { return static_cast<std::size_t>(e); }
     void stop_all() noexcept {
@@ -96,6 +140,9 @@ private:
         }
     }
 
+    Pool pool_;
+    std::uint32_t rng_ = 0x2545F491u, next_pick_ = 0;
+    int last_key_ = -1;
     eyes::CatModel model_;
     std::array<eyes::CatView, kEyes> views_;
     std::array<Clip, kEyes> clips_{};

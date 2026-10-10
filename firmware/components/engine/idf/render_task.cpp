@@ -24,6 +24,9 @@ QueueHandle_t g_queue = nullptr;
 Scene<clip::ClipPlayer>* g_scene = nullptr;
 portMUX_TYPE g_stats_mux = portMUX_INITIALIZER_UNLOCKED;
 Stats g_stats{};
+portMUX_TYPE g_pool_mux = portMUX_INITIALIZER_UNLOCKED;
+Pool g_pool;
+std::uint32_t g_pool_version = 1;
 UBaseType_t g_stack_hwm = 0;
 std::uint64_t g_fill_us = 0;  // render task only
 
@@ -91,12 +94,22 @@ bool service_lcd(Scene<clip::ClipPlayer>& scene, std::uint32_t now) {
     return true;
 }
 
+Pool load_pool() {  // saved pool (NVS) on top of the default pool
+    Pool p;
+    if (auto j = settings::get("pool")) {
+        if (auto patch = parse_pool(*j)) apply(p, *patch);
+    }
+    return p;
+}
+
 void task(void*) {
     esp_task_wdt_add(nullptr);
     auto num = [](const char* k, int d) { auto v = settings::get(k); return v ? std::atoi(v->c_str()) : d; };
     Scene<clip::ClipPlayer> scene(esp_timer_get_time() & 0xFFFFFFFF, static_cast<std::uint8_t>(num("style", 0)),
                                   static_cast<std::uint8_t>(num("iris", 0)), num("auto", 1) != 0);
     g_scene = &scene;
+    g_pool = load_pool();
+    std::uint32_t pool_seen = 0;
     scene.clip(Eye::Left).set_slot(0);
     scene.clip(Eye::Right).set_slot(1);
     std::uint32_t frame_n = 0;
@@ -111,6 +124,14 @@ void task(void*) {
         const std::uint32_t now = now_ms();
         Command cmd;
         while (xQueueReceive(g_queue, &cmd, 0) == pdTRUE) scene.apply(cmd, now);
+        if (pool_seen != g_pool_version) {  // the HTTP side changed the pool
+            Pool copy;
+            taskENTER_CRITICAL(&g_pool_mux);
+            copy = g_pool;
+            pool_seen = g_pool_version;
+            taskEXIT_CRITICAL(&g_pool_mux);
+            scene.set_pool(copy);
+        }
         scene.tick(now);
         if (scene.save_pending()) {  // "save": persist style, iris and random-idle
             const auto i = scene.eye_info();
@@ -182,6 +203,20 @@ bool lcd_request(LcdOp op, int arg) noexcept {
     if (!busy) g_lcd_req = LcdReq{true, op, arg};
     taskEXIT_CRITICAL(&g_lcd_mux);
     return !busy;
+}
+
+Pool pool_get() noexcept {
+    taskENTER_CRITICAL(&g_pool_mux);
+    Pool p = g_pool;
+    taskEXIT_CRITICAL(&g_pool_mux);
+    return p;
+}
+
+void pool_set(const Pool& p) noexcept {
+    taskENTER_CRITICAL(&g_pool_mux);
+    g_pool = p;
+    ++g_pool_version;
+    taskEXIT_CRITICAL(&g_pool_mux);
 }
 
 eyes::CatInfo eye_info() noexcept {

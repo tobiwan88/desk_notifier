@@ -15,6 +15,27 @@ SPECIALS = {"anime": "sparkle", "cute": "heart_eyes", "halloween": "demon_flare"
 # play accepts the animations, the meta names "special" / "random", and the style special names.
 PLAY_NAMES = set(ANIMATIONS) | {"special", "random"} | set(SPECIALS.values())
 EYE_FIELDS = {"style", "iris", "play", "auto", "look", "save"}
+POOL_INTERVAL = [2.5, 7.0]
+
+
+def validate_pool(body, known: set[str]) -> str | None:
+    """Return an error message for an invalid POST /api/pool body, or None if it is valid."""
+    if not isinstance(body, dict):
+        return "body must be a JSON object"
+    if "enabled" in body:
+        enabled = body["enabled"]
+        if not isinstance(enabled, list):
+            return "enabled must be a list of names"
+        for name in enabled:
+            if not isinstance(name, str) or name not in known:
+                return f"unknown item: {name}"
+    if "interval" in body:
+        iv = body["interval"]
+        ok = (isinstance(iv, list) and len(iv) == 2
+              and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in iv))
+        if not ok or not (1 <= iv[0] <= iv[1] <= 120):
+            return "interval must be [min,max] seconds with 1 <= min <= max <= 120"
+    return None
 
 
 def validate_eye(body) -> str | None:
@@ -52,6 +73,8 @@ class MockDevice:
         self.play_cmds: list[dict] = []
         self.eye_state = {"style": "realistic", "iris": "amber", "auto": False, "anim": None}
         self.stops = 0
+        self.pool_enabled: set[str] = set(ANIMATIONS)
+        self.pool_interval: list[float] = list(POOL_INTERVAL)
         mock = self
 
         class H(BaseHTTPRequestHandler):
@@ -93,6 +116,8 @@ class MockDevice:
                 if self.path == "/api/clips":
                     return self._send(200, {"clips": [{"name": n, "size": len(d), "frames": 1, "fps": 10.0} for n, d in mock.clips.items()],
                                             "free": 3000000})
+                if self.path == "/api/pool":
+                    return self._send(200, mock.pool_body())
                 self._err(404, "E_NOT_FOUND", "no route")
 
             def do_POST(self):
@@ -120,6 +145,19 @@ class MockDevice:
                 if self.path == "/api/stop":
                     mock.stops += 1
                     return self._send(202, {"queued": True})
+                if self.path == "/api/pool":
+                    try:
+                        cmd = json.loads(body)
+                    except ValueError:
+                        return self._err(400, "E_BAD_JSON", "body is not valid JSON")
+                    problem = validate_pool(cmd, set(mock.pool_names()))
+                    if problem:
+                        return self._err(400, "E_BAD_JSON", problem)
+                    if "enabled" in cmd:
+                        mock.pool_enabled = set(cmd["enabled"])
+                    if "interval" in cmd:
+                        mock.pool_interval = list(cmd["interval"])
+                    return self._send(200, mock.pool_body())
                 self._err(404, "E_NOT_FOUND", "no route")
 
             def do_PUT(self):
@@ -138,10 +176,19 @@ class MockDevice:
                 name = self.path.rsplit("/", 1)[-1]
                 if mock.clips.pop(name, None) is None:
                     return self._err(404, "E_NOT_FOUND", "no such clip")
+                mock.pool_enabled.discard(name)
                 self._send(204)
 
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), H)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+
+    def pool_names(self) -> list[str]:
+        return ANIMATIONS + list(self.clips)
+
+    def pool_body(self) -> dict:
+        items = [{"name": n, "kind": "anim", "enabled": n in self.pool_enabled} for n in ANIMATIONS]
+        items += [{"name": n, "kind": "clip", "enabled": n in self.pool_enabled} for n in self.clips]
+        return {"items": items, "interval": list(self.pool_interval), "auto": True}
 
     @property
     def host(self) -> str:

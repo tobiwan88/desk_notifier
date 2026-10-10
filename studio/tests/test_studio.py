@@ -79,6 +79,24 @@ def test_prepare_send_delete(tmp_path):
         assert c.delete("/api/devices/eyes-mock/clips/blob").status_code == 404
 
 
+def test_pool_proxy(tmp_path):
+    with MockDevice() as m:
+        c = client(tmp_path, m)
+        m.clips["fire"] = b"EYCL" + b"\0" * 8
+        p = c.get("/api/devices/eyes-mock/pool").json()
+        assert len(p["items"]) == 13 and p["interval"] == [2.5, 7.0] and p["auto"] is True
+        assert [i["name"] for i in p["items"] if i["kind"] == "clip"] == ["fire"]
+        r = c.post("/api/devices/eyes-mock/pool", json={"enabled": ["wink", "fire"], "interval": [1, 4]})
+        assert r.status_code == 200
+        assert {i["name"] for i in r.json()["items"] if i["enabled"]} == {"wink", "fire"}
+        assert m.pool_interval == [1, 4]
+        r = c.post("/api/devices/eyes-mock/pool", json={"enabled": ["nope"]})
+        assert r.status_code == 400 and r.json()["error"]["message"] == "unknown item: nope"
+        assert m.pool_enabled == {"wink", "fire"}
+        assert c.post("/api/devices/nope/pool", json={}).status_code == 404
+        assert c.get("/api/devices/nope/pool").status_code == 404
+
+
 def test_prepare_rejects_garbage(tmp_path):
     with MockDevice() as m:
         c = client(tmp_path, m)

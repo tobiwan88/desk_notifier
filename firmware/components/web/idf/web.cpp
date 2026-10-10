@@ -10,6 +10,8 @@
 
 #include "engine/core/errors.hpp"
 #include "engine/core/parse.hpp"
+#include "engine/core/pool.hpp"
+#include "eyes/core/cat.hpp"
 #include "engine/idf/render_task.hpp"
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
@@ -32,13 +34,13 @@ const char* const kTag = "web";
 std::string g_token;
 bool g_open = false;
 
-void send_error(httpd_req_t* r, engine::Err e, std::string_view msg) {
+void send_error(httpd_req_t* r, engine::Err e, std::string_view msg) {  // msg must not contain quotes
     const auto info = engine::describe(e);
     char status[24];
     std::snprintf(status, sizeof status, "%d", info.http);
     httpd_resp_set_status(r, status);
     httpd_resp_set_type(r, "application/json");
-    char body[160];
+    char body[200];
     std::snprintf(body, sizeof body, R"({"error":{"code":"%.*s","message":"%.*s"}})", static_cast<int>(info.code.size()),
                   info.code.data(), static_cast<int>(msg.size()), msg.data());
     httpd_resp_sendstr(r, body);
@@ -134,6 +136,58 @@ std::string_view uri_name(httpd_req_t* r) {
     if (auto q = u.find('?'); q != std::string_view::npos) u = u.substr(0, q);
     constexpr std::string_view p = "/api/clips/";
     return u.size() > p.size() ? u.substr(p.size()) : std::string_view{};
+}
+
+// GET/POST /api/pool: which animations and clips the random mode may pick, and the pause between picks.
+std::string pool_body(const engine::Pool& p) {
+    std::string b = "{\"items\":[";
+    bool first = true;
+    auto item = [&](std::string_view name, const char* kind, bool on) {
+        if (!first) b += ',';
+        first = false;
+        b += "{\"name\":\""; b.append(name); b += "\",\"kind\":\""; b += kind; b += "\",\"enabled\":"; b += on ? "true}" : "false}";
+    };
+    for (std::size_t i = 0; i < eyes::kAnimNames.size(); ++i) item(eyes::kAnimNames[i], "anim", (p.anim_mask >> i) & 1);
+    if (auto l = storage::list()) {
+        for (const auto& c : *l) {
+            bool on = false;
+            for (const auto& n : p.clips) on |= (n.view() == c.name.view());
+            item(c.name.view(), "clip", on);
+        }
+    }
+    char t[96];
+    std::snprintf(t, sizeof t, "],\"interval\":[%.1f,%.1f],\"auto\":%s}", p.min_ds / 10.0, p.max_ds / 10.0,
+                  engine::eye_info().auto_idle ? "true" : "false");
+    return b + t;
+}
+
+esp_err_t get_pool(httpd_req_t* r) {
+    if (!authorized(r)) return ESP_OK;
+    send_json(r, "200 OK", pool_body(engine::pool_get()).c_str());
+    return ESP_OK;
+}
+
+esp_err_t post_pool(httpd_req_t* r) {
+    if (!authorized(r)) return ESP_OK;
+    std::array<char, engine::kMaxBody + 1> buf;
+    std::string_view body;
+    if (!read_body(r, buf, body)) return ESP_OK;
+    auto patch = engine::parse_pool(body);
+    if (!patch) { send_error(r, patch.error().code, patch.error().message.view()); return ESP_OK; }
+    for (const auto& c : patch->clips) {  // every named clip must exist on the device
+        if (!storage::info(c.view())) {
+            std::string m = "unknown item: ";
+            m.append(c.view());
+            send_error(r, engine::Err::BadJson, m);
+            return ESP_OK;
+        }
+    }
+    engine::Pool p = engine::pool_get();
+    engine::apply(p, *patch);
+    engine::pool_set(p);
+    settings::set("pool", engine::pool_to_json(p));
+    send_json(r, "200 OK", pool_body(p).c_str());
+    return ESP_OK;
 }
 
 esp_err_t get_clips(httpd_req_t* r) {
@@ -292,6 +346,8 @@ std::expected<void, engine::Err> start() noexcept {
         {.uri = "/api/play", .method = HTTP_POST, .handler = post_play, .user_ctx = nullptr},
         {.uri = "/api/stop", .method = HTTP_POST, .handler = post_stop, .user_ctx = nullptr},
         {.uri = "/api/ota", .method = HTTP_POST, .handler = post_ota, .user_ctx = nullptr},
+        {.uri = "/api/pool", .method = HTTP_GET, .handler = get_pool, .user_ctx = nullptr},
+        {.uri = "/api/pool", .method = HTTP_POST, .handler = post_pool, .user_ctx = nullptr},
         {.uri = "/api/clips", .method = HTTP_GET, .handler = get_clips, .user_ctx = nullptr},
         {.uri = "/api/clips/*", .method = HTTP_PUT, .handler = put_clip, .user_ctx = nullptr},
         {.uri = "/api/clips/*", .method = HTTP_DELETE, .handler = delete_clip, .user_ctx = nullptr},
