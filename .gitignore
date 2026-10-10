@@ -28,3 +28,6 @@ firmware/sdkconfig
 sdkconfig.local
 soak*.csv
 *.rgb
+
+# Original video files (use the small GIF in docs/media instead)
+*.mp4
