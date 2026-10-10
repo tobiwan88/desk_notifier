@@ -104,15 +104,15 @@ esp_err_t post_stop(httpd_req_t* r) {
 esp_err_t get_status(httpd_req_t* r) {
     const auto s = engine::stats();
     const auto* app = esp_app_get_description();
-    char b[704];
+    char b[768];
     std::snprintf(b, sizeof b,
         R"({"version":"%s","idf":"%s","hostname":"%s","uptime_s":%lld,"heap_internal":%u,"heap_min":%u,"psram_free":%u,)"
-        R"("fps":%u.%u,"frame_ms_avg":%lu,"frame_ms_max":%lu,"rssi":%d,"ip":"%s","source":{"left":"%.*s","right":"%.*s"},)"
+        R"("fps":%u.%u,"fill_ms_avg":%lu,"frame_ms_avg":%lu,"frame_ms_max":%lu,"rssi":%d,"ip":"%s","source":{"left":"%.*s","right":"%.*s"},)"
         R"("fs_free":%lu,"clip_max_bps":%d,"spi_hz":%d})",
         app->version, app->idf_ver, net::hostname().c_str(), static_cast<long long>(esp_timer_get_time() / 1000000),
         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)), static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)),
         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)), s.fps_x10 / 10, s.fps_x10 % 10,
-        static_cast<unsigned long>(s.frame_us_avg / 1000), static_cast<unsigned long>(s.frame_us_max / 1000), net::rssi(), net::ip().c_str(),
+        static_cast<unsigned long>(s.fill_us_avg / 1000), static_cast<unsigned long>(s.frame_us_avg / 1000), static_cast<unsigned long>(s.frame_us_max / 1000), net::rssi(), net::ip().c_str(),
         static_cast<int>(s.source[0].size()), s.source[0].data(), static_cast<int>(s.source[1].size()), s.source[1].data(), static_cast<unsigned long>(storage::free_bytes()),
         CONFIG_EYES_CLIP_MAX_BPS, CONFIG_EYES_LCD_SPI_HZ);
     send_json(r, "200 OK", b);
@@ -239,6 +239,7 @@ std::expected<void, engine::Err> start() noexcept {
     c.max_uri_handlers = 16;
     c.recv_wait_timeout = 10;
     c.send_wait_timeout = 10;
+    c.max_open_sockets = 4;
     c.lru_purge_enable = true;
     c.uri_match_fn = httpd_uri_match_wildcard;
     httpd_handle_t h = nullptr;

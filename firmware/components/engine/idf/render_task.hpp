@@ -12,7 +12,7 @@ namespace engine {
 
 struct Stats {
     std::uint16_t fps_x10;
-    std::uint32_t frame_us_avg, frame_us_max;
+    std::uint32_t frame_us_avg, frame_us_max, fill_us_avg;
     std::array<std::string_view, kEyes> source;
 };
 

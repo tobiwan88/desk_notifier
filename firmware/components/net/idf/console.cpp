@@ -1,4 +1,7 @@
 // UART/USB console (plan §5.6).
+#include <fcntl.h>
+#include <unistd.h>
+
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -6,6 +9,8 @@
 #include "engine/core/command.hpp"
 #include "engine/idf/render_task.hpp"
 #include "esp_console.h"
+#include "esp_heap_caps.h"
+#include "esp_timer.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "net/idf/net.hpp"
@@ -68,6 +73,26 @@ int cmd_play(int argc, char** argv) {
     return engine::post(engine::Command{p}, 100) ? 0 : 1;
 }
 int cmd_stop(int, char**) { return engine::post(engine::Command{engine::StopCmd{}}, 100) ? 0 : 1; }
+int cmd_fsbench(int argc, char** argv) {
+    if (argc < 2) { std::printf("usage: fsbench <clip>\n"); return 1; }
+    char path[96];
+    std::snprintf(path, sizeof path, "/fs/clips/%s.clip", argv[1]);
+    for (std::size_t chunk : {4096u, 16384u, 32768u}) {
+        int fd = open(path, O_RDONLY);
+        if (fd < 0) { std::printf("cannot open\n"); return 1; }
+        auto* buf = static_cast<char*>(heap_caps_malloc(chunk, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
+        if (!buf) { close(fd); std::printf("no memory for %u\n", static_cast<unsigned>(chunk)); continue; }
+        const int64_t t0 = esp_timer_get_time();
+        std::size_t total = 0;
+        for (ssize_t n; (n = read(fd, buf, chunk)) > 0;) total += static_cast<std::size_t>(n);
+        const int64_t us = esp_timer_get_time() - t0;
+        std::printf("chunk=%u: %u bytes in %lld ms = %u KB/s\n", static_cast<unsigned>(chunk), static_cast<unsigned>(total),
+                    static_cast<long long>(us / 1000), static_cast<unsigned>(total * 1000000ULL / (us ? us : 1) / 1024));
+        heap_caps_free(buf);
+        close(fd);
+    }
+    return 0;
+}
 int cmd_reboot(int, char**) { esp_restart(); return 0; }
 int cmd_factory(int, char**) { settings::erase_all(); std::printf("NVS erased (clips kept); rebooting\n"); esp_restart(); return 0; }
 
@@ -90,6 +115,7 @@ std::expected<void, engine::Err> start_console() noexcept {
         {.command = "eye", .help = "eye <mood>", .hint = nullptr, .func = cmd_eye, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "play", .help = "play <clip> [loop]", .hint = nullptr, .func = cmd_play, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "stop", .help = "stop clips", .hint = nullptr, .func = cmd_stop, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
+        {.command = "fsbench", .help = "fsbench <clip>", .hint = nullptr, .func = cmd_fsbench, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "reboot", .help = "reboot", .hint = nullptr, .func = cmd_reboot, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "factory-reset", .help = "erase NVS settings", .hint = nullptr, .func = cmd_factory, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
     };
