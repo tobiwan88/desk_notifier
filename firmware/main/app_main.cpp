@@ -1,7 +1,10 @@
 #include "display/idf/display.hpp"
 #include "engine/idf/render_task.hpp"
+#include <string>
+
 #include "esp_log.h"
 #include "esp_ota_ops.h"
+#include "esp_system.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -31,8 +34,34 @@ static void selftest(void*) {
     vTaskDelete(nullptr);
 }
 
+// Keeps the last 8 reset reasons in NVS ("POWERON,SW,BROWNOUT,...", newest last) so a power problem
+// (e.g. brown-out on a weak power bank) can be read back later from /api/status or the console.
+static void record_reset_reason() {
+    const char* name = "OTHER";
+    switch (esp_reset_reason()) {
+        case ESP_RST_POWERON: name = "POWERON"; break;
+        case ESP_RST_SW: name = "SW"; break;
+        case ESP_RST_PANIC: name = "PANIC"; break;
+        case ESP_RST_INT_WDT: name = "INT_WDT"; break;
+        case ESP_RST_TASK_WDT: name = "TASK_WDT"; break;
+        case ESP_RST_WDT: name = "WDT"; break;
+        case ESP_RST_BROWNOUT: name = "BROWNOUT"; break;
+        case ESP_RST_DEEPSLEEP: name = "DEEPSLEEP"; break;
+        case ESP_RST_USB: name = "USB"; break;
+        default: break;
+    }
+    std::string h = settings::get("rst").value_or("");
+    h += h.empty() ? "" : ",";
+    h += name;
+    int commas = 0;
+    for (char c : h) commas += (c == ',');
+    while (commas >= 8) { h.erase(0, h.find(',') + 1); --commas; }
+    settings::set("rst", h);
+}
+
 extern "C" void app_main(void) {
     settings::init();
+    record_reset_reason();
 #ifdef CONFIG_EYES_TEST_CRASH_ON_BOOT
     vTaskDelay(pdMS_TO_TICKS(1500));
     abort();

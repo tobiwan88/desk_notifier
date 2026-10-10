@@ -22,6 +22,7 @@
 #include "esp_timer.h"
 #include "net/idf/net.hpp"
 #include "sdkconfig.h"
+#include "settings/idf/settings.hpp"
 #include "storage/idf/storage.hpp"
 
 namespace web {
@@ -108,17 +109,17 @@ esp_err_t get_status(httpd_req_t* r) {
     const auto s = engine::stats();
     const auto ei = engine::eye_info();
     const auto* app = esp_app_get_description();
-    char b[896];
+    char b[1024];
     std::snprintf(b, sizeof b,
         R"({"version":"%s","idf":"%s","hostname":"%s","uptime_s":%lld,"heap_internal":%u,"heap_min":%u,"psram_free":%u,)"
         R"("fps":%u.%u,"fill_ms_avg":%lu,"frame_ms_avg":%lu,"frame_ms_max":%lu,"rssi":%d,"ip":"%s","source":{"left":"%.*s","right":"%.*s"},)"
-        R"("auth":"%s","render_stack_free":%u,"eye":{"style":"%.*s","iris":"%.*s","auto":%s,"anim":"%.*s"},"fs_free":%lu,"clip_max_bps":%d,"spi_hz":%d})",
+        R"("auth":"%s","resets":"%s","render_stack_free":%u,"eye":{"style":"%.*s","iris":"%.*s","auto":%s,"anim":"%.*s"},"fs_free":%lu,"clip_max_bps":%d,"spi_hz":%d})",
         app->version, app->idf_ver, net::hostname().c_str(), static_cast<long long>(esp_timer_get_time() / 1000000),
         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)), static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)),
         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)), s.fps_x10 / 10, s.fps_x10 % 10,
         static_cast<unsigned long>(s.fill_us_avg / 1000), static_cast<unsigned long>(s.frame_us_avg / 1000), static_cast<unsigned long>(s.frame_us_max / 1000), net::rssi(), net::ip().c_str(),
         static_cast<int>(s.source[0].size()), s.source[0].data(), static_cast<int>(s.source[1].size()), s.source[1].data(),
-        g_open ? "open" : "token", engine::render_stack_free_bytes(),
+        g_open ? "open" : "token", settings::get("rst").value_or("").c_str(), engine::render_stack_free_bytes(),
         static_cast<int>(ei.style_name.size()), ei.style_name.data(), static_cast<int>(ei.iris_name.size()), ei.iris_name.data(),
         ei.auto_idle ? "true" : "false", static_cast<int>(ei.anim.size()), ei.anim.data(), static_cast<unsigned long>(storage::free_bytes()),
         CONFIG_EYES_CLIP_MAX_BPS, CONFIG_EYES_LCD_SPI_HZ);
