@@ -57,6 +57,7 @@ int cmd_hostname(int argc, char** argv) {
     return 0;
 }
 int cmd_status(int, char**) {
+    std::printf("resets: %s\n", settings::get("rst").value_or("").c_str());
     const auto s = engine::stats();
     std::printf("host=%s ip=%s rssi=%d fps=%u.%u frame_avg=%luus src=%.*s/%.*s heap=%lu\n", hostname().c_str(), ip().c_str(),
                 rssi(), s.fps_x10 / 10, s.fps_x10 % 10, static_cast<unsigned long>(s.frame_us_avg),
