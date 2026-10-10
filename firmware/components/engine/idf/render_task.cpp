@@ -1,6 +1,8 @@
 #include "engine/idf/render_task.hpp"
 
 #include <algorithm>
+#include <cstdlib>
+#include <string>
 
 #include "clip/idf/player.hpp"
 #include "config.hpp"
@@ -22,7 +24,16 @@ QueueHandle_t g_queue = nullptr;
 Scene<clip::ClipPlayer>* g_scene = nullptr;
 portMUX_TYPE g_stats_mux = portMUX_INITIALIZER_UNLOCKED;
 Stats g_stats{};
+UBaseType_t g_stack_hwm = 0;
 std::uint64_t g_fill_us = 0;  // render task only
+
+portMUX_TYPE g_info_mux = portMUX_INITIALIZER_UNLOCKED;
+eyes::CatInfo g_info{};
+void publish_eye_info(const eyes::CatInfo& i) {
+    taskENTER_CRITICAL(&g_info_mux);
+    g_info = i;
+    taskEXIT_CRITICAL(&g_info_mux);
+}
 
 std::uint32_t now_ms() { return static_cast<std::uint32_t>(esp_timer_get_time() / 1000); }
 
@@ -49,7 +60,9 @@ std::expected<void, Err> draw(Scene<clip::ClipPlayer>& scene, Eye eye, const Fra
 
 void task(void*) {
     esp_task_wdt_add(nullptr);
-    Scene<clip::ClipPlayer> scene(esp_timer_get_time() & 0xFFFFFFFF, settings::load_style().value_or(eyes::kRealistic));
+    auto num = [](const char* k, int d) { auto v = settings::get(k); return v ? std::atoi(v->c_str()) : d; };
+    Scene<clip::ClipPlayer> scene(esp_timer_get_time() & 0xFFFFFFFF, static_cast<std::uint8_t>(num("style", 0)),
+                                  static_cast<std::uint8_t>(num("iris", 0)), num("auto", 1) != 0);
     g_scene = &scene;
     scene.clip(Eye::Left).set_slot(0);
     scene.clip(Eye::Right).set_slot(1);
@@ -66,7 +79,13 @@ void task(void*) {
         Command cmd;
         while (xQueueReceive(g_queue, &cmd, 0) == pdTRUE) scene.apply(cmd, now);
         scene.tick(now);
-        if (scene.style_save_pending()) { (void)settings::save_style(scene.style()); scene.style_saved(); }
+        if (scene.save_pending()) {  // "save": persist style, iris and random-idle
+            const auto i = scene.eye_info();
+            settings::set("style", std::to_string(i.style));
+            settings::set("iris", std::to_string(i.iris));
+            settings::set("auto", i.auto_idle ? "1" : "0");
+            scene.saved();
+        }
 
         std::uint32_t next_delay = 100;
         bool failed = false;
@@ -96,8 +115,10 @@ void task(void*) {
             g_fill_us = 0;
             taskEXIT_CRITICAL(&g_stats_mux);
             frame_n = 0; sum_us = 0; max_us = 0; window_start = nowm;
+            g_stack_hwm = uxTaskGetStackHighWaterMark(nullptr);
         }
         g_stats.source = {scene.current(Eye::Left), scene.current(Eye::Right)};
+        publish_eye_info(scene.eye_info());
         delay_ms = next_delay;
         const TickType_t before = last_wake;
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(delay_ms));
@@ -111,7 +132,7 @@ void task(void*) {
 std::expected<void, Err> start_render_task() noexcept {
     g_queue = xQueueCreate(8, sizeof(Command));
     if (!g_queue) return std::unexpected(Err::Io);
-    if (xTaskCreate(task, "render", 6144, nullptr, 8, nullptr) != pdPASS) return std::unexpected(Err::Io);
+    if (xTaskCreate(task, "render", 4096, nullptr, 8, nullptr) != pdPASS) return std::unexpected(Err::Io);
     return {};
 }
 
@@ -119,6 +140,15 @@ std::expected<void, Err> post(const Command& c, std::uint32_t timeout_ms) noexce
     if (!g_queue) return std::unexpected(Err::Busy);
     return xQueueSend(g_queue, &c, pdMS_TO_TICKS(timeout_ms)) == pdTRUE ? std::expected<void, Err>{} : std::unexpected(Err::Busy);
 }
+
+eyes::CatInfo eye_info() noexcept {
+    taskENTER_CRITICAL(&g_info_mux);
+    eyes::CatInfo i = g_info;
+    taskEXIT_CRITICAL(&g_info_mux);
+    return i;
+}
+
+unsigned render_stack_free_bytes() noexcept { return static_cast<unsigned>(g_stack_hwm) * sizeof(StackType_t); }
 
 Stats stats() noexcept {
     taskENTER_CRITICAL(&g_stats_mux);

@@ -67,6 +67,10 @@ def create_app(registry: Registry | None = None, work_dir: Path | None = None, m
                 out.append({"id": e.id, "host": e.host, "error": str(ex)})
         return out
 
+    @app.get("/api/devices/{id_}/animations")
+    def animations(id_: str):
+        return dev(id_).animations()
+
     @app.post("/api/devices/{id_}/eye")
     def eye(id_: str, body: dict):
         dev(id_).eye(**body)

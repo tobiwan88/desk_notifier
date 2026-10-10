@@ -8,7 +8,7 @@
 #include <string_view>
 
 #include "engine/core/command.hpp"
-#include "eyes/core/model.hpp"
+#include "eyes/core/cat.hpp"
 
 namespace engine {
 
@@ -29,14 +29,14 @@ struct NoClip {
 template <ClipSource Clip>
 class Scene {
 public:
-    explicit Scene(std::uint32_t seed = 1, const eyes::EyeStyle& style = eyes::kRealistic) noexcept
-        : views_{eyes::EyeView(model_, Eye::Left), eyes::EyeView(model_, Eye::Right)} {
-        model_.start(seed, style);
+    // style/iris default to realistic/amber (cat_eyes enums 0/0)
+    explicit Scene(std::uint32_t seed = 1, std::uint8_t style = 0, std::uint8_t iris = 0, bool auto_idle = true) noexcept
+        : views_{eyes::CatView(Eye::Left), eyes::CatView(Eye::Right)} {
+        model_.start(seed, style, iris, auto_idle);
     }
 
     void apply(const Command& cmd, std::uint32_t now) noexcept {
         if (const auto* e = std::get_if<EyeCmd>(&cmd)) {
-            if (e->interrupt) stop_all();
             model_.apply(*e, now);
         } else if (const auto* p = std::get_if<PlayCmd>(&cmd)) {
             for (std::size_t i = 0; i < kEyes; ++i) {
@@ -77,11 +77,11 @@ public:
     }
 
     std::string_view current(Eye e) const noexcept {
-        return active_[idx(e)] == Src::Playing ? Clip::kName : eyes::EyeView::kName;
+        return active_[idx(e)] == Src::Playing ? Clip::kName : eyes::CatView::kName;
     }
-    bool style_save_pending() const noexcept { return model_.style_dirty(); }
-    const eyes::EyeStyle& style() const noexcept { return model_.style(); }
-    void style_saved() noexcept { model_.clear_style_dirty(); }
+    bool save_pending() const noexcept { return model_.save_pending(); }
+    void saved() noexcept { model_.saved(); }
+    static eyes::CatInfo eye_info() noexcept { return eyes::CatModel::info(); }
     Clip& clip(Eye e) noexcept { return clips_[idx(e)]; }
 
 private:
@@ -93,8 +93,8 @@ private:
         }
     }
 
-    eyes::EyesModel model_;
-    std::array<eyes::EyeView, kEyes> views_;
+    eyes::CatModel model_;
+    std::array<eyes::CatView, kEyes> views_;
     std::array<Clip, kEyes> clips_{};
     std::array<Src, kEyes> active_{Src::Eyes, Src::Eyes};
     std::array<bool, kEyes> then_eyes_{true, true};

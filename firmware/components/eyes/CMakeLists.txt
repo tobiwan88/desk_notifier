@@ -1,1 +1,1 @@
-idf_component_register(SRCS "core/eyes.cpp" "core/model.cpp" INCLUDE_DIRS ".." REQUIRES gfx engine)
+idf_component_register(SRCS "core/cat.cpp" INCLUDE_DIRS ".." REQUIRES engine gfx cat_eyes)

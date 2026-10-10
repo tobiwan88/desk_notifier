@@ -13,7 +13,6 @@
 
 #include "engine/core/static.hpp"
 #include "engine/core/types.hpp"
-#include "eyes/core/style.hpp"
 #include "gfx/core/gfx.hpp"
 
 namespace engine {
@@ -34,22 +33,17 @@ concept FrameSource = requires(S s, std::uint32_t now, gfx::Rect r, std::span<gf
     { S::kName } -> std::convertible_to<std::string_view>;
 };
 
-enum class EyeSel : std::uint8_t { Both, Left, Right };
-
-struct LidCmd { std::optional<std::uint8_t> top, bottom; std::optional<std::int8_t> tilt; };
+// Play targets besides the 12 animation ids (0..11) of cat_eyes.
+inline constexpr std::uint8_t kPlayBlink = 200, kPlayRandom = 201;
 
 struct EyeCmd {
-    std::optional<eyes::Mood> mood;
-    std::optional<std::array<std::int16_t, 2>> look_q8;   // -256..256
-    std::optional<EyeSel> blink;                          // Both = blink, Left/Right = wink
-    std::optional<bool> auto_blink, auto_look;
-    std::optional<std::uint8_t> pupil;                    // 64..255
-    std::optional<LidCmd> lids;
-    std::optional<eyes::StylePatch> style;
-    bool save_style = false;
-    std::optional<std::uint8_t> brightness;               // 0..100
-    std::optional<std::uint16_t> transition_ms;
-    bool interrupt = false;
+    std::optional<std::uint8_t> style;                    // cat_style_t
+    std::optional<std::uint8_t> iris;                     // cat_iris_t
+    std::optional<std::uint8_t> play;                     // animation id | kPlayBlink | kPlayRandom
+    std::optional<bool> auto_idle;                        // random idle animations on/off
+    std::optional<std::array<std::int16_t, 2>> look_q8;   // gaze -256..256 (= -1..1)
+    std::uint16_t hold_ms = 1000;                         // gaze hold time for look
+    bool save = false;                                    // persist style + iris + auto
 };
 
 struct PlayCmd {

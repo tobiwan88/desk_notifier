@@ -7,12 +7,50 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 TOKEN = "testtoken"
 
+STYLES = ["realistic", "flat", "line", "anime", "cute", "halloween", "christmas"]
+IRISES = ["amber", "green", "blue", "copper", "violet", "odd"]
+ANIMATIONS = ["wink", "slow_blink", "roll", "side_eye", "hunt", "startle", "nictitate", "sleepy",
+              "cross_eyed", "happy", "glance", "special"]
+SPECIALS = {"anime": "sparkle", "cute": "heart_eyes", "halloween": "demon_flare", "christmas": "twinkle"}
+# play accepts the animations, the meta names "special" / "random", and the style special names.
+PLAY_NAMES = set(ANIMATIONS) | {"special", "random"} | set(SPECIALS.values())
+EYE_FIELDS = {"style", "iris", "play", "auto", "look", "save"}
+
+
+def validate_eye(body) -> str | None:
+    """Return an error message for an invalid POST /api/eye body, or None if it is valid."""
+    if not isinstance(body, dict):
+        return "body must be a JSON object"
+    unknown = set(body) - EYE_FIELDS
+    if unknown:
+        return f"unknown field(s): {', '.join(sorted(unknown))}"
+    if "style" in body and body["style"] not in STYLES:
+        return f"unknown style {body['style']!r}"
+    if "iris" in body and body["iris"] not in IRISES:
+        return f"unknown iris {body['iris']!r}"
+    if "play" in body and body["play"] not in PLAY_NAMES:
+        return f"unknown animation {body['play']!r}"
+    if "auto" in body and not isinstance(body["auto"], bool):
+        return "auto must be a boolean"
+    if "save" in body and not isinstance(body["save"], bool):
+        return "save must be a boolean"
+    if "look" in body:
+        look = body["look"]
+        if not isinstance(look, list) or len(look) not in (2, 3):
+            return "look must be [gx,gy] or [gx,gy,hold_ms]"
+        if not all(isinstance(v, (int, float)) and not isinstance(v, bool) and -1 <= v <= 1 for v in look[:2]):
+            return "look gx,gy must be numbers in -1..1"
+        if len(look) == 3 and (not isinstance(look[2], int) or isinstance(look[2], bool) or look[2] < 0):
+            return "look hold_ms must be a non-negative integer"
+    return None
+
 
 class MockDevice:
     def __init__(self):
         self.clips: dict[str, bytes] = {}
         self.eye_cmds: list[dict] = []
         self.play_cmds: list[dict] = []
+        self.eye_state = {"style": "realistic", "iris": "amber", "auto": False, "anim": None}
         self.stops = 0
         mock = self
 
@@ -45,7 +83,11 @@ class MockDevice:
                     return self._send(200, {"version": "mock", "hostname": "eyes-mock", "fps": 30.0, "uptime_s": 1,
                                             "heap_internal": 100000, "heap_min": 90000, "frame_ms_max": 20,
                                             "source": {"left": "eyes", "right": "eyes"}, "fs_free": 3000000,
-                                            "clip_max_bps": 1500000, "spi_hz": 20000000, "ip": "127.0.0.1", "rssi": -50})
+                                            "clip_max_bps": 1500000, "spi_hz": 20000000, "ip": "127.0.0.1", "rssi": -50,
+                                            "eye": dict(mock.eye_state)})
+                if self.path == "/api/animations":
+                    return self._send(200, {"styles": STYLES, "irises": IRISES, "animations": ANIMATIONS,
+                                            "specials": SPECIALS, "state": dict(mock.eye_state)})
                 if not self._auth():
                     return
                 if self.path == "/api/clips":
@@ -58,7 +100,19 @@ class MockDevice:
                     return
                 body = self._body()
                 if self.path == "/api/eye":
-                    mock.eye_cmds.append(json.loads(body))
+                    try:
+                        cmd = json.loads(body)
+                    except ValueError:
+                        return self._err(400, "E_BAD_JSON", "body is not valid JSON")
+                    problem = validate_eye(cmd)
+                    if problem:
+                        return self._err(400, "E_BAD_JSON", problem)
+                    mock.eye_cmds.append(cmd)
+                    for k in ("style", "iris", "auto"):
+                        if k in cmd:
+                            mock.eye_state[k] = cmd[k]
+                    if "play" in cmd:
+                        mock.eye_state["anim"] = cmd["play"]
                     return self._send(202, {"queued": True})
                 if self.path == "/api/play":
                     mock.play_cmds.append(json.loads(body))

@@ -46,12 +46,6 @@ extern "C" void app_main(void) {
     if (!web::start()) ESP_LOGE(kTag, "web failed");
     if (!net::start_console()) ESP_LOGE(kTag, "console failed");
     xTaskCreate(selftest, "selftest", 3072, nullptr, 3, nullptr);
-    ESP_LOGI(kTag, "up: host=%s token=%s", net::hostname().c_str(), net::token().c_str());
-    for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(10000));
-        const auto s = engine::stats();
-        ESP_LOGI(kTag, "fps=%u.%u avg=%luus max=%luus heap=%lu", s.fps_x10 / 10, s.fps_x10 % 10,
-                 static_cast<unsigned long>(s.frame_us_avg), static_cast<unsigned long>(s.frame_us_max),
-                 static_cast<unsigned long>(esp_get_free_heap_size()));
-    }
+    ESP_LOGI(kTag, "up: host=%s auth=%s", net::hostname().c_str(), net::open_access() ? "open" : net::token().c_str());
+    // app_main returns; the main task is freed (internal RAM is scarce)
 }

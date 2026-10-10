@@ -23,4 +23,7 @@ Animated eyes on two GC9A01 round displays driven by an ESP32-C61. Full spec: `e
 - Commit per slice: `<ID>: <title>`; local git only, no CI.
 
 ## Status
-S0.2 (skeleton + gate), S1.1, S1.2 done. Hardware-dependent slices (S0.1, S0.3, S2.x HIL) need the owner at the board. PSRAM config is not yet in `sdkconfig.defaults` (added in S0.3).
+Plan v2.0 (see plan doc): the procedural eye renderer was replaced by the `cat_eyes` C component (`firmware/components/cat_eyes`, additions: `cat_eyes_get_iris/get_auto/force_full`; one NaN fix in `cat_eyes_render.c`). Default style realistic. Device API: `POST /api/eye {style, iris, play, auto, look, save}`, `GET /api/animations`, embedded page at `GET /`, clips + OTA unchanged. Auth: anonymous by default (`CONFIG_EYES_OPEN_ACCESS`, console `auth open|token`).
+Board: ESP32-C61 on /dev/cu.usbmodem11101 (USB-Serial/JTAG console; `tools/console.py`, `tools/serial_log.py`), Wi-Fi via console `wifi "<ssid>" <pw>`, device at eyes-xxxxxx.local.
+Gotchas: never set ESP_INTR_FLAG_IRAM on the SPI bus (esp_lcd callback is not IRAM-safe); after changing SDKCONFIG_DEFAULTS rm -rf build; internal RAM is the scarce resource (Wi-Fi/lwIP in PSRAM, 10-line strips).
+Open: SPI clock (20 MHz default; 40 MHz showed left-eye glitches), S7.2 power cuts, S7.3 24 h soak, frame times for halloween/christmas (~70 ms, render-bound), optional date-based default style.

@@ -7,6 +7,7 @@
 #include <string_view>
 
 #include "engine/core/command.hpp"
+#include "eyes/core/cat.hpp"
 
 namespace engine {
 
@@ -19,5 +20,7 @@ struct Stats {
 [[nodiscard]] std::expected<void, Err> start_render_task() noexcept;
 [[nodiscard]] std::expected<void, Err> post(const Command&, std::uint32_t timeout_ms) noexcept;
 Stats stats() noexcept;
+unsigned render_stack_free_bytes() noexcept;  // minimum free stack of the render task seen so far
+eyes::CatInfo eye_info() noexcept;  // style / iris / auto / running animation (names are static strings)
 
 }  // namespace engine

@@ -59,6 +59,11 @@ std::string hostname() noexcept {
     return b;
 }
 
+bool open_access() noexcept {
+    if (auto o = settings::get("open")) return *o == "1";
+    return CONFIG_EYES_OPEN_ACCESS;
+}
+
 std::string token() noexcept {
     if (auto t = settings::get("token"); t && !t->empty()) return *t;
     char b[33];

@@ -17,7 +17,7 @@ import requests
 
 from eyes_client import Device, DeviceError
 
-MOODS = ["neutral", "happy", "angry", "sleepy", "scared", "curious", "asleep"]
+SMOKE_ANIMS = ["wink", "glance", "happy"]
 
 
 def soak(dev: Device, hours: float, upload: Path | None, out: Path) -> int:
@@ -25,6 +25,7 @@ def soak(dev: Device, hours: float, upload: Path | None, out: Path) -> int:
     next_status, next_upload = 0.0, time.time() + 600
     errors = lat = 0
     lats: list[float] = []
+    anims = dev.animations()["animations"]
     with out.open("w", newline="") as f:
         w = csv.writer(f)
         w.writerow(["t", "uptime_s", "heap_internal", "heap_min", "fps", "frame_ms_max", "errors"])
@@ -36,9 +37,9 @@ def soak(dev: Device, hours: float, upload: Path | None, out: Path) -> int:
                 if c < 0.5:
                     dev.eye(look=[random.uniform(-1, 1), random.uniform(-1, 1)])
                 elif c < 0.8:
-                    dev.eye(mood=random.choice(MOODS[:-1]))
+                    dev.eye(play=random.choice(anims))
                 else:
-                    dev.eye(blink=random.choice(["both", "left", "right"]))
+                    dev.eye(play="random")
                 lats.append(time.time() - s)
                 if upload and t >= next_upload:
                     dev.upload("soak", upload); dev.delete("soak"); next_upload = t + 600
@@ -62,7 +63,10 @@ def main(argv=None) -> int:
     ap.add_argument("--token", default=os.environ.get("EYES_TOKEN", ""))
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status")
-    e = sub.add_parser("eye"); e.add_argument("json", help='JSON body, e.g. \'{"mood":"happy"}\'')
+    e = sub.add_parser("eye"); e.add_argument("json", help='JSON body, e.g. \'{"play":"happy","look":[0,0.5,800]}\'')
+    an = sub.add_parser("anim"); an.add_argument("name", help="animation name, e.g. wink, glance, random, sparkle")
+    st = sub.add_parser("style"); st.add_argument("style", help="realistic|flat|line|anime|cute|halloween|christmas")
+    st.add_argument("--iris", help="amber|green|blue|copper|violet|odd"); st.add_argument("--save", action="store_true")
     p = sub.add_parser("play"); p.add_argument("clip", nargs="?"); p.add_argument("--left"); p.add_argument("--right")
     p.add_argument("--loop", action="store_true"); p.add_argument("--hold", action="store_true")
     sub.add_parser("stop")
@@ -80,6 +84,15 @@ def main(argv=None) -> int:
             print(json.dumps(dev.status(), indent=2))
         elif a.cmd == "eye":
             dev.eye(**json.loads(a.json))
+        elif a.cmd == "anim":
+            dev.eye(play=a.name)
+        elif a.cmd == "style":
+            body: dict = {"style": a.style}
+            if a.iris:
+                body["iris"] = a.iris
+            if a.save:
+                body["save"] = True
+            dev.eye(**body)
         elif a.cmd == "play":
             dev.play(a.clip, left=a.left, right=a.right, loop=a.loop, then="hold" if a.hold else "eyes")
         elif a.cmd == "stop":
@@ -99,10 +112,12 @@ def main(argv=None) -> int:
             return soak(dev, a.hours, a.upload, a.csv)
         elif a.cmd == "smoke":
             st = dev.status()
-            for m in MOODS:
-                dev.eye(mood=m, transition_ms=100); time.sleep(0.4)
-            dev.eye(mood="neutral"); dev.eye(blink="left"); dev.eye(look=[0.5, -0.5]); dev.stop()
-            print("smoke ok:", st["hostname"], st["fps"], "fps")
+            dev.eye(style="realistic")
+            for name in SMOKE_ANIMS:
+                dev.eye(play=name); time.sleep(0.4)
+            dev.eye(play="random"); dev.eye(auto=True)
+            anims = dev.animations()
+            print("smoke ok:", st["hostname"], st["fps"], "fps,", len(anims["animations"]), "animations")
     except (DeviceError, requests.RequestException) as ex:
         print(ex, file=sys.stderr)
         return 1
