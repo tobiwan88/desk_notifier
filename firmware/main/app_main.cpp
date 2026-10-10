@@ -33,6 +33,10 @@ static void selftest(void*) {
 
 extern "C" void app_main(void) {
     settings::init();
+#ifdef CONFIG_EYES_TEST_CRASH_ON_BOOT
+    vTaskDelay(pdMS_TO_TICKS(1500));
+    abort();
+#endif
     if (!storage::init()) ESP_LOGE(kTag, "storage init failed");
     if (auto r = display::init(); !r) { ESP_LOGE(kTag, "display init failed"); return; }
     if (auto r = engine::start_render_task(); !r) { ESP_LOGE(kTag, "render task failed"); return; }

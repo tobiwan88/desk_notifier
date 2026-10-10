@@ -46,6 +46,9 @@ menu "Eyes"
     config EYES_CLIP_MAX_BPS
         int "Sustained clip bytes/s the device can serve (measured by the fs benchmark)"
         default 1500000
+    config EYES_TEST_CRASH_ON_BOOT
+        bool "TEST ONLY: abort() right after start (exercises OTA rollback)"
+        default n
     config EYES_MAX_CLIP_BYTES
         int "Maximum clip size in bytes"
         default 2097152
