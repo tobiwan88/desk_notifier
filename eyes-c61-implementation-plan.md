@@ -272,7 +272,7 @@ Avoided: GPIO7/8/9 (strapping, RGB LED), 10/11 (UART0 = console), 12/13 (USB), 1
 | DC | 3 | J1-13 | both displays `DC` | `EYES_LCD_PIN_DC` |
 | RST | 2 | J1-12 | both displays `RST` | `EYES_LCD_PIN_RST` |
 | CS left | 4 | J1-3 | left display `CS` | `EYES_LCD_PIN_CS_L` |
-| CS right | 0 | J1-7 | right display `CS` | `EYES_LCD_PIN_CS_R` |
+| CS right | 7 (owner's wiring; plan had 0) | – | right display `CS` | `EYES_LCD_PIN_CS_R` — see `docs/wiring.md` |
 | **5V** | — | **J1-14** | both `VCC` (module LDO makes 3.3 V, F22) | — |
 | GND | — | J1-15 | both `GND` | — |
 | reserved | 1 | J1-8 | only for the optional backlight MOSFET mod | `EYES_LCD_PIN_BL` (default −1) |
@@ -289,7 +289,7 @@ DevKitC-1 J1                  Left module (7-pin)     Right module (7-pin)
  GPIO3 (13) DC ──────────┼──  5 DC              ├──  5 DC
  GPIO2 (12) RST ─────────┴──  7 RST             └──  7 RST
  GPIO4 (3)  CS_L ───────────  6 CS
- GPIO0 (7)  CS_R ─────────────────────────────────── 6 CS
+ GPIO7      CS_R ─────────────────────────────────── 6 CS   (see docs/wiring.md)
 ```
 
 Wiring notes: keep shared SCL/SDA wires short (< 10 cm per branch), daisy-chain rather than long star. The modules’ 1 kΩ series resistors (F22) already damp ringing, but also slow the edges — hence the 20 MHz default and the optional SCL/SDA bridge mod (§1.5). GPIO0/1 are the 32 kHz crystal pins; the DevKitC-1 has no such crystal, so they are free.

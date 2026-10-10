@@ -17,7 +17,8 @@ inline constexpr int kSpiHz = CONFIG_EYES_LCD_SPI_HZ;
 inline constexpr std::size_t kStripLines = CONFIG_EYES_STRIP_LINES;
 inline constexpr std::size_t kStripCount = CONFIG_EYES_STRIP_COUNT;
 
-consteval bool reserved(int p) { return p >= 7 && p <= 14; }  // strapping, UART0, USB, PSRAM CS
+// strapping, UART0, USB, PSRAM CS. GPIO7 is allowed on purpose: the right display's CS is wired there and idles high.
+consteval bool reserved(int p) { return p >= 8 && p <= 14; }
 consteval bool all_distinct(const std::array<int, 7>& a) {
     for (std::size_t i = 0; i < a.size(); ++i)
         for (std::size_t j = i + 1; j < a.size(); ++j)

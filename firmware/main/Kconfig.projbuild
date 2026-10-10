@@ -16,8 +16,8 @@ menu "Eyes"
             int "Left display CS GPIO"
             default 4
         config EYES_LCD_PIN_CS_R
-            int "Right display CS GPIO"
-            default 0
+            int "Right display CS GPIO (wired to GPIO7 on the owner's board)"
+            default 7
         config EYES_LCD_PIN_BL
             int "Backlight PWM GPIO (-1 = none, needs MOSFET mod)"
             default -1
