@@ -84,7 +84,7 @@ def test_pool_proxy(tmp_path):
         c = client(tmp_path, m)
         m.clips["fire"] = b"EYCL" + b"\0" * 8
         p = c.get("/api/devices/eyes-mock/pool").json()
-        assert len(p["items"]) == 13 and p["interval"] == [2.5, 7.0] and p["auto"] is True
+        assert len(p["items"]) == 32 and p["interval"] == [2.5, 7.0] and p["auto"] is True
         assert [i["name"] for i in p["items"] if i["kind"] == "clip"] == ["fire"]
         r = c.post("/api/devices/eyes-mock/pool", json={"enabled": ["wink", "fire"], "interval": [1, 4]})
         assert r.status_code == 200
