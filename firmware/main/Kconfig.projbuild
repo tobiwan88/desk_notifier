@@ -1,0 +1,43 @@
+menu "Eyes"
+    menu "Display pins (shared SPI bus, two GC9A01)"
+        config EYES_LCD_PIN_SCLK
+            int "SCLK GPIO"
+            default 6
+        config EYES_LCD_PIN_MOSI
+            int "MOSI GPIO"
+            default 5
+        config EYES_LCD_PIN_DC
+            int "DC GPIO"
+            default 3
+        config EYES_LCD_PIN_RST
+            int "RST GPIO"
+            default 2
+        config EYES_LCD_PIN_CS_L
+            int "Left display CS GPIO"
+            default 4
+        config EYES_LCD_PIN_CS_R
+            int "Right display CS GPIO"
+            default 0
+        config EYES_LCD_PIN_BL
+            int "Backlight PWM GPIO (-1 = none, needs MOSFET mod)"
+            default -1
+    endmenu
+    config EYES_LCD_SPI_HZ
+        int "SPI clock (Hz), max 40 MHz"
+        default 20000000
+    config EYES_STRIP_LINES
+        int "Lines per DMA strip"
+        default 20
+    config EYES_STRIP_COUNT
+        int "Number of DMA strip buffers"
+        default 3
+    config EYES_WIFI_SSID
+        string "Wi-Fi SSID (overridable via UART console)"
+        default ""
+    config EYES_WIFI_PASSWORD
+        string "Wi-Fi password"
+        default ""
+    config EYES_MAX_CLIP_BYTES
+        int "Maximum clip size in bytes"
+        default 2097152
+endmenu

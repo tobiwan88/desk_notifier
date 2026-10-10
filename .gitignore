@@ -18,3 +18,4 @@ dependencies.lock
 # Editors / OS
 .idea/
 .DS_Store
+firmware/sdkconfig

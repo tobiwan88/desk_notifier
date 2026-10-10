@@ -1,0 +1,5 @@
+dependencies:
+  espressif/esp_lcd_gc9a01: "^2.0.4"
+  joltwallet/littlefs: "^1.22.3"
+  espressif/mdns: "^1.14.0"
+  espressif/cjson: "*"
