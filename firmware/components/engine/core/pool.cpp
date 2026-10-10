@@ -10,7 +10,10 @@
 namespace engine {
 namespace {
 // relative frequency of each built-in animation (same as the cat_eyes idle scheduler, x10) and of a clip
-constexpr int kAnimWeight[12] = {20, 20, 15, 15, 12, 6, 10, 8, 6, 15, 30, 14};
+constexpr int kAnimWeight[kAnimSlots] = {20, 20, 15, 15, 12, 6, 10, 8, 6, 15, 30,
+                                         8, 7, 6, 6, 5, 5, 5, 5, 6, 5, 6, 5, 6, 5, 5, 5, 5, 5, 5,  // effects
+                                         14};
+static_assert(eyes::kAnimNames.size() == kAnimSlots, "pool weights must match the animation list");
 constexpr int kClipWeight = 20;
 
 std::uint32_t next(std::uint32_t& s) {
@@ -34,14 +37,14 @@ bool operator==(const Pool& a, const Pool& b) noexcept {
 Pick pick(const Pool& p, std::uint32_t& rng, int last, bool has_special) noexcept {
     int total = 0;
     auto usable = [&](int key, int w) { return key != last && w > 0 ? w : 0; };
-    for (int i = 0; i < 12; ++i)
-        if ((p.anim_mask >> i) & 1 && (i != 11 || has_special)) total += usable(i, kAnimWeight[i]);
+    for (int i = 0; i < kAnimSlots; ++i)
+        if ((p.anim_mask >> i) & 1 && (i != kSpecialAnim || has_special)) total += usable(i, kAnimWeight[i]);
     for (std::size_t c = 0; c < p.clips.size(); ++c) total += usable(64 + static_cast<int>(c), kClipWeight);
     if (total == 0 && last >= 0) return pick(p, rng, -1, has_special);  // only one item enabled: repeat it
     if (total == 0) return {};
     int r = static_cast<int>(next(rng) % static_cast<std::uint32_t>(total));
-    for (int i = 0; i < 12; ++i) {
-        if (!((p.anim_mask >> i) & 1) || (i == 11 && !has_special)) continue;
+    for (int i = 0; i < kAnimSlots; ++i) {
+        if (!((p.anim_mask >> i) & 1) || (i == kSpecialAnim && !has_special)) continue;
         r -= usable(i, kAnimWeight[i]);
         if (r < 0 && usable(i, kAnimWeight[i])) return {Pick::Kind::Anim, i};
     }
@@ -70,7 +73,7 @@ std::expected<PoolPatch, ParseError> parse_pool(std::string_view json) noexcept 
         for (const cJSON* it = en->child; it; it = it->next) {
             if (!cJSON_IsString(it)) return E(Err::BadJson, "enabled must be a list of names");
             const std::string_view n = it->valuestring;
-            if (const int a = anim_id(n); a >= 0) { out.anim_mask |= static_cast<std::uint16_t>(1u << a); continue; }
+            if (const int a = anim_id(n); a >= 0) { out.anim_mask |= static_cast<std::uint32_t>(1u << a); continue; }
             if (!clip_name_valid(n)) return E(Err::BadName, "invalid item name");
             bool dup = false;
             for (const auto& c : out.clips) dup |= (c.view() == n);
@@ -99,7 +102,7 @@ void apply(Pool& p, const PoolPatch& d) noexcept {
 std::string pool_to_json(const Pool& p) {
     std::string s = "{\"enabled\":[";
     bool first = true;
-    for (int i = 0; i < 12; ++i) {
+    for (int i = 0; i < kAnimSlots; ++i) {
         if (!((p.anim_mask >> i) & 1)) continue;
         if (!first) s += ',';
         first = false;

@@ -13,10 +13,12 @@
 namespace engine {
 
 inline constexpr std::size_t kMaxPoolClips = 12;
-inline constexpr std::uint16_t kAllAnims = 0x0FFF;  // bits 0..11 = cat_eyes animation ids
+inline constexpr int kAnimSlots = 31;                      // cat_eyes animations (enum order); the last one is "special"
+inline constexpr int kSpecialAnim = kAnimSlots - 1;
+inline constexpr std::uint32_t kAllAnims = (1u << kAnimSlots) - 1;  // bit i = cat_eyes animation id i
 
 struct Pool {
-    std::uint16_t anim_mask = kAllAnims;
+    std::uint32_t anim_mask = kAllAnims;
     StaticVec<StaticString<31>, kMaxPoolClips> clips;  // enabled clip names
     std::uint16_t min_ds = 25, max_ds = 70;             // pause between random picks, in 0.1 s
     friend bool operator==(const Pool&, const Pool&) noexcept;
@@ -35,7 +37,7 @@ struct Pick {
 // Request body of POST /api/pool: {"enabled":[names...],"interval":[min_s,max_s]}, both optional.
 struct PoolPatch {
     bool has_enabled = false, has_interval = false;
-    std::uint16_t anim_mask = 0;
+    std::uint32_t anim_mask = 0;
     StaticVec<StaticString<31>, kMaxPoolClips> clips;  // names that are not built-in animations (the caller checks they exist)
     std::uint16_t min_ds = 25, max_ds = 70;
 };
