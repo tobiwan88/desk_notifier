@@ -49,7 +49,6 @@ std::expected<void, engine::Err> init() noexcept {
     bus.quadwp_io_num = -1;
     bus.quadhd_io_num = -1;
     bus.max_transfer_sz = static_cast<int>(kStripBytes);
-    bus.intr_flags = ESP_INTR_FLAG_IRAM;
     if (spi_bus_initialize(kHost, &bus, SPI_DMA_CH_AUTO) != ESP_OK) return std::unexpected(engine::Err::Io);
 
     const std::array<int, engine::kEyes> cs = {cfg::kLcdPins[4], cfg::kLcdPins[5]};

@@ -8,6 +8,7 @@
 #include "esp_log.h"
 #include "esp_task_wdt.h"
 #include "esp_timer.h"
+#include "settings/idf/settings.hpp"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
@@ -43,7 +44,7 @@ std::expected<void, Err> draw(Scene<NoClip>& scene, Eye eye, const FramePlan& pl
 
 void task(void*) {
     esp_task_wdt_add(nullptr);
-    Scene<NoClip> scene(esp_timer_get_time() & 0xFFFFFFFF);
+    Scene<NoClip> scene(esp_timer_get_time() & 0xFFFFFFFF, settings::load_style().value_or(eyes::kRealistic));
     g_scene = &scene;
     std::uint32_t frame_n = 0;
     std::uint64_t sum_us = 0;
@@ -58,6 +59,7 @@ void task(void*) {
         Command cmd;
         while (xQueueReceive(g_queue, &cmd, 0) == pdTRUE) scene.apply(cmd, now);
         scene.tick(now);
+        if (scene.style_save_pending()) { (void)settings::save_style(scene.style()); scene.style_saved(); }
 
         std::uint32_t next_delay = 100;
         bool failed = false;
