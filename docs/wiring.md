@@ -21,7 +21,7 @@ Module header order: `1 VCC · 2 GND · 3 SCL · 4 SDA · 5 DC · 6 CS · 7 RST`
 - "Left" and "right" are the viewer's left and right (logical eye 0 / eye 1).
 - Shared lines (SCL, SDA, DC, RST, VCC, GND) go to both displays; only the two CS wires are separate.
 - Power the modules from the 5V pin: each module has its own 3.3 V regulator for the panel and backlight.
-- The modules have no backlight pin (always on), 1 kΩ series resistors on SCL/SDA/DC/CS/RST, so the SPI clock is 20 MHz by default.
+- The modules have no backlight pin (always on), 1 kΩ series resistors on SCL/SDA/DC/CS/RST, so 20 MHz is the safe SPI clock; 40 MHz (the current default) works with short, good wires. If you see noise, set `CONFIG_EYES_LCD_SPI_HZ` to 20000000.
 - GPIO7 is a boot-strapping pin. As the right CS it works (idles high after boot); if boot ever misbehaves with the display attached, move that wire to GPIO0 or GPIO22 and set `CONFIG_EYES_LCD_PIN_CS_R`.
 - The earlier plan used GPIO0 for the right CS. A mismatch between code and wire (right CS on GPIO7 but code on GPIO0) made the right display receive both displays' data (symptom: L and R alternating on the right display with the `lcd test` pattern).
 

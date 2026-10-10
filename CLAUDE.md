@@ -22,7 +22,7 @@ See `docs/wiring.md` (pin table, all GPIOs, `lcd` diagnostics). Current: SCL=6, 
 - Layout: `firmware/components/<name>/{core,idf}`. `core/` is pure C++ with no `esp_*`/`freertos/` includes (check.sh enforces it) and is tested on the host; include as `"gfx/core/gfx.hpp"` (components dir is on the include path).
 - C++: no exceptions/RTTI/iostream/`std::function`, `std::expected` for errors, `constexpr` tables, `static_assert` as tests, no heap in render paths. Tests: `firmware/test/host/test_*.cpp` (doctest vendored).
 - Pixels are RGB565 big-endian (`gfx::Rgb565be`). Circle mask: r²=14470 (calibrated to 48 880 px for 20-line strips).
-- Pins/clock come from Kconfig via `firmware/main/config.hpp` (defaults: plan §1.6; SPI 20 MHz).
+- Pins/clock come from Kconfig via `firmware/main/config.hpp` (SPI 40 MHz since the wiring was fixed; use 20 MHz for long wires).
 - Commit per slice: `<ID>: <title>`; local git only, no CI.
 
 ## Status
@@ -31,4 +31,5 @@ Board: ESP32-C61 on /dev/cu.usbmodem11101 (USB-Serial/JTAG console; `tools/conso
 Boards: #1 MAC d8:85:ac:60:0e:d0 `eyes-600ed0` (192.168.178.86); #2 MAC d8:85:ac:60:10:80 `eyes-601080` (192.168.178.87). Both run the same firmware, open access, same Wi-Fi. Check the MAC with `python -m esptool --port <port> chip-id` before flashing when two boards are attached. After re-cabling the displays, restart the board (or `lcd init`) so the panels are re-initialised.
 Gotchas: never set ESP_INTR_FLAG_IRAM on the SPI bus (esp_lcd callback is not IRAM-safe); after changing SDKCONFIG_DEFAULTS rm -rf build; internal RAM is the scarce resource (Wi-Fi/lwIP in PSRAM, 10-line strips).
 Panel bring-up: shared RST pulse + SWRESET on both + 120 ms reset-cancel waits (left panel used to get its init inside the reset window). Display diagnostics: console `lcd swap [on|off]` (left content on the CS_R panel), `lcd init [spi_hz]` (re-init, other clock), `lcd test [s]` (row-address pattern on both panels).
-Open: left-eye "up and down" glitch (v2.0, realistic) to be confirmed on hardware with the new init and `lcd` experiments; SPI clock (20 MHz default; 40 MHz showed left-eye glitches), S7.2 power cuts, S7.3 24 h soak, frame times for halloween/christmas (~70 ms, render-bound), optional date-based default style.
+Random pool: `engine::Pool` (anim mask + clip names + pause) is chosen via `GET/POST /api/pool`, stored in NVS key `pool`, and used by `Scene` for random mode (cat_eyes' own random pick is off; saccades and blinks still run). In progress: in-browser GIF-to-clip encoder (`web/ui/clip_encoder.js`).
+Open: S7.2 power cuts, S7.3 24 h soak, frame times for halloween/christmas (~70 ms, render-bound), optional date-based default style.
