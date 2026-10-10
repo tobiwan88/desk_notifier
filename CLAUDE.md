@@ -9,6 +9,9 @@ Animated eyes on two GC9A01 round displays driven by an ESP32-C61. Full spec: `e
 - Target: `esp32c61`, 8 MB flash. Host compiler: Apple clang 21 (C++23, `std::expected` OK).
 - Note: this machine's `ls` is aliased to something that rejects paths; use `command ls`.
 
+## Wiring
+See `docs/wiring.md` (pin table, all GPIOs, `lcd` diagnostics). Current: SCL=6, SDA=5, DC=3, RST=2, CS left=4, **CS right=7**, VCC=5V.
+
 ## Commands
 - `scripts/check.sh` — the single gate: core-include check, host doctest (ASan/UBSan, C++23, `-Werror`), pytest for `clipprep/` and `studio/`, then `idf.py build`.
 - `scripts/check.sh --quick` — skips the IDF build.
