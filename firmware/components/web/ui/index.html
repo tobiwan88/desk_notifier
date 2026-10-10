@@ -6,8 +6,7 @@
 <title>Cat Eyes</title>
 <style>
 :root{--bg:#f6f5f2;--fg:#1d1d1f;--muted:#6b6b70;--card:#fff;--line:#d9d7d2;--accent:#c46a1a;--err:#c0392b;--btn:#ecebe7}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121214;--fg:#eceae6;--muted:#8e8e96;--card:#1c1c20;--line:#33333a;--accent:#f0a050;--err:#ff6b5e;--btn:#26262c}}
-:root[data-theme="dark"]{--bg:#121214;--fg:#eceae6;--muted:#8e8e96;--card:#1c1c20;--line:#33333a;--accent:#f0a050;--err:#ff6b5e;--btn:#26262c}
+@media (prefers-color-scheme: dark){:root{--bg:#121214;--fg:#eceae6;--muted:#8e8e96;--card:#1c1c20;--line:#33333a;--accent:#f0a050;--err:#ff6b5e;--btn:#26262c}}
 *{box-sizing:border-box}
 [hidden],.hidden{display:none!important}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,-apple-system,sans-serif}
@@ -15,7 +14,7 @@ main{max-width:520px;margin:0 auto;padding:16px}
 h1{font-size:1.4rem;margin:8px 0 12px}
 section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
 label{display:block;font-size:.85rem;color:var(--muted);margin:8px 0 4px}
-input[type=password],select{width:100%;font:inherit;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+select{width:100%;font:inherit;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
 .row{display:flex;gap:8px;align-items:flex-end}
 .row>*{flex:1;min-width:0}
 button{font:inherit;padding:10px 6px;border-radius:8px;border:1px solid var(--line);background:var(--btn);color:var(--fg);cursor:pointer;touch-action:manipulation}
@@ -35,20 +34,11 @@ button:active{border-color:var(--accent)}
 <main>
 <h1>Cat Eyes</h1>
 
-<section id="tokenbox" class="hidden">
-  <label for="token">Access token</label>
-  <div class="row">
-    <input id="token" type="password" autocomplete="off">
-    <button id="saveTok">Save</button>
-  </div>
-</section>
-
 <section>
   <div class="row">
     <div><label for="style">Style</label><select id="style"></select></div>
     <div><label for="iris">Iris</label><select id="iris"></select></div>
   </div>
-  <label class="check"><input type="checkbox" id="save"> Save as default</label>
   <label class="check"><input type="checkbox" id="auto"> Random idle animations</label>
 </section>
 
@@ -71,47 +61,37 @@ button:active{border-color:var(--accent)}
 
 <script>
 (function () {
-  var KEY = 'catEyesToken';
   var $ = function (id) { return document.getElementById(id); };
   var ui = {
-    style: $('style'), iris: $('iris'), save: $('save'), auto: $('auto'),
+    style: $('style'), iris: $('iris'), auto: $('auto'),
     anims: $('anims'), pad: $('pad'), dot: $('dot'), status: $('status'),
-    err: $('err'), tokenbox: $('tokenbox'), token: $('token'), special: null
+    err: $('err'), special: null
   };
-  var token = '', meta = null;
+  var meta = null;
   var last = 0, timer = 0, pending = null, dragging = false;
 
-  try { token = localStorage.getItem(KEY) || ''; } catch (e) {}
-  ui.token.value = token;
 
   function setErr(m) { ui.err.textContent = m || ''; }
-  function showToken() { ui.tokenbox.classList.remove('hidden'); ui.token.focus(); }
   function label(s) { return s.replace(/_/g, ' '); }
-
-  $('saveTok').onclick = function () {
-    token = ui.token.value.trim();
-    try { localStorage.setItem(KEY, token); } catch (e) {}
-    ui.tokenbox.classList.add('hidden');
-    setErr('');
-  };
 
   function send(body) {
     var r;
     return fetch('/api/eye', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     }).then(function (res) {
       r = res;
       return res.json().catch(function () { return {}; });
     }).then(function (j) {
-      if (r.status === 401) { showToken(); setErr('Unauthorized: enter access token'); return; }
+      if (r.status === 401) { setErr('Device requires a token: run `auth open` on its console'); return; }
       if (!r.ok) { setErr((j.error && j.error.message) || ('Error ' + r.status)); return; }
       setErr('');
     }, function () { setErr('Network error'); });
   }
 
-  function withSave(o) { if (ui.save.checked) o.save = true; return o; }
+  // style, iris and idle choices are remembered by the device
+  function withSave(o) { o.save = true; return o; }
 
   function fill(sel, list) {
     sel.innerHTML = '';
@@ -163,7 +143,7 @@ button:active{border-color:var(--accent)}
 
   ui.style.onchange = function () { updateSpecial(); send(withSave({ style: ui.style.value })); };
   ui.iris.onchange = function () { send(withSave({ iris: ui.iris.value })); };
-  ui.auto.onchange = function () { send({ auto: ui.auto.checked }); };
+  ui.auto.onchange = function () { send(withSave({ auto: ui.auto.checked })); };
 
   // Look pad
   function padPos(e) {
@@ -197,7 +177,6 @@ button:active{border-color:var(--accent)}
   ui.pad.onpointerup = ui.pad.onpointercancel = function () { dragging = false; };
 
   // Init
-  if (!token) showToken();
   fetch('/api/animations').then(function (r) { return r.json(); }).then(function (j) {
     meta = j;
     fill(ui.style, j.styles);
