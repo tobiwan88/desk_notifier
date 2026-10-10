@@ -19,3 +19,12 @@ dependencies.lock
 .idea/
 .DS_Store
 firmware/sdkconfig
+
+# Secrets and local data (keep Wi-Fi names, passwords and tokens out of git)
+.env
+.env.*
+*.pem
+*.key
+sdkconfig.local
+soak*.csv
+*.rgb
