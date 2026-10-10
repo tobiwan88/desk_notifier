@@ -15,8 +15,12 @@ namespace eyes {
 // Catalogue, in the enum order of cat_eyes.h (checked against the component's name helpers in tests).
 inline constexpr std::array<std::string_view, 7> kStyleNames = {"realistic", "flat", "line", "anime", "cute", "halloween", "christmas"};
 inline constexpr std::array<std::string_view, 6> kIrisNames = {"amber", "green", "blue", "copper", "violet", "odd"};
-inline constexpr std::array<std::string_view, 12> kAnimNames = {"wink", "slow_blink", "roll", "side_eye", "hunt", "startle",
-                                                               "nictitate", "sleepy", "cross_eyed", "happy", "glance", "special"};
+inline constexpr std::array<std::string_view, 31> kAnimNames = {
+    "wink", "slow_blink", "roll", "side_eye", "hunt", "startle", "nictitate", "sleepy", "cross_eyed", "happy", "glance",
+    // effects (cat_eyes_fx.c)
+    "food", "fly", "paper_plane", "bubble", "spiral", "slots", "euro", "fish", "rain", "snow",
+    "leaf", "day_night", "paw", "spider", "loading", "pacman", "matrix", "disco", "pumpkin",
+    "special"};
 // special animation name per style ("" = none)
 inline constexpr std::array<std::string_view, 7> kSpecialNames = {"", "", "", "sparkle", "heart_eyes", "demon_flare", "twinkle"};
 

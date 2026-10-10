@@ -10,11 +10,14 @@
 #define CE_MAX_KEYS 14
 #define CE_MAX_TRACKS 8
 #define CE_MAX_SHAPES 48
+#define CE_MAX_FX 40       /* shapes in the effects layer (drawn last, above everything) */
 #define CE_MAX_HL 5
 #define CE_SNOW 24
 #define CE_BATS 3
 
 #define RGB565(r, g, b) ((uint16_t)((((r) & 0xF8) << 8) | (((g) & 0xFC) << 3) | ((b) >> 3)))
+/* raw 5/6/5-bit channel values; used for the per-eye tint (see ce_frame_t.tint_*) */
+#define T565(r5, g6, b5) ((uint16_t)(((r5) << 11) | ((g6) << 5) | (b5)))
 
 enum { P_GX, P_GY, P_UPPER, P_LOWER, P_PUPIL, P_TILT, P_NICT, P_FX, P_SMILE, P_COUNT };
 
@@ -57,12 +60,16 @@ typedef struct { uint8_t n; ce_track_t tr[CE_MAX_TRACKS]; } ce_tracks_t;
 typedef struct { cat_anim_t id; uint16_t dur; bool jitter; ce_tracks_t eye[2]; } ce_anim_t;
 
 /* ---- per-eye frame description built by tick, consumed by render ---- */
-typedef enum { SH_CIRCLE, SH_ELLIPSE, SH_CAPSULE, SH_TRI } ce_shape_kind_t;
+/* SH_RECT: x0,y0..x1,y1 inclusive.  SH_RING: centre x0,y0, outer r, inner r2.
+ * SH_GLYPH: top-left x0,y0, pixel scale r, glyph index r2 (5x7 font).
+ * clip != 0: rows outside [x2, y2] are not drawn (all kinds except SH_TRI).  */
+typedef enum { SH_CIRCLE, SH_ELLIPSE, SH_CAPSULE, SH_TRI, SH_RECT, SH_RING, SH_GLYPH } ce_shape_kind_t;
 typedef struct {
-    uint8_t kind; uint16_t color;
+    uint8_t kind, clip; uint16_t color;
     int16_t x0, y0, x1, y1, x2, y2, r, r2;
     int16_t bx0, by0, bx1, by1;
 } ce_shape_t;
+enum { CE_L_UNDER = 0, CE_L_OVER = 1, CE_L_FX = 2 };
 
 typedef struct {
     uint8_t kind;         /* 0 ellipse/circle, 1 star mask */
@@ -101,9 +108,18 @@ typedef struct {
     /* shapes drawn behind / above the eye */
     uint8_t n_under, n_over;
     ce_shape_t under[CE_MAX_SHAPES], over[CE_MAX_SHAPES];
+    /* effects layer (cat_eyes_fx.c): shapes above everything, plus an optional
+     * whole-eye tint  out = ((c >> shift) & mask) + add  (shift 1 or 2, 0 = off).
+     * add must not overflow: per channel <= max - (max >> shift).             */
+    uint8_t n_fx; ce_shape_t fx[CE_MAX_FX];
+    uint8_t tint_shift; uint16_t tint_add;
+    int16_t fx_lo, fx_hi;
     /* dirty rows */
     int16_t y_lo, y_hi;
 } ce_frame_t;
+
+/* per-run randomisation of the effect animations */
+typedef struct { int dir; int var; uint32_t seed; } ce_fxs_t;
 
 typedef struct {
     bool inited, auto_idle, swap;
@@ -122,6 +138,9 @@ typedef struct {
     int16_t prev_lo[2], prev_hi[2];
     uint32_t prev_hash[2];
     bool force_full[2];
+    bool prev_fx[2], prev_tint[2];
+    int16_t prev_fx_lo[2], prev_fx_hi[2];
+    ce_fxs_t fxs;
 } ce_state_t;
 
 extern ce_state_t g_ce;
@@ -140,3 +159,27 @@ float ce_track_eval(const ce_track_t *t, uint32_t ms);
 /* render */
 void ce_render_init(void);
 void ce_build_frame(int eye, const float *params, uint32_t now);
+
+/* shape primitives (layer = CE_L_UNDER / CE_L_OVER / CE_L_FX); degenerate sizes are ignored */
+void ce_sh_circle(ce_frame_t *f, int layer, int x, int y, int r, uint16_t c);
+void ce_sh_ellipse(ce_frame_t *f, int layer, int x, int y, int rx, int ry, uint16_t c);
+void ce_sh_capsule(ce_frame_t *f, int layer, int x0, int y0, int x1, int y1, int r, uint16_t c);
+void ce_sh_tri(ce_frame_t *f, int layer, int x0, int y0, int x1, int y1, int x2, int y2, uint16_t c);
+void ce_sh_rect(ce_frame_t *f, int layer, int x0, int y0, int x1, int y1, uint16_t c);
+void ce_sh_ring(ce_frame_t *f, int layer, int x, int y, int r_out, int r_in, uint16_t c);
+void ce_sh_glyph(ce_frame_t *f, int layer, int x, int y, int scale, int glyph, uint16_t c);
+/* clip the shapes [first, n) of a layer to rows y0..y1 (not for triangles) */
+void ce_sh_clip(ce_frame_t *f, int layer, int first, int y0, int y1);
+
+/* 5x7 font: digits 0-9, '%', euro sign, 8 pseudo-katakana (matrix rain) */
+#define CE_GLYPH_PCT 10
+#define CE_GLYPH_EURO 11
+#define CE_GLYPH_KANA0 12
+#define CE_GLYPH_COUNT 20
+extern const uint8_t g_ce_font[CE_GLYPH_COUNT][7];
+
+/* effects (cat_eyes_fx.c) */
+uint16_t ce_fx_duration(cat_anim_t id);
+void ce_fx_begin(cat_anim_t id);                                   /* randomise a new run   */
+void ce_fx_params(cat_anim_t id, int eye, float t_ms, float *p);   /* gaze / lids / pupil   */
+void ce_fx_draw(cat_anim_t id, int eye, float t_ms, ce_frame_t *f);/* shapes + tint         */

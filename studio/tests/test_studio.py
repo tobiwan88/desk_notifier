@@ -59,7 +59,7 @@ def test_animations_proxy(tmp_path):
         c = client(tmp_path, m)
         a = c.get("/api/devices/eyes-mock/animations").json()
         assert a["styles"][0] == "realistic" and "amber" in a["irises"]
-        assert len(a["animations"]) == 12 and a["specials"]["cute"] == "heart_eyes"
+        assert len(a["animations"]) == 31 and a["specials"]["cute"] == "heart_eyes"
         assert a["state"]["style"] == "realistic"
         assert c.get("/api/devices/nope/animations").status_code == 404
 

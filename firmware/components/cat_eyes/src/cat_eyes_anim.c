@@ -142,7 +142,9 @@ void ce_anim_build(cat_anim_t id, ce_anim_t *a)
         if (s == CAT_STYLE_ANIME) K(e0, P_GY, 0, 0, 250, -.3f, 1600, -.3f, 2000, 0);
         a->dur = 2100; break;
     }
-    default: a->dur = 1; break;
+    default:
+        a->dur = (id >= CAT_ANIM_FX_FIRST && id <= CAT_ANIM_FX_LAST) ? ce_fx_duration(id) : 1;
+        break;
     }
     if (copy) a->eye[1] = a->eye[0];
 }

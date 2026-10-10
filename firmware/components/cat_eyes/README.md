@@ -30,7 +30,7 @@ for (;;) {
 |---|---|
 | `cat_eyes_set_style(CAT_STYLE_HALLOWEEN)` | realistic, flat, line art, anime, cute, halloween, christmas |
 | `cat_eyes_set_iris(CAT_IRIS_ODD)` | amber, green, blue, copper, violet, odd-eyed (themed styles ignore it) |
-| `cat_eyes_play(CAT_ANIM_WINK)` | wink, slow_blink, roll, side_eye, hunt, startle, nictitate, sleepy, cross_eyed, happy, glance, special |
+| `cat_eyes_play(CAT_ANIM_WINK)` | wink, slow_blink, roll, side_eye, hunt, startle, nictitate, sleepy, cross_eyed, happy, glance, **effects** (food, fly, paper_plane, bubble, spiral, slots, euro, fish, rain, snow, leaf, day_night, paw, spider, loading, pacman, matrix, disco, pumpkin), special |
 | `cat_eyes_blink()` / `cat_eyes_look(gx, gy, ms)` | manual blink / hold gaze |
 | `cat_eyes_set_auto(false)` | stop random idle (API-driven only) |
 | `cat_eyes_*_from_name("...")` | string → enum for your JSON API |
@@ -42,6 +42,18 @@ Add an enum value in `cat_eyes.h` and a row in `src/cat_eyes_styles.c` (lid shap
 
 ## Add your own animation
 Add an enum value + name in `src/cat_eyes.c` (`k_anim_names`, `k_weights`) and a `case` in `src/cat_eyes_anim.c` using `K(eye, PARAM, t0, v0, t1, v1, ...)` keyframes. Params: GX, GY (gaze −1..1), UPPER, LOWER (lid 0 open..1 closed), PUPIL (0 slit..1 round), TILT, NICT (third eyelid), FX (style special), SMILE.
+
+## Effects (`src/cat_eyes_fx.c`)
+Effects are animations that draw shapes above the eye instead of (only) moving the lids and the iris. Each is one function
+`fx_xxx(eye, t_ms, p, f)` that is called twice per eye and frame: with `p` to change gaze, lids and pupil, then with `f` to add
+shapes (`ce_sh_circle / ellipse / capsule / tri / rect / ring / glyph`, layer `CE_L_FX`, at most `CE_MAX_FX` = 40 per eye) and an
+optional whole-eye tint (`f->tint_shift`, `f->tint_add`). Both displays share one "world" x axis (eye 0 = 0..240, a 56 px gap,
+eye 1 = 296..536), so a sprite can fly from one eye to the other.
+The component works out the rows to push from the shape bounds, so nothing else needs to know about effects.
+
+To add one: add an enum value between `CAT_ANIM_GLANCE` and `CAT_ANIM_SPECIAL` in `cat_eyes.h` (keep `SPECIAL` last, update
+`CAT_ANIM_FX_FIRST/LAST`), a name and a weight in `src/cat_eyes.c`, a function plus its duration in `cat_eyes_fx.c`, and the name in
+`firmware/components/eyes/core/cat.hpp` and `tools/mock_device.py`. A host test checks that the name tables match the component.
 
 ## PC preview (no hardware)
 ```
