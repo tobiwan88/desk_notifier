@@ -1,5 +1,7 @@
 # ESP Eyes
 
+![Two round displays show animated cat eyes on a painted cat](docs/media/demo.gif)
+
 Two round screens show animated cat eyes. An ESP32-C61 board controls them. You change the eyes from a web page, from a script, or from the command line. The eyes also move by themselves.
 
 ## What you need
