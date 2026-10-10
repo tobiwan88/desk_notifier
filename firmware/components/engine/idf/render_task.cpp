@@ -22,6 +22,7 @@ QueueHandle_t g_queue = nullptr;
 Scene<clip::ClipPlayer>* g_scene = nullptr;
 portMUX_TYPE g_stats_mux = portMUX_INITIALIZER_UNLOCKED;
 Stats g_stats{};
+std::uint64_t g_fill_us = 0;  // render task only
 
 std::uint32_t now_ms() { return static_cast<std::uint32_t>(esp_timer_get_time() / 1000); }
 
@@ -33,7 +34,10 @@ std::expected<void, Err> draw(Scene<clip::ClipPlayer>& scene, Eye eye, const Fra
         for (const gfx::Rect s : gfx::Strips(r, static_cast<int>(cfg::kStripLines), plan.trim)) {
             auto buf = display::acquire(100);
             if (!buf) return std::unexpected(buf.error());
-            if (auto f = scene.fill(eye, s, buf->px.first(static_cast<std::size_t>(s.area()))); !f) {
+            const std::int64_t f0 = esp_timer_get_time();
+            auto f = scene.fill(eye, s, buf->px.first(static_cast<std::size_t>(s.area())));
+            g_fill_us += static_cast<std::uint64_t>(esp_timer_get_time() - f0);
+            if (!f) {
                 // buffer was acquired but never pushed: push black so the pool stays consistent
                 std::fill(buf->px.begin(), buf->px.begin() + s.area(), gfx::Rgb565be{0});
             }
@@ -88,6 +92,8 @@ void task(void*) {
             g_stats.fps_x10 = static_cast<std::uint16_t>(frame_n * 10000 / (nowm - window_start));
             g_stats.frame_us_avg = static_cast<std::uint32_t>(sum_us / frame_n);
             g_stats.frame_us_max = max_us;
+            g_stats.fill_us_avg = static_cast<std::uint32_t>(g_fill_us / frame_n);
+            g_fill_us = 0;
             taskEXIT_CRITICAL(&g_stats_mux);
             frame_n = 0; sum_us = 0; max_us = 0; window_start = nowm;
         }
