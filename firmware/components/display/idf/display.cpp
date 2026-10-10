@@ -172,20 +172,32 @@ std::expected<void, engine::Err> fill(engine::Eye eye, gfx::Rgb565be color) noex
     return wait_idle(200);
 }
 
+// 5x7 glyphs drawn 12x scaled in the middle of the test pattern: L / R identify the logical eye.
+constexpr std::uint8_t kGlyphL[7] = {0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b11111};
+constexpr std::uint8_t kGlyphR[7] = {0b11110, 0b10001, 0b10001, 0b11110, 0b10100, 0b10010, 0b10001};
+bool glyph_px(const std::uint8_t (&g)[7], int x, int y) {  // x,y in panel coordinates
+    constexpr int kScale = 12, kX0 = 90, kY0 = 78;
+    const int gx = (x - kX0) / kScale, gy = (y - kY0) / kScale;
+    if (x < kX0 || y < kY0 || gx >= 5 || gy >= 7) return false;
+    return (g[gy] >> (4 - gx)) & 1;
+}
+
+// Left panel: RED bands (row markers brighter), right panel: BLUE bands. Any blue on the left display
+// (or red on the right one) means the other panel's data or CS leaked over.
 std::expected<void, engine::Err> pattern(engine::Eye eye) noexcept {
     constexpr int kLines = static_cast<int>(cfg::kStripLines);
+    const bool left = eye == engine::Eye::Left;
+    auto tone = [&](int v) { return left ? gfx::rgb565_rt(static_cast<std::uint8_t>(v), 0, 0) : gfx::rgb565_rt(0, 0, static_cast<std::uint8_t>(v)); };
     for (int y = 0; y < gfx::kScreen; y += kLines) {
         const int h = std::min(kLines, gfx::kScreen - y);
         auto b = acquire(200);
         if (!b) return std::unexpected(b.error());
         for (int r = 0; r < h; ++r) {
             const int row = y + r;
-            gfx::Rgb565be c = ((row / 10) & 1) ? gfx::rgb565_rt(70, 70, 70) : gfx::rgb565_rt(20, 20, 20);
-            if (row % 40 == 0) c = gfx::rgb565_rt(255, 255, 255);
-            if (row == 120) c = gfx::rgb565_rt(0, 160, 255);
-            if (row == 0) c = gfx::rgb565_rt(255, 0, 0);
-            if (row == gfx::kScreen - 1) c = gfx::rgb565_rt(0, 255, 0);
-            for (int x = 0; x < gfx::kScreen; ++x) b->px[static_cast<std::size_t>(r * gfx::kScreen + x)] = (x == 120) ? gfx::rgb565_rt(0, 160, 255) : c;
+            gfx::Rgb565be c = ((row / 10) & 1) ? tone(120) : tone(40);
+            if (row % 40 == 0) c = tone(255);
+            if (row == 0 || row == gfx::kScreen - 1) c = gfx::rgb565_rt(255, 255, 255);  // top/bottom edge rows: white
+            for (int x = 0; x < gfx::kScreen; ++x) b->px[static_cast<std::size_t>(r * gfx::kScreen + x)] = (x == 120 || glyph_px(left ? kGlyphL : kGlyphR, x, row)) ? gfx::rgb565_rt(255, 255, 255) : c;
         }
         if (auto r = push(eye, std::move(*b), gfx::Rect{0, static_cast<std::int16_t>(y), gfx::kScreen, static_cast<std::int16_t>(h)}); !r) return r;
     }

@@ -9,7 +9,11 @@
 
 #include "engine/core/command.hpp"
 #include "engine/idf/render_task.hpp"
+#include "driver/gpio.h"
 #include "esp_console.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "sdkconfig.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
 #include "esp_log.h"
@@ -108,7 +112,17 @@ int cmd_lcd(int argc, char** argv) {  // display diagnostics, see engine::LcdOp
     if (argc >= 2 && !std::strcmp(argv[1], "swap")) ok = engine::lcd_request(engine::LcdOp::Swap, argc > 2 ? std::strcmp(argv[2], "off") != 0 : 1);
     else if (argc >= 2 && !std::strcmp(argv[1], "init")) ok = engine::lcd_request(engine::LcdOp::Init, arg(0));
     else if (argc >= 2 && !std::strcmp(argv[1], "test")) ok = engine::lcd_request(engine::LcdOp::Test, arg(20));
-    else { std::printf("usage: lcd swap [on|off] | lcd init [spi_hz] | lcd test [seconds, 0 = stop]\n"); return 1; }
+    else if (argc >= 2 && !std::strcmp(argv[1], "pins")) {  // idle levels: CS lines must read 1 between transfers
+        const int pins[] = {CONFIG_EYES_LCD_PIN_CS_L, CONFIG_EYES_LCD_PIN_CS_R, CONFIG_EYES_LCD_PIN_DC, CONFIG_EYES_LCD_PIN_RST};
+        const char* names[] = {"CS_L", "CS_R", "DC", "RST"};
+        for (int n = 0; n < 6; ++n) {
+            for (int i = 0; i < 4; ++i) std::printf("%s(gpio%d)=%d ", names[i], pins[i], gpio_get_level(static_cast<gpio_num_t>(pins[i])));
+            std::printf("\n");
+            vTaskDelay(pdMS_TO_TICKS(37));
+        }
+        return 0;
+    }
+    else { std::printf("usage: lcd pins | lcd swap [on|off] | lcd init [spi_hz] | lcd test [seconds, 0 = stop]\n"); return 1; }
     std::printf(ok ? "queued (see render log)\n" : "busy, retry\n");
     return ok ? 0 : 1;
 }
