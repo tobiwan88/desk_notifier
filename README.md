@@ -63,6 +63,8 @@ On the page you can:
 - push **Random** for a random animation
 - turn random idle animations on or off
 - drag on the round pad to make the eyes look somewhere
+- choose what the random mode may play (the **Random pool**): built-in animations and your own clips, and the pause between them
+- see, play, upload, and delete clips
 
 The board remembers your style, iris color, and idle setting after a restart.
 
@@ -94,7 +96,13 @@ curl -X POST http://$HOST/api/eye -d '{"style":"cute","save":true}'
 
 # list all names and show the current state
 curl http://$HOST/api/animations
+
+# choose what random mode may play, and the pause (in seconds)
+curl -X POST http://$HOST/api/pool -d '{"enabled":["wink","glance","fire"],"interval":[3,8]}'
+curl http://$HOST/api/pool
 ```
+
+`"play":"random"` and the idle mode (`"auto":true`) play only the items in the pool. A clip can be in the pool too. By default the pool holds all built-in animations and no clips.
 
 Other routes: `GET /api/status` (health data), `POST /api/play` (play a clip), `POST /api/stop`, `GET /api/clips`, `PUT` and `DELETE /api/clips/<name>`, `POST /api/ota` (firmware update).
 
@@ -113,13 +121,25 @@ Anyone on your network can control the board. To require a token, use the consol
 
 ## Your own clips
 
-A clip is a short video that plays on the displays. Make a clip from a GIF, a PNG sequence, or a video file:
+A clip is a short animation that plays on both displays. Make it from a GIF, a PNG sequence, or a video, and add it with one command:
 
 ```sh
-PYTHONPATH=clipprep uv run python -m clipprep my.gif my.clip --preview preview.gif
-uv run python tools/eyesctl.py upload my.clip --name hello
-uv run python tools/eyesctl.py play hello
+export EYES_HOST=eyes-xxxxxx.local
+PYTHONPATH=clipprep:tools uv run python tools/eyesctl.py add fire.gif --name fire --pool
 ```
+
+`--pool` also puts the clip into the random pool. Without it, you can enable the clip later on the web page or with `eyesctl pool add fire`.
+
+More commands:
+
+```sh
+uv run python tools/eyesctl.py play fire --loop   # play now
+uv run python tools/eyesctl.py clips              # list clips
+uv run python tools/eyesctl.py pool               # show the pool
+uv run python tools/eyesctl.py pool set wink glance fire --interval 3 8
+```
+
+The tool changes the frame rate if the clip is too big or too fast for the board. It prints what it changed. A full-screen clip needs about 90 KB per frame and per display, so 10 frames per second is a good limit. Small areas are faster: use `--region x,y,w,h`.
 
 `eyes-studio` is a small web app that does the same steps with a form:
 
@@ -151,7 +171,7 @@ Connect with `uv run python tools/console.py <port> "<command>"`. Useful command
 | One display is blank | Check its CS wire. Then restart the board. The board starts the displays only at boot. |
 | Both displays are blank | Check VCC, GND, SCL, SDA, DC, and RST. Restart the board. |
 | Wrong picture on a display | Run `lcd test 30`. Red **L** must show on the left display. Blue **R** must show on the right display. If not, check the CS wires. |
-| Picture jumps or has noise | Use shorter wires. Or lower the SPI clock (`CONFIG_EYES_LCD_SPI_HZ`). The default is 20 MHz. |
+| Picture jumps or has noise | Use shorter wires. Or lower the SPI clock (`CONFIG_EYES_LCD_SPI_HZ`). The default is 40 MHz. Use 20 MHz if the wires are long. |
 | Board does not start from a power bank | Use a better cable or a stronger power source. Read the reset reasons with `status`. `BROWNOUT` means too little power. |
 | Web page does not open | Use the IP address instead of the `.local` name. Check that your computer is on the same network. |
 
@@ -171,7 +191,7 @@ scripts/check.sh --quick  # tests only
 
 ## Known limits
 
-- The speed is about 15 to 20 frames per second. The halloween and christmas styles are slower, about 14 frames per second, because they redraw the whole screen.
+- The speed is about 20 frames per second for the realistic style, and about 7 to 10 for full-screen clips. The halloween and christmas styles are slower, about 14 frames per second, because they redraw the whole screen.
 - The board has little free internal memory (about 37 KB at its lowest point). Add new features with care.
 - The 24-hour test and the power-cut test are not done yet.
 

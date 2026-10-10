@@ -51,6 +51,17 @@
 | RAM | Internal RAM is the scarce resource. Wi-Fi/lwIP buffers moved to PSRAM, `SPIRAM_MALLOC_ALWAYSINTERNAL=256`. |
 | PSRAM usage | Clip index, upload/OTA buffers, and Wi-Fi/lwIP. |
 
+### v2.1 additions (random pool, easy clips, web page)
+
+| Item | Status |
+|---|---|
+| SPI clock 40 MHz again (wiring fixed; the earlier glitches were cabling) | done |
+| Random pool: user chooses which built-in animations and which clips random mode may pick, plus the pause range (`GET/POST /api/pool`, NVS key `pool`, `Scene` scheduler, `play:"random"` uses the pool) | done |
+| `eyesctl add` (GIF/PNG/video → prepared with the device budget → upload, `--pool`), `eyesctl pool …`, studio proxy routes | done |
+| Web page: Random pool checkboxes + interval, clip list (play/loop/delete/stop), `.clip` upload | done |
+| **Web page: add an animation from a GIF without any tool.** The browser decodes the GIF (`ImageDecoder`), fits it to 240×240, encodes a `.clip` with a JavaScript port of clipprep (`web/ui/clip_encoder.js`, byte-identical to the Python writer, tested in Node), applies the same size budget, previews the result in a round canvas, uploads it, and can add it to the pool. Fallback text for browsers without `ImageDecoder`: use `eyesctl add`. | in progress |
+| Later: clip rename, per-item weights in the pool, "play now" on pool items, date-based default style, upload of MP4 via `<video>` frame capture | planned |
+
 ### Implementation status
 
 **Done**
