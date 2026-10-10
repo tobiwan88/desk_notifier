@@ -6,12 +6,14 @@
 #include "freertos/task.h"
 #include "net/idf/net.hpp"
 #include "settings/idf/settings.hpp"
+#include "storage/idf/storage.hpp"
 #include "web/idf/web.hpp"
 
 static const char* const kTag = "eyes";
 
 extern "C" void app_main(void) {
     settings::init();
+    if (!storage::init()) ESP_LOGE(kTag, "storage init failed");
     if (auto r = display::init(); !r) { ESP_LOGE(kTag, "display init failed"); return; }
     if (auto r = engine::start_render_task(); !r) { ESP_LOGE(kTag, "render task failed"); return; }
     // Eyes run even if networking fails.

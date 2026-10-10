@@ -60,6 +60,14 @@ int cmd_eye(int argc, char** argv) {
     std::printf("unknown mood\n");
     return 1;
 }
+int cmd_play(int argc, char** argv) {
+    if (argc < 2) { std::printf("usage: play <clip> [loop]\n"); return 1; }
+    engine::PlayCmd p;
+    p.clip[0].assign(argv[1]); p.clip[1].assign(argv[1]);
+    p.loop = argc > 2;
+    return engine::post(engine::Command{p}, 100) ? 0 : 1;
+}
+int cmd_stop(int, char**) { return engine::post(engine::Command{engine::StopCmd{}}, 100) ? 0 : 1; }
 int cmd_reboot(int, char**) { esp_restart(); return 0; }
 int cmd_factory(int, char**) { settings::erase_all(); std::printf("NVS erased (clips kept); rebooting\n"); esp_restart(); return 0; }
 
@@ -80,6 +88,8 @@ std::expected<void, engine::Err> start_console() noexcept {
         {.command = "hostname", .help = "hostname [name]", .hint = nullptr, .func = cmd_hostname, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "status", .help = "show status", .hint = nullptr, .func = cmd_status, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "eye", .help = "eye <mood>", .hint = nullptr, .func = cmd_eye, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
+        {.command = "play", .help = "play <clip> [loop]", .hint = nullptr, .func = cmd_play, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
+        {.command = "stop", .help = "stop clips", .hint = nullptr, .func = cmd_stop, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "reboot", .help = "reboot", .hint = nullptr, .func = cmd_reboot, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "factory-reset", .help = "erase NVS settings", .hint = nullptr, .func = cmd_factory, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
     };

@@ -43,6 +43,9 @@ menu "Eyes"
     config EYES_WIFI_PASSWORD
         string "Wi-Fi password"
         default ""
+    config EYES_CLIP_MAX_BPS
+        int "Sustained clip bytes/s the device can serve (measured by the fs benchmark)"
+        default 1500000
     config EYES_MAX_CLIP_BYTES
         int "Maximum clip size in bytes"
         default 2097152

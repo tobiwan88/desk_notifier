@@ -13,9 +13,7 @@ cmake -S firmware/test/host -B build/host -DCMAKE_BUILD_TYPE=Debug >/dev/null
 cmake --build build/host -j
 ./build/host/host_tests
 
-for d in clipprep studio; do
-  if [[ -d $d/tests ]]; then (cd $d && uv run --project .. pytest -q); fi
-done
+uv run pytest -q
 
 if [[ $quick -eq 0 ]]; then
   . scripts/idf-env.sh
