@@ -76,6 +76,25 @@ button:active{border-color:var(--accent)}
 </section>
 
 <section>
+  <h2>Add animation from a GIF</h2>
+  <label for="gfile">GIF, WebP or PNG</label>
+  <input type="file" id="gfile" accept="image/gif,image/webp,image/png,.gif">
+  <div class="row">
+    <div><label for="gfit">Fit</label><select id="gfit"><option>cover</option><option>contain</option></select></div>
+    <div><label for="gfps">Frame rate cap (fps, optional)</label><input class="inp" id="gfps" type="number" min="1" max="30" step="0.5" placeholder="original"></div>
+  </div>
+  <canvas id="gprev" width="240" height="240" hidden style="display:block;width:200px;height:200px;margin:12px auto 0;border-radius:50%;background:#000"></canvas>
+  <p class="hint" id="ginfo"></p>
+  <label for="gname">Name</label>
+  <input class="inp" id="gname" type="text" maxlength="31">
+  <label class="check"><input type="checkbox" id="gpool"> Also add to random pool</label>
+  <div class="row more">
+    <button id="ggo">Convert &amp; upload</button>
+    <span class="muted" id="gprog"></span>
+  </div>
+</section>
+
+<section>
   <h2>Clips <span class="muted" id="free"></span></h2>
   <div id="clips"></div>
   <div class="row more">
@@ -101,6 +120,7 @@ button:active{border-color:var(--accent)}
 <div id="err" role="alert"></div>
 </main>
 
+<script src="/clip_encoder.js"></script>
 <script>
 (function () {
   var $ = function (id) { return document.getElementById(id); };
@@ -336,6 +356,147 @@ button:active{border-color:var(--accent)}
       ui.cprog.textContent = '';
       fail(e);
     }).then(function () { ui.cup.disabled = false; });
+  };
+
+  // GIF -> clip, encoded in the browser (clip_encoder.js)
+  var G = {
+    file: $('gfile'), fit: $('gfit'), fps: $('gfps'), name: $('gname'), pool: $('gpool'),
+    go: $('ggo'), prog: $('gprog'), info: $('ginfo'), prev: $('gprev')
+  };
+  var NO_DECODER = 'This browser cannot read GIFs. Use Chrome, Edge or Safari, or run: eyesctl add my.gif';
+  var gctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  var gTimer = 0;
+  gctx.canvas.width = gctx.canvas.height = 240;
+  if (typeof ImageDecoder === 'undefined') { G.info.textContent = NO_DECODER; G.go.disabled = true; }
+
+  function decodeFrames(file) {
+    var dec = new ImageDecoder({ data: file.stream(), type: file.type || 'image/gif' });
+    var out = [], total = 1, i = 0;
+    function next(n) {
+      if (i >= n) return Promise.resolve();
+      return dec.decode({ frameIndex: i }).then(function (r) {
+        var vf = r.image, w = vf.displayWidth, h = vf.displayHeight;
+        var s = G.fit.value === 'contain' ? Math.min(240 / w, 240 / h) : Math.max(240 / w, 240 / h);
+        var dw = Math.round(w * s), dh = Math.round(h * s);
+        gctx.fillStyle = '#000';
+        gctx.fillRect(0, 0, 240, 240);
+        gctx.drawImage(vf, Math.round((240 - dw) / 2), Math.round((240 - dh) / 2), dw, dh);
+        out.push({ rgba: gctx.getImageData(0, 0, 240, 240).data, ms: Math.max(20, Math.round((vf.duration || 100000) / 1000)) });
+        vf.close();
+        i++;
+        return next(n);
+      });
+    }
+    return dec.tracks.ready.then(function () {
+      var track = dec.tracks.selectedTrack;
+      total = track ? track.frameCount : 1;
+      return next(Math.min(total, 200));
+    }).then(function () {
+      dec.close();
+      return { frames: out, total: total };
+    });
+  }
+
+  function sumMs(fr) { return fr.reduce(function (s, f) { return s + f.ms; }, 0); }
+
+  // Keep frames at a target rate, durations carried over (clipprep _resample)
+  function resampleFrames(frames, fps) {
+    var step = 1000 / fps, out = [], cum = 0, nxt = 0;
+    frames.forEach(function (f) {
+      if (cum >= nxt - 1e-6) { out.push({ rgba: f.rgba, ms: 0 }); nxt += step; }
+      out[out.length - 1].ms += f.ms;
+      cum += f.ms;
+    });
+    out.forEach(function (f) { f.ms = Math.max(f.ms, 20); });
+    return out;
+  }
+
+  // Halve the frame rate: keep every 2nd frame, the dropped one's time goes to the kept one
+  function halveFrames(frames) {
+    var out = [];
+    for (var i = 0; i < frames.length; i += 2) {
+      out.push({ rgba: frames[i].rgba, ms: frames[i].ms + (i + 1 < frames.length ? frames[i + 1].ms : 0) });
+    }
+    return out;
+  }
+
+  function encodeFrames(fr) {
+    var bytes = encodeClip(fr, { loop: true, bg: [0, 0, 0] });
+    return { bytes: bytes, bps: clipWorstBps(bytes.payloadBytes, fr.map(function (f) { return f.ms; })) };
+  }
+
+  // Animated preview, shown round like the displays
+  function startPreview(frames) {
+    var i = 0;
+    clearTimeout(gTimer);
+    G.prev.hidden = false;
+    var pctx = G.prev.getContext('2d');
+    (function step() {
+      pctx.putImageData(new ImageData(frames[i].rgba, 240, 240), 0, 0);
+      var ms = frames[i].ms;
+      i = (i + 1) % frames.length;
+      gTimer = setTimeout(step, ms);
+    })();
+  }
+
+  G.file.onchange = function () {
+    var f = G.file.files[0];
+    if (f) G.name.value = defName(f);
+  };
+
+  G.go.onclick = async function () {
+    var f = G.file.files[0], name = G.name.value.trim();
+    if (!f) { setErr('Choose a GIF, WebP or PNG file'); return; }
+    if (!name) { setErr('Enter a clip name'); return; }
+    if (typeof ImageDecoder === 'undefined') { G.info.textContent = NO_DECODER; return; }
+    if (typeof encodeClip !== 'function') { setErr('Encoder script /clip_encoder.js did not load'); return; }
+    G.go.disabled = true;
+    setErr('');
+    G.prog.textContent = 'Converting…';
+    try {
+      var st = await api('GET', '/api/status');
+      var dec = await decodeFrames(f);
+      if (!dec.frames.length) throw new Error('No frames in this file');
+      var frames = dec.frames, note = '';
+      if (dec.total > 200) note = 'only the first 200 of ' + dec.total + ' frames used';
+      var fpsCap = parseFloat(G.fps.value);
+      if (fpsCap > 0) frames = resampleFrames(frames, fpsCap);
+      var limit = Math.min(1500000, st.fs_free - 65536);
+      var maxBps = 0.8 * st.clip_max_bps;
+      var enc = encodeFrames(frames);
+      while ((enc.bytes.length > limit || enc.bps > maxBps) && Math.ceil(frames.length / 2) >= 6) {
+        frames = halveFrames(frames);
+        enc = encodeFrames(frames);
+        note = 'frame rate reduced to ~' + Math.round(frames.length * 1000 / sumMs(frames)) + ' fps to fit';
+      }
+      if (enc.bytes.length > limit) {
+        throw new Error('Too large: ' + Math.round(enc.bytes.length / 1024) + ' KB, space for ' + Math.round(limit / 1024) + ' KB');
+      }
+      if (enc.bps > maxBps) note = (note ? note + '; ' : '') + 'peak rate is above the device limit';
+      var fps = (frames.length * 1000 / sumMs(frames)).toFixed(1);
+      G.info.textContent = frames.length + ' frames, ' + fps + ' fps, ' + Math.round(enc.bytes.length / 1024) +
+        ' KB, ' + (st.fs_free / 1048576).toFixed(1) + ' MB free' + (note ? '. ' + note : '');
+      startPreview(frames);
+      G.prog.textContent = 'Uploading…';
+      await api('PUT', '/api/clips/' + encodeURIComponent(name), new Blob([enc.bytes], { type: 'application/octet-stream' }));
+      if (G.pool.checked) {
+        clearTimeout(poolTimer);
+        poolTimer = 0;
+        var names = poolEnabled().filter(function (n) { return n !== name; });
+        names.push(name);
+        var body = { enabled: names };
+        var min = parseFloat(ui.pmin.value), max = parseFloat(ui.pmax.value);
+        if (isFinite(min) && isFinite(max)) body.interval = [min, max];
+        await api('POST', '/api/pool', body);
+      }
+      await refresh();
+      G.prog.textContent = 'Done';
+    } catch (e) {
+      G.prog.textContent = '';
+      setErr(e.message || String(e));
+    } finally {
+      G.go.disabled = false;
+    }
   };
 
   // Look pad
