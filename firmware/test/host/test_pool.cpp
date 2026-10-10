@@ -41,24 +41,24 @@ TEST_CASE("pick honours the mask and never repeats") {
 }
 
 TEST_CASE("pick: special only with a style that has it, empty pool gives None, single item repeats") {
-    Pool special_only; special_only.anim_mask = 1u << 11;
+    Pool special_only; special_only.anim_mask = 1u << kSpecialAnim;
     std::uint32_t rng = 3;
     CHECK(pick(special_only, rng, -1, false).kind == Pick::Kind::None);
-    CHECK(pick(special_only, rng, -1, true).index == 11);
-    CHECK(pick(special_only, rng, 11, true).index == 11);  // nothing else to pick
+    CHECK(pick(special_only, rng, -1, true).index == kSpecialAnim);
+    CHECK(pick(special_only, rng, kSpecialAnim, true).index == kSpecialAnim);  // nothing else to pick
     Pool none; none.anim_mask = 0;
     CHECK(pick(none, rng, -1, true).kind == Pick::Kind::None);
 }
 
 TEST_CASE("pick includes clips with their key") {
-    Pool p = only_clips({"fire", "rain"});
+    Pool p = only_clips({"fire", "storm"});
     std::uint32_t rng = 11; std::set<int> seen;
     for (int i = 0; i < 50; ++i) { Pick k = pick(p, rng, -1, true); CHECK(k.kind == Pick::Kind::Clip); seen.insert(k.index); }
     CHECK(seen.size() == 2);
 }
 
 TEST_CASE("parse_pool: names, clips, interval") {
-    auto r = parse_pool(R"({"enabled":["wink","happy","fire","fire","rain"],"interval":[3,8.5]})");
+    auto r = parse_pool(R"({"enabled":["wink","happy","fire","fire","storm"],"interval":[3,8.5]})");
     CHECK(static_cast<bool>(r)); if (!r) return;
     CHECK(r->anim_mask == ((1u << 0) | (1u << 9)));
     CHECK(r->clips.size() == 2);
