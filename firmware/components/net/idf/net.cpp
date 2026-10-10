@@ -109,6 +109,7 @@ std::expected<void, engine::Err> start_mdns() noexcept {
 }
 
 bool connected() noexcept { return g_connected; }
+bool has_credentials() noexcept { return !settings::get("ssid").value_or(CONFIG_EYES_WIFI_SSID).empty(); }
 std::int8_t rssi() noexcept {
     wifi_ap_record_t ap{};
     return esp_wifi_sta_get_ap_info(&ap) == ESP_OK ? ap.rssi : 0;

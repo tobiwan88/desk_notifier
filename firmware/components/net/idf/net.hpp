@@ -13,6 +13,7 @@ namespace net {
 [[nodiscard]] std::expected<void, engine::Err> start_mdns() noexcept;    // hostname eyes-<MAC3> (or NVS), service _eyes._tcp
 [[nodiscard]] std::expected<void, engine::Err> start_console() noexcept;
 bool connected() noexcept;
+bool has_credentials() noexcept;  // Wi-Fi configured (NVS or Kconfig)
 std::int8_t rssi() noexcept;
 std::string ip() noexcept;
 std::string hostname() noexcept;
