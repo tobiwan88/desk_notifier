@@ -1,0 +1,103 @@
+// engine: per-display source selection (eyes vs clip) on top of the shared eye model (plan §3.2).
+// Two fixed source kinds instead of a variant: no heap, no visit, same behaviour.
+#pragma once
+
+#include <array>
+#include <expected>
+#include <span>
+#include <string_view>
+
+#include "engine/core/command.hpp"
+#include "eyes/core/model.hpp"
+
+namespace engine {
+
+template <class Clip>
+concept ClipSource = FrameSource<Clip> && requires(Clip c, std::string_view n, bool loop) {
+    { c.start(n, loop) } noexcept -> std::same_as<std::expected<void, Err>>;
+};
+
+// Source that never plays anything (before clips exist / for tests).
+struct NoClip {
+    static constexpr std::string_view kName = "clip";
+    std::expected<void, Err> start(std::string_view, bool) noexcept { return std::unexpected(Err::NotFound); }
+    FramePlan next(std::uint32_t) noexcept { FramePlan p; p.finished = true; return p; }
+    std::expected<void, Err> fill(gfx::Rect, std::span<gfx::Rgb565be>) noexcept { return {}; }
+    void stop() noexcept {}
+};
+
+template <ClipSource Clip>
+class Scene {
+public:
+    explicit Scene(std::uint32_t seed = 1, const eyes::EyeStyle& style = eyes::kRealistic) noexcept
+        : views_{eyes::EyeView(model_, Eye::Left), eyes::EyeView(model_, Eye::Right)} {
+        model_.start(seed, style);
+    }
+
+    void apply(const Command& cmd, std::uint32_t now) noexcept {
+        if (const auto* e = std::get_if<EyeCmd>(&cmd)) {
+            if (e->interrupt) stop_all();
+            model_.apply(*e, now);
+        } else if (const auto* p = std::get_if<PlayCmd>(&cmd)) {
+            for (std::size_t i = 0; i < kEyes; ++i) {
+                if (p->clip[i].empty()) continue;
+                if (clips_[i].start(p->clip[i].view(), p->loop)) {
+                    active_[i] = Src::Playing;
+                    then_eyes_[i] = p->then_eyes;
+                }
+            }
+        } else {
+            stop_all();
+        }
+    }
+
+    void tick(std::uint32_t now) noexcept { model_.tick(now); }  // once per frame, before next()
+
+    FramePlan next(Eye e, std::uint32_t now) noexcept {
+        const auto i = idx(e);
+        if (active_[i] == Src::Playing) {
+            FramePlan p = clips_[i].next(now);
+            if (!p.finished) return p;
+            clips_[i].stop();
+            if (then_eyes_[i]) {
+                active_[i] = Src::Eyes;
+                views_[i].invalidate();
+                return views_[i].next(now);
+            }
+            FramePlan hold;  // keep the last clip frame on screen
+            hold.delay_ms = 100;
+            return hold;
+        }
+        return views_[i].next(now);
+    }
+
+    std::expected<void, Err> fill(Eye e, gfx::Rect r, std::span<gfx::Rgb565be> buf) noexcept {
+        const auto i = idx(e);
+        return active_[i] == Src::Playing ? clips_[i].fill(r, buf) : views_[i].fill(r, buf);
+    }
+
+    std::string_view current(Eye e) const noexcept {
+        return active_[idx(e)] == Src::Playing ? Clip::kName : eyes::EyeView::kName;
+    }
+    bool style_save_pending() const noexcept { return model_.style_dirty(); }
+    const eyes::EyeStyle& style() const noexcept { return model_.style(); }
+    void style_saved() noexcept { model_.clear_style_dirty(); }
+    Clip& clip(Eye e) noexcept { return clips_[idx(e)]; }
+
+private:
+    enum class Src : std::uint8_t { Eyes, Playing };
+    static constexpr std::size_t idx(Eye e) noexcept { return static_cast<std::size_t>(e); }
+    void stop_all() noexcept {
+        for (std::size_t i = 0; i < kEyes; ++i) {
+            if (active_[i] == Src::Playing) { clips_[i].stop(); active_[i] = Src::Eyes; views_[i].invalidate(); }
+        }
+    }
+
+    eyes::EyesModel model_;
+    std::array<eyes::EyeView, kEyes> views_;
+    std::array<Clip, kEyes> clips_{};
+    std::array<Src, kEyes> active_{Src::Eyes, Src::Eyes};
+    std::array<bool, kEyes> then_eyes_{true, true};
+};
+
+}  // namespace engine

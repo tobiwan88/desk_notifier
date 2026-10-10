@@ -22,8 +22,9 @@ constexpr std::size_t kStripBytes = gfx::kScreen * cfg::kStripLines * 2;
 
 std::array<esp_lcd_panel_io_handle_t, engine::kEyes> g_io{};
 std::array<esp_lcd_panel_handle_t, engine::kEyes> g_panel{};
-SemaphoreHandle_t g_done = nullptr;
-std::uint16_t* g_buf = nullptr;
+SemaphoreHandle_t g_free = nullptr;  // counts free strip buffers, given from the ISR
+std::array<std::uint16_t*, cfg::kStripCount> g_bufs{};
+std::size_t g_head = 0;  // next buffer to hand out; returns are FIFO (see wait_idle at display switch)
 
 extern "C" IRAM_ATTR bool on_color_done(esp_lcd_panel_io_handle_t, esp_lcd_panel_io_event_data_t*, void* ctx) {
     BaseType_t woken = pdFALSE;
@@ -34,9 +35,12 @@ extern "C" IRAM_ATTR bool on_color_done(esp_lcd_panel_io_handle_t, esp_lcd_panel
 }  // namespace
 
 std::expected<void, engine::Err> init() noexcept {
-    g_done = xSemaphoreCreateCounting(8, 0);
-    g_buf = static_cast<std::uint16_t*>(heap_caps_malloc(kStripBytes, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
-    if (!g_done || !g_buf) return std::unexpected(engine::Err::Io);
+    g_free = xSemaphoreCreateCounting(cfg::kStripCount, cfg::kStripCount);
+    if (!g_free) return std::unexpected(engine::Err::Io);
+    for (auto& b : g_bufs) {
+        b = static_cast<std::uint16_t*>(heap_caps_malloc(kStripBytes, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
+        if (!b) return std::unexpected(engine::Err::Io);
+    }
 
     spi_bus_config_t bus = {};
     bus.mosi_io_num = cfg::kLcdPins[1];
@@ -55,11 +59,11 @@ std::expected<void, engine::Err> init() noexcept {
         io.dc_gpio_num = static_cast<gpio_num_t>(cfg::kLcdPins[2]);
         io.spi_mode = 0;
         io.pclk_hz = cfg::kSpiHz;
-        io.trans_queue_depth = 4;
+        io.trans_queue_depth = cfg::kStripCount;
         io.lcd_cmd_bits = 8;
         io.lcd_param_bits = 8;
         io.on_color_trans_done = on_color_done;
-        io.user_ctx = g_done;
+        io.user_ctx = g_free;
         if (esp_lcd_new_panel_io_spi(static_cast<esp_lcd_spi_bus_handle_t>(kHost), &io, &g_io[i]) != ESP_OK)
             return std::unexpected(engine::Err::Io);
 
@@ -83,15 +87,42 @@ std::expected<void, engine::Err> init() noexcept {
 
 void set_backlight(std::uint8_t) noexcept {}
 
-std::expected<void, engine::Err> fill(engine::Eye eye, gfx::Rgb565be color) noexcept {
-    const auto idx = static_cast<std::size_t>(eye);
-    for (std::size_t i = 0; i < kStripBytes / 2; ++i) g_buf[i] = color;
-    for (int y = 0; y < gfx::kScreen; y += static_cast<int>(cfg::kStripLines)) {
-        if (esp_lcd_panel_draw_bitmap(g_panel[idx], 0, y, gfx::kScreen, y + static_cast<int>(cfg::kStripLines), g_buf) != ESP_OK)
-            return std::unexpected(engine::Err::Io);
-        if (xSemaphoreTake(g_done, pdMS_TO_TICKS(200)) != pdTRUE) return std::unexpected(engine::Err::DisplayStall);
+std::expected<StripBuf, engine::Err> acquire(std::uint32_t timeout_ms) noexcept {
+    if (xSemaphoreTake(g_free, pdMS_TO_TICKS(timeout_ms)) != pdTRUE) return std::unexpected(engine::Err::DisplayStall);
+    const auto i = g_head;
+    g_head = (g_head + 1) % cfg::kStripCount;
+    return StripBuf{{g_bufs[i], kStripBytes / 2}, static_cast<std::uint8_t>(i)};
+}
+
+std::expected<void, engine::Err> push(engine::Eye eye, StripBuf&& b, gfx::Rect r) noexcept {
+    const StripBuf moved = b;  // `b` is consumed: caller must not reuse it
+    b.px = {};
+    if (esp_lcd_panel_draw_bitmap(g_panel[static_cast<std::size_t>(eye)], r.x, r.y, r.x + r.w, r.y + r.h,
+                                  moved.px.data()) != ESP_OK) {
+        xSemaphoreGive(g_free);  // never queued: return the buffer
+        return std::unexpected(engine::Err::Io);
     }
     return {};
+}
+
+std::expected<void, engine::Err> wait_idle(std::uint32_t timeout_ms) noexcept {
+    std::size_t got = 0;
+    std::expected<void, engine::Err> res{};
+    for (; got < cfg::kStripCount; ++got) {
+        if (xSemaphoreTake(g_free, pdMS_TO_TICKS(timeout_ms)) != pdTRUE) { res = std::unexpected(engine::Err::DisplayStall); break; }
+    }
+    for (std::size_t i = 0; i < got; ++i) xSemaphoreGive(g_free);
+    return res;
+}
+
+std::expected<void, engine::Err> fill(engine::Eye eye, gfx::Rgb565be color) noexcept {
+    for (int y = 0; y < gfx::kScreen; y += static_cast<int>(cfg::kStripLines)) {
+        auto b = acquire(200);
+        if (!b) return std::unexpected(b.error());
+        for (auto& px : b->px) px = color;
+        if (auto r = push(eye, std::move(*b), gfx::Rect{0, static_cast<std::int16_t>(y), gfx::kScreen, static_cast<std::int16_t>(cfg::kStripLines)}); !r) return r;
+    }
+    return wait_idle(200);
 }
 
 }  // namespace display
