@@ -13,6 +13,8 @@ import sys
 import time
 from pathlib import Path
 
+import requests
+
 from eyes_client import Device, DeviceError
 
 MOODS = ["neutral", "happy", "angry", "sleepy", "scared", "curious", "asleep"]
@@ -101,7 +103,7 @@ def main(argv=None) -> int:
                 dev.eye(mood=m, transition_ms=100); time.sleep(0.4)
             dev.eye(mood="neutral"); dev.eye(blink="left"); dev.eye(look=[0.5, -0.5]); dev.stop()
             print("smoke ok:", st["hostname"], st["fps"], "fps")
-    except DeviceError as ex:
+    except (DeviceError, requests.RequestException) as ex:
         print(ex, file=sys.stderr)
         return 1
     return 0
