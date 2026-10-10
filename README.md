@@ -175,7 +175,7 @@ scripts/check.sh --quick  # tests only
 
 ## License
 
-This project uses the [MIT License](LICENSE). You can use, copy, change, and share it for any purpose, also in commercial products. Keep the copyright line and the license text with the code.
+This project uses the [MIT License](LICENSE). You can use, copy, change, and share it for any purpose, also in commercial products. Keep the copyright line and the license text with the code. The license covers all code in this repository, also the `cat_eyes` component and its eye designs.
 
 The project includes other code that has its own license:
 
