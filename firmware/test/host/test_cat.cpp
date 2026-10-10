@@ -85,3 +85,45 @@ TEST_CASE("catalogue matches the component") {
     for (std::size_t i = 0; i < kSpecialNames.size(); ++i)
         if (!kSpecialNames[i].empty()) CHECK(cat_eyes_anim_from_name(std::string(kSpecialNames[i]).c_str()) == CAT_ANIM_SPECIAL);
 }
+
+// Left-eye glitch investigation: the eye-0 path (dirty rows -> 10-line strips as the render task pushes them)
+// must behave exactly like eye 1. A panel model per eye is updated only with the pushed strips and compared
+// against a full render every frame: rows inside the pushed range must match exactly (no row offset or
+// misplaced strip), and what stays stale outside it (pupil drift below the hash quantum) is small for both eyes.
+TEST_CASE("dirty strips reproduce the full render equally for both eyes") {
+    constexpr int kW = 240, kLines = 10;
+    std::vector<gfx::Rgb565be> panel[2] = {std::vector<gfx::Rgb565be>(kW * kW), std::vector<gfx::Rgb565be>(kW * kW)};
+    std::vector<gfx::Rgb565be> full(kW * kW);
+    CatModel m; m.start(77, CAT_STYLE_REALISTIC, 0, true);
+    CatView views[2] = {CatView(engine::Eye::Left), CatView(engine::Eye::Right)};
+    long stale[2] = {0, 0}, wrong_in_pushed[2] = {0, 0}, pushes[2] = {0, 0};
+    std::uint32_t t = 1000;
+    for (int f = 0; f < 600; ++f, t += 33 + static_cast<std::uint32_t>((f * 7) % 23)) {
+        if (f % 60 == 30) { engine::EyeCmd c; c.play = static_cast<std::uint8_t>((f / 60) % (CAT_ANIM_COUNT - 1)); m.apply(c, t); }
+        m.tick(t);
+        for (int e = 0; e < 2; ++e) {
+            const auto p = views[e].next(t);
+            std::vector<bool> pushed(kW, false);
+            for (const auto& r : p.dirty) {
+                ++pushes[e];
+                for (const gfx::Rect s : gfx::Strips(r, kLines, p.trim)) {
+                    CHECK(s.x == 0); CHECK(s.w == kW);
+                    const auto dst = std::span(panel[e]).subspan(static_cast<std::size_t>(s.y * kW), static_cast<std::size_t>(s.area()));
+                    CHECK(static_cast<bool>(views[e].fill(s, dst)));
+                    for (int y = s.y; y < s.y + s.h; ++y) pushed[static_cast<std::size_t>(y)] = true;
+                }
+            }
+            CHECK(static_cast<bool>(views[e].fill(gfx::Rect{0, 0, kW, kW}, full)));
+            for (int i = 0; i < kW * kW; ++i) {
+                if (panel[e][static_cast<std::size_t>(i)] == full[static_cast<std::size_t>(i)]) continue;
+                ++(pushed[static_cast<std::size_t>(i / kW)] ? wrong_in_pushed[e] : stale[e]);
+            }
+            panel[e] = full;  // resync so each frame is judged on its own
+        }
+    }
+    CHECK(wrong_in_pushed[0] == 0);
+    CHECK(wrong_in_pushed[1] == 0);
+    CHECK(pushes[0] > 100);
+    CHECK(stale[0] < 600 * 40);
+    CHECK(stale[1] < 600 * 40);
+}
