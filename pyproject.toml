@@ -1,0 +1,13 @@
+[project]
+name = "esp-eyes"
+version = "0.1.0"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "esp-idf-size>=2.3.2",
+    "esptool>=5.5.0",
+    "pyserial>=3.5",
+    "ruff>=0.17.0",
+]

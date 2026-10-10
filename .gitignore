@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.ruff_cache/
+.pytest_cache/
+
+# uv
+# uv.lock is tracked on purpose so installs are reproducible
+
+# ESP-IDF / PlatformIO build output
+build/
+sdkconfig.old
+managed_components/
+dependencies.lock
+.vscode/
+
+# Editors / OS
+.idea/
+.DS_Store
