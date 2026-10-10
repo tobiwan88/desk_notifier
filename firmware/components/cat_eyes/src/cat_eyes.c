@@ -7,12 +7,32 @@ ce_state_t g_ce;
 
 static const char *const k_anim_names[CAT_ANIM_COUNT] = {
     "wink", "slow_blink", "roll", "side_eye", "hunt", "startle",
-    "nictitate", "sleepy", "cross_eyed", "happy", "glance", "special",
+    "nictitate", "sleepy", "cross_eyed", "happy", "glance",
+    "food", "fly", "paper_plane", "bubble", "spiral", "slots", "euro", "fish", "rain", "snow",
+    "leaf", "day_night", "paw", "spider", "loading", "pacman", "matrix", "disco", "pumpkin",
+    "special",
 };
-/* relative frequency in random idle; rare ones stay surprising */
+/* relative frequency in random idle; rare ones stay surprising.
+ * The effects are big set pieces, so each one is rare (together about 40 %). */
 static const float k_weights[CAT_ANIM_COUNT] = {
-    2, 2, 1.5f, 1.5f, 1.2f, .6f, 1, .8f, .6f, 1.5f, 3, 1.4f,
+    2, 2, 1.5f, 1.5f, 1.2f, .6f, 1, .8f, .6f, 1.5f, 3,
+    .8f, .7f, .6f, .6f, .5f, .5f, .5f, .5f, .6f, .5f,
+    .6f, .5f, .6f, .5f, .5f, .5f, .5f, .5f, .5f,
+    1.4f,
 };
+/* seasonal affinity: some effects come up more often in matching styles */
+static float affinity(int anim, cat_style_t st)
+{
+    if (st == CAT_STYLE_HALLOWEEN) {
+        if (anim == CAT_ANIM_PUMPKIN) return 6.f;
+        if (anim == CAT_ANIM_SPIDER) return 4.f;
+        if (anim == CAT_ANIM_RAIN) return 2.f;
+    }
+    if (st == CAT_STYLE_CHRISTMAS && anim == CAT_ANIM_SNOW) return 6.f;
+    if (st != CAT_STYLE_HALLOWEEN && anim == CAT_ANIM_PUMPKIN) return .35f;
+    if (st != CAT_STYLE_CHRISTMAS && anim == CAT_ANIM_SNOW) return .6f;
+    return 1.f;
+}
 static const char *const k_iris_names[CAT_IRIS_COUNT] = {"amber", "green", "blue", "copper", "violet", "odd"};
 static const float k_base[P_COUNT] = {0, 0, .12f, .06f, .22f, 0, 0, 0, 0};
 
@@ -85,6 +105,7 @@ void cat_eyes_play(cat_anim_t id)
     if ((unsigned)id >= CAT_ANIM_COUNT) return;
     if (id == CAT_ANIM_SPECIAL && !g_ce_styles[g_ce.style].special_name) return;
     ce_anim_build(id, &g_ce.anim);
+    if (id >= CAT_ANIM_FX_FIRST && id <= CAT_ANIM_FX_LAST) ce_fx_begin(id);
     g_ce.anim_on = true; g_ce.anim_start = g_ce.now; g_ce.last_anim = id;
 }
 void cat_eyes_blink(void) { g_ce.blink_start = g_ce.now; }
@@ -125,11 +146,11 @@ static cat_anim_t pick(void)
 {
     float tot = 0; bool sp = g_ce_styles[g_ce.style].special_name != NULL;
     for (int i = 0; i < CAT_ANIM_COUNT; i++)
-        if (i != g_ce.last_anim && (i != CAT_ANIM_SPECIAL || sp)) tot += k_weights[i];
+        if (i != g_ce.last_anim && (i != CAT_ANIM_SPECIAL || sp)) tot += k_weights[i] * affinity(i, g_ce.style);
     float r = ce_randf(0, tot);
     for (int i = 0; i < CAT_ANIM_COUNT; i++) {
         if (i == g_ce.last_anim || (i == CAT_ANIM_SPECIAL && !sp)) continue;
-        r -= k_weights[i];
+        r -= k_weights[i] * affinity(i, g_ce.style);
         if (r <= 0) return (cat_anim_t)i;
     }
     return CAT_ANIM_GLANCE;
@@ -167,8 +188,9 @@ void cat_eyes_tick(uint32_t now)
         g_ce.anim_on = false; g_ce.next_anim = now + (uint32_t)ce_randf(2500, 7000);
     }
     if (g_ce.auto_idle && !g_ce.anim_on && (int32_t)(now - g_ce.next_anim) > 0) cat_eyes_play(pick());
+    const bool fx = g_ce.anim_on && g_ce.anim.id >= CAT_ANIM_FX_FIRST && g_ce.anim.id <= CAT_ANIM_FX_LAST;
     if ((int32_t)(now - g_ce.next_blink) > 0) {
-        if (!anim_drives(0, P_UPPER)) g_ce.blink_start = now;
+        if (!anim_drives(0, P_UPPER) && !fx) g_ce.blink_start = now;
         g_ce.next_blink = now + ((ce_rand() % 100) < 15 ? 350 : (uint32_t)ce_randf(2500, 7000));
     }
     if ((int32_t)(now - g_ce.next_sacc) > 0) {
@@ -188,6 +210,7 @@ void cat_eyes_tick(uint32_t now)
             const ce_tracks_t *tr = &g_ce.anim.eye[e];
             for (int i = 0; i < tr->n; i++) p[tr->tr[i].param] = ce_track_eval(&tr->tr[i], t);
             if (g_ce.anim.jitter) p[P_GX] += sinf(t / 37.f) * .03f;
+            if (fx) ce_fx_params(g_ce.anim.id, e, (float)t, p);
         }
         /* style pupil remap */
         float tg = p[P_PUPIL];
@@ -202,6 +225,7 @@ void cat_eyes_tick(uint32_t now)
         if (bv > p[P_UPPER]) p[P_UPPER] = bv;
         if (bv * .25f > p[P_LOWER]) p[P_LOWER] = bv * .25f;
         ce_build_frame(e, p, now);
+        if (fx) ce_fx_draw(g_ce.anim.id, e, (float)t, &g_ce.f[e]);
     }
 
     /* background particles */
@@ -219,15 +243,22 @@ bool cat_eyes_dirty_rows(int eye, int *y0, int *y1)
     const ce_frame_t *f = &g_ce.f[eye];
     const ce_style_t *st = f->st;
     uint32_t h = hash_frame(f);
-    bool full = g_ce.force_full[eye] || st->snow || st->moon_bats || st->iris == IRIS_FIRE;
-    if (!full && h == g_ce.prev_hash[eye]) return false;
+    const bool fx_on = f->n_fx > 0, tint_on = f->tint_shift != 0;
+    /* a whole-eye tint (or its removal) touches every row */
+    bool full = g_ce.force_full[eye] || st->snow || st->moon_bats || st->iris == IRIS_FIRE || tint_on || g_ce.prev_tint[eye];
+    if (!full && !fx_on && !g_ce.prev_fx[eye] && h == g_ce.prev_hash[eye]) return false;
     int lo = f->y_lo, hi = f->y_hi;
     if (full) { lo = 0; hi = CAT_EYES_H; }
     else {
         if (g_ce.prev_lo[eye] < lo) lo = g_ce.prev_lo[eye];
         if (g_ce.prev_hi[eye] > hi) hi = g_ce.prev_hi[eye];
+        /* effect shapes move: redraw where they are now and where they were */
+        if (fx_on) { if (f->fx_lo < lo) lo = f->fx_lo; if (f->fx_hi > hi) hi = f->fx_hi; }
+        if (g_ce.prev_fx[eye]) { if (g_ce.prev_fx_lo[eye] < lo) lo = g_ce.prev_fx_lo[eye]; if (g_ce.prev_fx_hi[eye] > hi) hi = g_ce.prev_fx_hi[eye]; }
     }
     g_ce.prev_hash[eye] = h; g_ce.prev_lo[eye] = f->y_lo; g_ce.prev_hi[eye] = f->y_hi;
+    g_ce.prev_fx[eye] = fx_on; g_ce.prev_fx_lo[eye] = f->fx_lo; g_ce.prev_fx_hi[eye] = f->fx_hi;
+    g_ce.prev_tint[eye] = tint_on;
     g_ce.force_full[eye] = false;
     *y0 = lo < 0 ? 0 : lo; *y1 = hi > CAT_EYES_H ? CAT_EYES_H : hi;
     return *y1 > *y0;

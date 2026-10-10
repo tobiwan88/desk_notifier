@@ -10,7 +10,10 @@ TOKEN = "testtoken"
 STYLES = ["realistic", "flat", "line", "anime", "cute", "halloween", "christmas"]
 IRISES = ["amber", "green", "blue", "copper", "violet", "odd"]
 ANIMATIONS = ["wink", "slow_blink", "roll", "side_eye", "hunt", "startle", "nictitate", "sleepy",
-              "cross_eyed", "happy", "glance", "special"]
+              "cross_eyed", "happy", "glance",
+              "food", "fly", "paper_plane", "bubble", "spiral", "slots", "euro", "fish", "rain", "snow",
+              "leaf", "day_night", "paw", "spider", "loading", "pacman", "matrix", "disco", "pumpkin",
+              "special"]
 SPECIALS = {"anime": "sparkle", "cute": "heart_eyes", "halloween": "demon_flare", "christmas": "twinkle"}
 # play accepts the animations, the meta names "special" / "random", and the style special names.
 PLAY_NAMES = set(ANIMATIONS) | {"special", "random"} | set(SPECIALS.values())

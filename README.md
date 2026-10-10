@@ -71,7 +71,35 @@ The board remembers your style, iris color, and idle setting after a restart.
 
 **Styles:** realistic (default), flat, line, anime, cute, halloween, christmas
 **Iris colors:** amber (default), green, blue, copper, violet, odd
-**Animations:** wink, slow_blink, roll, side_eye, hunt, startle, nictitate, sleepy, cross_eyed, happy, glance, special
+**Animations:** wink, slow_blink, roll, side_eye, hunt, startle, nictitate, sleepy, cross_eyed, happy, glance, special, and the [effects](#effects)
+
+### Effects
+
+Effects are small scenes drawn over the eyes. They are normal animations: play one with `{"play":"pacman"}`, push it on the web page, or leave random idle on. Each one is rare in random idle. Some use both displays as one wide canvas, so an object can leave the left eye and arrive in the right one.
+
+| Name | What happens |
+|---|---|
+| `food` | A pizza slice, donut, hot dog or burger flies from one eye to the other. The far eye chews it up in three bites. |
+| `fly` | A fly zigzags over both eyes, the pupils chase it, then snap. |
+| `paper_plane` | A paper plane glides across, loops in the second eye and flies off. |
+| `bubble` | A soap bubble drifts over, the eyes cross to watch it, then it pops. |
+| `spiral` | Hypnosis spirals. After 1.5 s one eye turns the other way. |
+| `slots` | The pupils become slot-machine reels. Most runs win (gold flash), some miss. |
+| `euro` | The pupils become shiny euro coins with a glint. |
+| `fish` | One eye turns into a fish tank. A second fish joins the first. The other eye watches. |
+| `rain` | Rain, a gloomy tint and a lightning flash on both eyes. |
+| `snow` | Snowfall, a snow bank, and a snowman pops up. |
+| `leaf` | Two autumn leaves fall. The eyes follow the first one to the ground. |
+| `day_night` | A dial in the pupil. The sun sets, the moon and stars rise. |
+| `paw` | A cat paw swats at the pupil. The pupil dodges, twice. |
+| `spider` | A spider crawls across one eye. Both eyes cross and shudder. |
+| `loading` | A buffering wheel, then "99%", then the eyes snap back. |
+| `pacman` | Pac-Man eats dots across both eyes, a ghost chases him, he eats the pellet and turns around. |
+| `matrix` | Green code rain. The right eye starts 0.4 s later. |
+| `disco` | A mirror ball, a colour wash on the beat (128 bpm) and sparkles. |
+| `pumpkin` | Jack-o'-lantern pupils with a flickering glow, and a bat flies by. It is common in the halloween style. |
+
+In random idle, `pumpkin` and `spider` come up more in the halloween style, and `snow` more in the christmas style.
 
 ## Use the API
 
@@ -192,7 +220,7 @@ scripts/check.sh --quick  # tests only
 
 ## Known limits
 
-- The speed is about 20 frames per second for the realistic style, and about 7 to 10 for full-screen clips. The halloween and christmas styles are slower, about 14 frames per second, because they redraw the whole screen.
+- The speed is about 20 frames per second for the realistic style, and about 7 to 10 for full-screen clips. The halloween and christmas styles are slower, about 14 frames per second, because they redraw the whole screen. Effects move something on every frame, so they run at the speed of the halloween style or a little below. The effects with a tint or a full-screen scene (`rain`, `snow`, `matrix`, `disco`, `pumpkin`) redraw the whole screen.
 - The board has little free internal memory (about 37 KB at its lowest point). Add new features with care.
 - The 24-hour test and the power-cut test are not done yet.
 

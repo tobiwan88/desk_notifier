@@ -86,47 +86,135 @@ void ce_render_init(void)
 }
 
 /* ---------------- shape list helpers ---------------- */
-static ce_shape_t *sh_add(ce_frame_t *f, bool over)
+static ce_shape_t *sh_add(ce_frame_t *f, int layer)
 {
-    uint8_t *n = over ? &f->n_over : &f->n_under;
-    if (*n >= CE_MAX_SHAPES) return NULL;
-    ce_shape_t *s = over ? &f->over[(*n)++] : &f->under[(*n)++];
+    uint8_t *n; ce_shape_t *arr; int cap;
+    if (layer == CE_L_FX) { n = &f->n_fx; arr = f->fx; cap = CE_MAX_FX; }
+    else if (layer == CE_L_OVER) { n = &f->n_over; arr = f->over; cap = CE_MAX_SHAPES; }
+    else { n = &f->n_under; arr = f->under; cap = CE_MAX_SHAPES; }
+    if (*n >= cap) return NULL;
+    ce_shape_t *s = &arr[(*n)++];
     memset(s, 0, sizeof(*s));
     return s;
 }
-static void sh_circle(ce_frame_t *f, bool over, int x, int y, int r, uint16_t c)
+void ce_sh_circle(ce_frame_t *f, int layer, int x, int y, int r, uint16_t c)
 {
-    ce_shape_t *s = sh_add(f, over); if (!s) return;
+    if (r <= 0) return;
+    ce_shape_t *s = sh_add(f, layer); if (!s) return;
     s->kind = SH_CIRCLE; s->color = c; s->x0 = x; s->y0 = y; s->r = r;
     s->bx0 = x - r; s->bx1 = x + r; s->by0 = y - r; s->by1 = y + r;
 }
-static void sh_ellipse(ce_frame_t *f, bool over, int x, int y, int rx, int ry, uint16_t c)
+void ce_sh_ellipse(ce_frame_t *f, int layer, int x, int y, int rx, int ry, uint16_t c)
 {
-    ce_shape_t *s = sh_add(f, over); if (!s) return;
+    if (rx <= 0 || ry <= 0) return;
+    ce_shape_t *s = sh_add(f, layer); if (!s) return;
     s->kind = SH_ELLIPSE; s->color = c; s->x0 = x; s->y0 = y; s->r = rx; s->r2 = ry;
     s->bx0 = x - rx; s->bx1 = x + rx; s->by0 = y - ry; s->by1 = y + ry;
 }
-static void sh_capsule(ce_frame_t *f, bool over, int x0, int y0, int x1, int y1, int r, uint16_t c)
+void ce_sh_capsule(ce_frame_t *f, int layer, int x0, int y0, int x1, int y1, int r, uint16_t c)
 {
-    ce_shape_t *s = sh_add(f, over); if (!s) return;
+    if (r <= 0) return;
+    ce_shape_t *s = sh_add(f, layer); if (!s) return;
     s->kind = SH_CAPSULE; s->color = c; s->x0 = x0; s->y0 = y0; s->x1 = x1; s->y1 = y1; s->r = r;
     s->bx0 = (x0 < x1 ? x0 : x1) - r; s->bx1 = (x0 > x1 ? x0 : x1) + r;
     s->by0 = (y0 < y1 ? y0 : y1) - r; s->by1 = (y0 > y1 ? y0 : y1) + r;
 }
-static void sh_tri(ce_frame_t *f, bool over, int x0, int y0, int x1, int y1, int x2, int y2, uint16_t c)
+void ce_sh_tri(ce_frame_t *f, int layer, int x0, int y0, int x1, int y1, int x2, int y2, uint16_t c)
 {
-    ce_shape_t *s = sh_add(f, over); if (!s) return;
+    ce_shape_t *s = sh_add(f, layer); if (!s) return;
     s->kind = SH_TRI; s->color = c; s->x0 = x0; s->y0 = y0; s->x1 = x1; s->y1 = y1; s->x2 = x2; s->y2 = y2;
     int a = x0 < x1 ? x0 : x1; s->bx0 = a < x2 ? a : x2; a = x0 > x1 ? x0 : x1; s->bx1 = a > x2 ? a : x2;
     a = y0 < y1 ? y0 : y1; s->by0 = a < y2 ? a : y2; a = y0 > y1 ? y0 : y1; s->by1 = a > y2 ? a : y2;
 }
+void ce_sh_rect(ce_frame_t *f, int layer, int x0, int y0, int x1, int y1, uint16_t c)
+{
+    ce_shape_t *s = sh_add(f, layer); if (!s) return;
+    if (x0 > x1) { int t = x0; x0 = x1; x1 = t; }
+    if (y0 > y1) { int t = y0; y0 = y1; y1 = t; }
+    s->kind = SH_RECT; s->color = c; s->x0 = x0; s->y0 = y0; s->x1 = x1; s->y1 = y1;
+    s->bx0 = x0; s->bx1 = x1; s->by0 = y0; s->by1 = y1;
+}
+void ce_sh_ring(ce_frame_t *f, int layer, int x, int y, int r_out, int r_in, uint16_t c)
+{
+    if (r_out <= 0) return;
+    if (r_in < 0) r_in = 0;
+    if (r_in >= r_out) return;
+    ce_shape_t *s = sh_add(f, layer); if (!s) return;
+    s->kind = SH_RING; s->color = c; s->x0 = x; s->y0 = y; s->r = r_out; s->r2 = r_in;
+    s->bx0 = x - r_out; s->bx1 = x + r_out; s->by0 = y - r_out; s->by1 = y + r_out;
+}
+void ce_sh_glyph(ce_frame_t *f, int layer, int x, int y, int scale, int glyph, uint16_t c)
+{
+    if (scale <= 0 || glyph < 0 || glyph >= CE_GLYPH_COUNT) return;
+    ce_shape_t *s = sh_add(f, layer); if (!s) return;
+    s->kind = SH_GLYPH; s->color = c; s->x0 = x; s->y0 = y; s->r = scale; s->r2 = glyph;
+    s->bx0 = x; s->bx1 = x + 5 * scale - 1; s->by0 = y; s->by1 = y + 7 * scale - 1;
+}
+void ce_sh_clip(ce_frame_t *f, int layer, int first, int y0, int y1)
+{
+    uint8_t n = layer == CE_L_FX ? f->n_fx : layer == CE_L_OVER ? f->n_over : f->n_under;
+    ce_shape_t *arr = layer == CE_L_FX ? f->fx : layer == CE_L_OVER ? f->over : f->under;
+    for (int i = first < 0 ? 0 : first; i < n; i++) {
+        if (arr[i].kind == SH_TRI) continue;
+        arr[i].clip = 1; arr[i].x2 = (int16_t)y0; arr[i].y2 = (int16_t)y1;
+    }
+}
+
+/* 5x7 font, one byte per row, bit 4 = leftmost pixel */
+const uint8_t g_ce_font[CE_GLYPH_COUNT][7] = {
+    {0x0E, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0E}, /* 0 */
+    {0x04, 0x0C, 0x04, 0x04, 0x04, 0x04, 0x0E}, /* 1 */
+    {0x0E, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1F}, /* 2 */
+    {0x1E, 0x01, 0x01, 0x0E, 0x01, 0x01, 0x1E}, /* 3 */
+    {0x02, 0x06, 0x0A, 0x12, 0x1F, 0x02, 0x02}, /* 4 */
+    {0x1F, 0x10, 0x1E, 0x01, 0x01, 0x11, 0x0E}, /* 5 */
+    {0x06, 0x08, 0x10, 0x1E, 0x11, 0x11, 0x0E}, /* 6 */
+    {0x1F, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08}, /* 7 */
+    {0x0E, 0x11, 0x11, 0x0E, 0x11, 0x11, 0x0E}, /* 8 */
+    {0x0E, 0x11, 0x11, 0x0F, 0x01, 0x02, 0x0C}, /* 9 */
+    {0x19, 0x1A, 0x02, 0x04, 0x08, 0x0B, 0x13}, /* % */
+    {0x07, 0x08, 0x1E, 0x08, 0x1E, 0x08, 0x07}, /* euro */
+    {0x1F, 0x04, 0x0E, 0x15, 0x04, 0x04, 0x04}, /* kana-ish glyphs */
+    {0x0A, 0x0A, 0x12, 0x12, 0x02, 0x04, 0x04},
+    {0x08, 0x1E, 0x08, 0x0E, 0x12, 0x12, 0x0C},
+    {0x1F, 0x01, 0x05, 0x0A, 0x04, 0x0A, 0x11},
+    {0x04, 0x1F, 0x04, 0x0E, 0x15, 0x04, 0x0C},
+    {0x1E, 0x02, 0x1F, 0x02, 0x0E, 0x02, 0x1E},
+    {0x0E, 0x00, 0x1F, 0x04, 0x0A, 0x11, 0x00},
+    {0x11, 0x0A, 0x04, 0x1F, 0x04, 0x04, 0x08},
+};
 
 static void sh_row(const ce_shape_t *s, int n, int y, uint16_t *d)
 {
     for (int i = 0; i < n; i++, s++) {
         if (y < s->by0 || y > s->by1) continue;
+        if (s->clip && (y < s->x2 || y > s->y2)) continue;
         int dy = y - s->y0, xa, xb;
         switch (s->kind) {
+        case SH_RECT: xa = s->x0; xb = s->x1; break;
+        case SH_RING: {
+            int ady = dy < 0 ? -dy : dy;
+            if (ady > s->r) continue;
+            int xo = (int)ce_isqrt((uint32_t)(s->r * s->r - dy * dy));
+            if (ady >= s->r2) { xa = s->x0 - xo; xb = s->x0 + xo; break; }
+            int xi = (int)ce_isqrt((uint32_t)(s->r2 * s->r2 - dy * dy));
+            for (int x = s->x0 - xo; x <= s->x0 - xi - 1; x++) if (x >= 0 && x < CAT_EYES_W) d[x] = s->color;
+            for (int x = s->x0 + xi + 1; x <= s->x0 + xo; x++) if (x >= 0 && x < CAT_EYES_W) d[x] = s->color;
+            continue;
+        }
+        case SH_GLYPH: {
+            int gy = dy / s->r;
+            if (gy < 0 || gy > 6) continue;
+            uint8_t bits = g_ce_font[s->r2][gy];
+            for (int c = 0; c < 5; c++) {
+                if (!((bits >> (4 - c)) & 1)) continue;
+                int xs = s->x0 + c * s->r, xe = xs + s->r - 1;
+                if (xs < 0) xs = 0;
+                if (xe > 239) xe = 239;
+                for (int x = xs; x <= xe; x++) d[x] = s->color;
+            }
+            continue;
+        }
         case SH_CIRCLE: {
             int hw = (int)ce_isqrt((uint32_t)(s->r * s->r - dy * dy));
             xa = s->x0 - hw; xb = s->x0 + hw; break;
@@ -183,6 +271,7 @@ void ce_build_frame(int eye, const float *p, uint32_t T)
     const ce_style_t *st = &g_ce_styles[g_ce.style];
     memcpy(f->p, p, sizeof(f->p));
     f->st = st;
+    f->n_fx = 0; f->tint_shift = 0; f->tint_add = 0; f->fx_lo = CAT_EYES_H; f->fx_hi = 0;
     f->side = eye == 0 ? 1 : -1;
     int side = f->side;
 
@@ -326,56 +415,56 @@ void ce_build_frame(int eye, const float *p, uint32_t T)
         uint16_t c = ce_blend(f->bg, 0, 46);
         for (int i = 0; i < 9; i++) {
             int x = 30 + i * 22;
-            sh_capsule(f, false, x, 0, x + 6, 26, 1, c); sh_capsule(f, false, x + 6, 26, x, 52, 1, c);
+            ce_sh_capsule(f, CE_L_UNDER, x, 0, x + 6, 26, 1, c); ce_sh_capsule(f, CE_L_UNDER, x + 6, 26, x, 52, 1, c);
         }
     }
     if (st->moon_bats) {
         int mx = eye ? 200 : 40;
-        sh_circle(f, false, mx, 40, 16, RGB565(0xf4, 0xc5, 0x42));
-        sh_circle(f, false, mx + 7, 35, 14, f->bg);
+        ce_sh_circle(f, CE_L_UNDER, mx, 40, 16, RGB565(0xf4, 0xc5, 0x42));
+        ce_sh_circle(f, CE_L_UNDER, mx + 7, 35, 14, f->bg);
         int flap = (int)lrintf(sinf(T / 80.f) * 4);
         for (int i = 0; i < CE_BATS; i++) {
             float a = g_ce.bats[i].a + T * g_ce.bats[i].v * .06f;
             int bx = (int)lrintf(120 + cosf(a) * g_ce.bats[i].r), by = (int)lrintf(60 + sinf(a * 2) * 25);
-            sh_tri(f, false, bx, by - 1, bx - 14, by - 2 + flap, bx - 4, by + 3, 0);
-            sh_tri(f, false, bx, by - 1, bx + 14, by - 2 + flap, bx + 4, by + 3, 0);
-            sh_circle(f, false, bx, by, 3, 0);
+            ce_sh_tri(f, CE_L_UNDER, bx, by - 1, bx - 14, by - 2 + flap, bx - 4, by + 3, 0);
+            ce_sh_tri(f, CE_L_UNDER, bx, by - 1, bx + 14, by - 2 + flap, bx + 4, by + 3, 0);
+            ce_sh_circle(f, CE_L_UNDER, bx, by, 3, 0);
         }
     }
     if (st->snow)
         for (int i = 0; i < CE_SNOW; i++)
-            sh_circle(f, false, (int)g_ce.snow[eye][i].x, (int)g_ce.snow[eye][i].y, (int)(g_ce.snow[eye][i].r + .5f), 0xffff);
-    if (st->blush) sh_ellipse(f, false, CE_CX - side * 40, 220, 26, 12, ce_blend(f->bg, RGB565(255, 110, 140), 115));
+            ce_sh_circle(f, CE_L_UNDER, (int)g_ce.snow[eye][i].x, (int)g_ce.snow[eye][i].y, (int)(g_ce.snow[eye][i].r + .5f), 0xffff);
+    if (st->blush) ce_sh_ellipse(f, CE_L_UNDER, CE_CX - side * 40, 220, 26, 12, ce_blend(f->bg, RGB565(255, 110, 140), 115));
 
     /* line the decorations follow: open upper lid, or the closed line */
     const int16_t *tl = f->open ? f->top : f->cl;
 #define SX(lx) (CE_CX + side * (lx))
 #define TL(lx) (tl[clampi(SX(lx), 0, 239)])
     if (f->smile_mode) {
-        sh_circle(f, true, SX(-70), 20 + CE_CY, 4, f->ink); sh_circle(f, true, SX(70), 20 + CE_CY, 4, f->ink);
+        ce_sh_circle(f, CE_L_OVER, SX(-70), 20 + CE_CY, 4, f->ink); ce_sh_circle(f, CE_L_OVER, SX(70), 20 + CE_CY, 4, f->ink);
     } else {
         if (st->lashes)
             for (int k = 0, i = 1; i <= 7; i += 3, k++) {
                 int lx = -CE_EYE_HALF_W + 2 * CE_EYE_HALF_W * i / 36, y = TL(lx);
-                sh_capsule(f, true, SX(lx), y, SX(lx - 18 - 2 * k), y - 6 - 6 * k, 3, f->ink);
+                ce_sh_capsule(f, CE_L_OVER, SX(lx), y, SX(lx - 18 - 2 * k), y - 6 - 6 * k, 3, f->ink);
             }
         if (st->demon_brow) {
             for (int i = 8; i <= 24; i += 8) {
                 int lx = -CE_EYE_HALF_W + 2 * CE_EYE_HALF_W * i / 36, y = TL(lx);
-                sh_tri(f, true, SX(lx - 8), y + 2, SX(lx + 2), y - 16, SX(lx + 8), y + 2, 0);
+                ce_sh_tri(f, CE_L_OVER, SX(lx - 8), y + 2, SX(lx + 2), y - 16, SX(lx + 8), y + 2, 0);
             }
-            sh_capsule(f, true, SX(-110), TL(-100) - 34, SX(104), TL(100) - 40 + (int)(p[P_TILT] * 30), 6, 0);
+            ce_sh_capsule(f, CE_L_OVER, SX(-110), TL(-100) - 34, SX(104), TL(100) - 40 + (int)(p[P_TILT] * 30), 6, 0);
         }
         if (st->santa_trim) {
             for (int i = 1; i < 36; i += 2) {
                 int lx = -CE_EYE_HALF_W + 2 * CE_EYE_HALF_W * i / 36, y = TL(lx);
-                sh_circle(f, true, SX(lx), y - 4, 8, RGB565(0xdd, 0xdd, 0xdd));
-                sh_circle(f, true, SX(lx), y - 4, 7, 0xffff);
+                ce_sh_circle(f, CE_L_OVER, SX(lx), y - 4, 8, RGB565(0xdd, 0xdd, 0xdd));
+                ce_sh_circle(f, CE_L_OVER, SX(lx), y - 4, 7, 0xffff);
             }
-            sh_circle(f, true, SX(-118), TL(-100) - 14, 11, 0xffff);
+            ce_sh_circle(f, CE_L_OVER, SX(-118), TL(-100) - 14, 11, 0xffff);
         }
         if (st->corner_flick)
-            sh_capsule(f, true, SX(-104), st->yo + CE_CY, SX(-120), st->yo + CE_CY - 12, 2, f->ink);
+            ce_sh_capsule(f, CE_L_OVER, SX(-104), st->yo + CE_CY, SX(-120), st->yo + CE_CY - 12, 2, f->ink);
     }
 #undef TL
 #undef SX
@@ -493,6 +582,12 @@ void cat_eyes_render_strip(int eye, int y0, int h, uint16_t *dst)
             }
         }
         sh_row(f->over, f->n_over, y, d);
+        if (f->tint_shift) {
+            const uint16_t add = f->tint_add;
+            if (f->tint_shift == 1) for (int x = 0; x < CAT_EYES_W; x++) d[x] = (uint16_t)(((d[x] >> 1) & 0x7BEF) + add);
+            else for (int x = 0; x < CAT_EYES_W; x++) d[x] = (uint16_t)(((d[x] >> 2) & 0x39E7) + add);
+        }
+        if (f->n_fx) sh_row(f->fx, f->n_fx, y, d);
         if (g_ce.swap) for (int x = 0; x < CAT_EYES_W; x++) d[x] = (uint16_t)((d[x] >> 8) | (d[x] << 8));
     }
 }

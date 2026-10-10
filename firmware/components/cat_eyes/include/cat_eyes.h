@@ -66,9 +66,34 @@ typedef enum {
     CAT_ANIM_CROSS_EYED,
     CAT_ANIM_HAPPY,
     CAT_ANIM_GLANCE,
-    CAT_ANIM_SPECIAL, /* style specific: sparkle / heart eyes / flare / twinkle */
+    /* Effects (src/cat_eyes_fx.c): sprites and scenes drawn over the eyes.
+     * Several travel from one display to the other through a shared "world"
+     * coordinate, so one object can fly from the left eye into the right one. */
+    CAT_ANIM_FOOD,       /* pizza / donut / hot dog / burger flies across and is eaten */
+    CAT_ANIM_FLY,        /* a fly zigzags over both eyes, the pupils chase it, snap    */
+    CAT_ANIM_PLANE,      /* paper plane glides across, loops in the second eye         */
+    CAT_ANIM_BUBBLE,     /* soap bubble drifts over, eyes cross, it pops               */
+    CAT_ANIM_SPIRAL,     /* hypnosis spirals, one eye reverses                         */
+    CAT_ANIM_SLOTS,      /* pupils become slot-machine reels, jackpot flash            */
+    CAT_ANIM_EURO,       /* pupils become shiny euro coins                             */
+    CAT_ANIM_FISH,       /* one eye is a fish tank, a second fish joins                */
+    CAT_ANIM_RAIN,       /* rain and a lightning flash on both eyes                    */
+    CAT_ANIM_SNOW,       /* snowfall, a snowman pops up                                */
+    CAT_ANIM_LEAF,       /* autumn leaves fall, the eyes follow them down              */
+    CAT_ANIM_DAYNIGHT,   /* sun sets, moon and stars rise                              */
+    CAT_ANIM_PAW,        /* a cat paw swats at the pupil, which dodges                 */
+    CAT_ANIM_SPIDER,     /* spider crawls across an eye, eyes cross and shudder        */
+    CAT_ANIM_LOADING,    /* buffering wheel, "99%", snap back                          */
+    CAT_ANIM_PACMAN,     /* Pac-Man chased by a ghost across both eyes                 */
+    CAT_ANIM_MATRIX,     /* green code rain, the right eye lags behind                 */
+    CAT_ANIM_DISCO,      /* mirror ball, colour wash on the beat, sparkles             */
+    CAT_ANIM_PUMPKIN,    /* jack-o'-lantern pupils, a bat flies by                     */
+    CAT_ANIM_SPECIAL, /* style specific: sparkle / heart eyes / flare / twinkle  (keep last) */
     CAT_ANIM_COUNT
 } cat_anim_t;
+
+#define CAT_ANIM_FX_FIRST CAT_ANIM_FOOD
+#define CAT_ANIM_FX_LAST CAT_ANIM_PUMPKIN
 
 /* Lifecycle ------------------------------------------------------------- */
 void cat_eyes_init(uint32_t seed);

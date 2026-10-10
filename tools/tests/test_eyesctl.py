@@ -27,7 +27,7 @@ def test_client_basic(dev):
 def test_client_animations(dev):
     a = Device(dev.host, TOKEN).animations()
     assert a["styles"] == STYLES and a["irises"] == IRISES and a["animations"] == ANIMATIONS
-    assert a["specials"] == SPECIALS and len(a["animations"]) == 12
+    assert a["specials"] == SPECIALS and len(a["animations"]) == len(ANIMATIONS) == 31
     assert a["state"] == {"style": "realistic", "iris": "amber", "auto": False, "anim": None}
 
 

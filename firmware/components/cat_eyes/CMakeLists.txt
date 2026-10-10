@@ -1,5 +1,5 @@
 idf_component_register(
-    SRCS "src/cat_eyes.c" "src/cat_eyes_anim.c" "src/cat_eyes_render.c" "src/cat_eyes_styles.c"
+    SRCS "src/cat_eyes.c" "src/cat_eyes_anim.c" "src/cat_eyes_render.c" "src/cat_eyes_styles.c" "src/cat_eyes_fx.c"
     INCLUDE_DIRS "include"
     PRIV_INCLUDE_DIRS "src"
 )
