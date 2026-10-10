@@ -25,6 +25,12 @@ menu "Eyes"
     config EYES_LCD_SPI_HZ
         int "SPI clock (Hz), max 40 MHz"
         default 20000000
+    config EYES_LCD_BGR
+        bool "Panel colour order is BGR"
+        default y
+    config EYES_LCD_INVERT
+        bool "Invert colours (most GC9A01 modules need this)"
+        default y
     config EYES_STRIP_LINES
         int "Lines per DMA strip"
         default 20
