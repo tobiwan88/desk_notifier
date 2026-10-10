@@ -173,6 +173,12 @@ scripts/check.sh --quick  # tests only
 - The board has little free internal memory (about 37 KB at its lowest point). Add new features with care.
 - The 24-hour test and the power-cut test are not done yet.
 
-## Licenses
+## License
 
-This project has no license file yet. The `cat_eyes` component came as a ready-made package with no license text. Ask its author before you share or sell this project. cJSON (MIT) is included for the tests in `firmware/test/host/third_party`. The `doctest` test library (MIT) is in `firmware/test/host`.
+This project uses the [MIT License](LICENSE). You can use, copy, change, and share it for any purpose, also in commercial products. Keep the copyright line and the license text with the code.
+
+The project includes other code that has its own license:
+
+- cJSON (MIT) in `firmware/test/host/third_party`, used for tests only
+- doctest (MIT) in `firmware/test/host`
+- ESP-IDF and the ESP component registry libraries (Apache-2.0 and others). The build downloads them. They are not part of this repository.
