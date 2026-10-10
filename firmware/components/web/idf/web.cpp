@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <string_view>
 
 #include "engine/core/errors.hpp"
 #include "engine/core/parse.hpp"
@@ -28,6 +29,7 @@ namespace {
 
 const char* const kTag = "web";
 std::string g_token;
+bool g_open = false;
 
 void send_error(httpd_req_t* r, engine::Err e, std::string_view msg) {
     const auto info = engine::describe(e);
@@ -48,6 +50,7 @@ void send_json(httpd_req_t* r, const char* status, const char* body) {
 }
 
 bool authorized(httpd_req_t* r) {
+    if (g_open) return true;
     char h[96];
     if (httpd_req_get_hdr_value_str(r, "Authorization", h, sizeof h) != ESP_OK) { send_error(r, engine::Err::Unauthorized, "missing token"); return false; }
     if (!engine::ct_equal(engine::bearer_token(h), g_token)) { send_error(r, engine::Err::Unauthorized, "wrong token"); return false; }
@@ -103,17 +106,21 @@ esp_err_t post_stop(httpd_req_t* r) {
 
 esp_err_t get_status(httpd_req_t* r) {
     const auto s = engine::stats();
+    const auto ei = engine::eye_info();
     const auto* app = esp_app_get_description();
-    char b[768];
+    char b[896];
     std::snprintf(b, sizeof b,
         R"({"version":"%s","idf":"%s","hostname":"%s","uptime_s":%lld,"heap_internal":%u,"heap_min":%u,"psram_free":%u,)"
         R"("fps":%u.%u,"fill_ms_avg":%lu,"frame_ms_avg":%lu,"frame_ms_max":%lu,"rssi":%d,"ip":"%s","source":{"left":"%.*s","right":"%.*s"},)"
-        R"("fs_free":%lu,"clip_max_bps":%d,"spi_hz":%d})",
+        R"("auth":"%s","render_stack_free":%u,"eye":{"style":"%.*s","iris":"%.*s","auto":%s,"anim":"%.*s"},"fs_free":%lu,"clip_max_bps":%d,"spi_hz":%d})",
         app->version, app->idf_ver, net::hostname().c_str(), static_cast<long long>(esp_timer_get_time() / 1000000),
         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)), static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)),
         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)), s.fps_x10 / 10, s.fps_x10 % 10,
         static_cast<unsigned long>(s.fill_us_avg / 1000), static_cast<unsigned long>(s.frame_us_avg / 1000), static_cast<unsigned long>(s.frame_us_max / 1000), net::rssi(), net::ip().c_str(),
-        static_cast<int>(s.source[0].size()), s.source[0].data(), static_cast<int>(s.source[1].size()), s.source[1].data(), static_cast<unsigned long>(storage::free_bytes()),
+        static_cast<int>(s.source[0].size()), s.source[0].data(), static_cast<int>(s.source[1].size()), s.source[1].data(),
+        g_open ? "open" : "token", engine::render_stack_free_bytes(),
+        static_cast<int>(ei.style_name.size()), ei.style_name.data(), static_cast<int>(ei.iris_name.size()), ei.iris_name.data(),
+        ei.auto_idle ? "true" : "false", static_cast<int>(ei.anim.size()), ei.anim.data(), static_cast<unsigned long>(storage::free_bytes()),
         CONFIG_EYES_CLIP_MAX_BPS, CONFIG_EYES_LCD_SPI_HZ);
     send_json(r, "200 OK", b);
     return ESP_OK;
@@ -225,17 +232,49 @@ esp_err_t post_ota(httpd_req_t* r) {
     return ESP_OK;
 }
 
+extern const char index_html_start[] asm("_binary_index_html_start");
+extern const char index_html_end[] asm("_binary_index_html_end");
+
 esp_err_t get_root(httpd_req_t* r) {
-    send_json(r, "200 OK", R"({"name":"eyes","hint":"use eyes-studio or /api/status"})");
+    httpd_resp_set_type(r, "text/html; charset=utf-8");
+    httpd_resp_set_hdr(r, "Cache-Control", "no-cache");
+    httpd_resp_send(r, index_html_start, index_html_end - index_html_start - 1);  // EMBED_TXTFILES appends a NUL
+    return ESP_OK;
+}
+
+void append_list(std::string& out, const char* key, const auto& names) {
+    out += '"'; out += key; out += "\":[";
+    bool first = true;
+    for (const auto n : names) { if (!first) out += ','; first = false; out += '"'; out.append(n); out += '"'; }
+    out += ']';
+}
+
+esp_err_t get_animations(httpd_req_t* r) {  // catalogue + current state; no auth (nothing sensitive)
+    std::string b = "{";
+    append_list(b, "styles", eyes::kStyleNames); b += ',';
+    append_list(b, "irises", eyes::kIrisNames); b += ',';
+    append_list(b, "animations", eyes::kAnimNames); b += ",\"specials\":{";
+    bool first = true;
+    for (std::size_t i = 0; i < eyes::kSpecialNames.size(); ++i) {
+        if (eyes::kSpecialNames[i].empty()) continue;
+        if (!first) b += ',';
+        first = false;
+        b += '"'; b.append(eyes::kStyleNames[i]); b += "\":\""; b.append(eyes::kSpecialNames[i]); b += '"';
+    }
+    const auto i = engine::eye_info();
+    b += "},\"state\":{\"style\":\""; b.append(i.style_name); b += "\",\"iris\":\""; b.append(i.iris_name);
+    b += "\",\"auto\":"; b += i.auto_idle ? "true" : "false"; b += ",\"anim\":\""; b.append(i.anim); b += "\"}}";
+    send_json(r, "200 OK", b.c_str());
     return ESP_OK;
 }
 
 }  // namespace
 
 std::expected<void, engine::Err> start() noexcept {
+    g_open = net::open_access();
     g_token = net::token();
     httpd_config_t c = HTTPD_DEFAULT_CONFIG();
-    c.stack_size = 8192;
+    c.stack_size = 6144;
     c.max_uri_handlers = 16;
     c.recv_wait_timeout = 10;
     c.send_wait_timeout = 10;
@@ -247,6 +286,7 @@ std::expected<void, engine::Err> start() noexcept {
     const httpd_uri_t routes[] = {
         {.uri = "/", .method = HTTP_GET, .handler = get_root, .user_ctx = nullptr},
         {.uri = "/api/status", .method = HTTP_GET, .handler = get_status, .user_ctx = nullptr},
+        {.uri = "/api/animations", .method = HTTP_GET, .handler = get_animations, .user_ctx = nullptr},
         {.uri = "/api/eye", .method = HTTP_POST, .handler = post_eye, .user_ctx = nullptr},
         {.uri = "/api/play", .method = HTTP_POST, .handler = post_play, .user_ctx = nullptr},
         {.uri = "/api/stop", .method = HTTP_POST, .handler = post_stop, .user_ctx = nullptr},

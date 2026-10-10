@@ -51,19 +51,4 @@ void erase_all() noexcept {
     if (n.ok) { nvs_erase_all(n.h); nvs_commit(n.h); }
 }
 
-std::optional<eyes::EyeStyle> load_style() noexcept {
-    static_assert(std::is_trivially_copyable_v<eyes::EyeStyle>);
-    Handle n(false);
-    if (!n.ok) return std::nullopt;
-    eyes::EyeStyle s;
-    std::size_t len = sizeof s;
-    if (nvs_get_blob(n.h, "style", &s, &len) != ESP_OK || len != sizeof s) return std::nullopt;
-    return s;
-}
-
-bool save_style(const eyes::EyeStyle& s) noexcept {
-    Handle n(true);
-    return n.ok && nvs_set_blob(n.h, "style", &s, sizeof s) == ESP_OK && nvs_commit(n.h) == ESP_OK;
-}
-
 }  // namespace settings

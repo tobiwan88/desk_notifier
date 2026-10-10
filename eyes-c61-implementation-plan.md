@@ -1,6 +1,6 @@
 # HTTP-Controlled Animated Eyes on ESP32-C61 — Implementation Plan
 
-**Version:** 1.3 (display module datasheet applied) · **Date:** 2026-10-10 · **Status:** ready for approval
+**Version:** 2.0 (cat_eyes pivot) · **Date:** 2026-10-10 · **Status:** in execution — M0–M7 mostly implemented, see 'Implementation status'
 **Execution model:** **Sonnet 5.5 coordinator** dispatches small vertical slices to **Haiku 5.5** workers with minimal context; **Sonnet 5.5** reviews; **Opus 5.5** freezes contracts and handles escalations.
 **Language:** firmware in **modern C++ (C++23 subset, compiled as gnu++26)**; PC/Docker tooling in Python 3.
 **Builds:** local only (no hosted CI). One script, `scripts/check.sh`, is the gate for every slice.
@@ -29,6 +29,51 @@
 | **1 kΩ series resistors** on SCL, SDA, DC, CS, RST | SPI default **20 MHz** (safe); S2.3 sweeps 20 / 26.7 / 40 MHz. For 40 MHz bridge the SCL/SDA resistors (§1.5). Performance tables for 20 / 26.7 / 40 MHz. |
 | On-board LDO, VCC input up to 6 V | Power both modules from the **5 V pin**: full backlight brightness, no load on the DevKit’s 3.3 V regulator. Logic stays 3.3 V. |
 | RST has its own 10 kΩ pull-up + 100 nF on the module | Shared RST line still used (one reset pulse for both); could be dropped later to free a GPIO. |
+
+### Changes v1.3 → v2.0 (cat_eyes pivot + hardware results)
+
+| Change | Effect |
+|---|---|
+| Procedural `EyeStyle` / mood renderer (§3.3, §5.2: moods, lids, `StylePatch`) | **Replaced** by the ready-made C component `cat_eyes` (`firmware/components/cat_eyes`). The old sections stay in the document, marked superseded. |
+| cat_eyes styles | `realistic` (default), `flat`, `line`, `anime`, `cute`, `halloween`, `christmas`. |
+| cat_eyes iris colours | `amber`, `green`, `blue`, `copper`, `violet`, `odd`. |
+| cat_eyes animations (12) | `wink`, `slow_blink`, `roll`, `side_eye`, `hunt`, `startle`, `nictitate`, `sleepy`, `cross_eyed`, `happy`, `glance`, `special`. Built-in random idle with saccades and blinks. |
+| Device eye API is now very small | `POST /api/eye` accepts any of the keys `style`, `iris`, `play` (animation name, `blink` or `random`), `auto` (random idle on/off), `look` (`[gx, gy, hold_ms]`), `save`. |
+| New `GET /api/animations` | Catalog plus current state; no auth. Status fields are embedded in the existing status output. |
+| On-device web page | `GET /` serves a small page to pick style, iris and animation and to toggle random idle. Replaces decision D14 ("no on-device UI"). `eyes-studio` remains for clip preparation. |
+| Clips kept as optional second source | Per display: RAW565 `.clip`, `PUT/GET/DELETE /api/clips`, `POST /api/play`, `POST /api/stop`. |
+| Rendering model | cat_eyes renders full 240-px rows with dirty-row ranges (no circle trim). `halloween` and `christmas` redraw the full screen every frame. |
+| Console | USB-Serial/JTAG, not UART0. |
+| SPI interrupt flag | The esp_lcd SPI done-callback is not IRAM-safe, so `ESP_INTR_FLAG_IRAM` must **not** be set on the SPI bus. |
+| SPI clock | GPIO-matrix SPI at 40 MHz is being evaluated visually (S2.3). |
+| LittleFS read speed | Measured 3.2 MB/s. A6 is satisfied; the D9 fallback is not needed. |
+| OTA | OTA with rollback verified on the board. |
+| RAM | Internal RAM is the scarce resource. Wi-Fi/lwIP buffers moved to PSRAM, `SPIRAM_MALLOC_ALWAYSINTERNAL=256`. |
+| PSRAM usage | Clip index, upload/OTA buffers, and Wi-Fi/lwIP. |
+
+### Implementation status
+
+**Done**
+- S0.2 skeleton + gate
+- S1.1 / S1.2 gfx
+- S2.1 / S2.2 display + strip pool
+- S3.x old eye renderer (superseded by cat_eyes)
+- S4.1 parser
+- S4.3 net/console
+- S4.4 web API
+- S4.5 eyesctl
+- S5.x clips (clipprep, clip core, storage, ClipPlayer, routes)
+- S5.0 fs benchmark (3.2 MB/s)
+- S6.1 / S6.2 studio
+- S7.1 OTA + rollback
+
+**Open**
+- S2.3 clock sweep (20 / 26.7 / 40 MHz, visual)
+- S7.2 power-cut test (owner)
+- S7.3 24 h soak
+- RAM headroom target: minimum free internal RAM >= 40 KB
+- cat_eyes frame-time measurement per style (target < 33 ms)
+- Optional date-based default style (halloween in October, christmas in December)
 
 ---
 
@@ -444,6 +489,8 @@ Scene behavior: each display has an active source (`EyeView` or `ClipPlayer`). `
 
 ### 3.3 `eyes` (core) — general, layered eye model
 
+> **Superseded in v2.0** by the cat_eyes component — see 'Changes v1.3 → v2.0'.
+
 **Layer stack per eye (drawn per row, back to front):** background → sclera → iris (with optional ring) → pupil (round or slit) → highlight → upper/lower lids (bg or skin colour, curved edge, tilt).
 
 ```cpp
@@ -699,6 +746,8 @@ TWDT on render (5 s); `acquire` timeout 100 ms, 3 in a row → display re-init; 
 
 ### 5.2 Eye command schema (`docs/spec/eye.schema.json`, abbreviated)
 
+> **Superseded in v2.0** by the cat_eyes component — see 'Changes v1.3 → v2.0'.
+
 ```json
 {
   "type": "object", "additionalProperties": false,
@@ -734,6 +783,8 @@ TWDT on render (5 s); `acquire` timeout 100 ms, 3 in a row → display re-init; 
 Body ≤ 1 KB. `preset` is applied first, then the other style fields. `save_style:true` stores the resulting style in NVS (loaded at boot). `brightness` scales all eye colours (renderer multiplies RGB565 channels via a 101-entry constexpr LUT); clips are unaffected. With the backlight mod it drives PWM instead.
 
 ### 5.3 Device HTTP API (7 routes)
+
+> **Updated in v2.0**: POST /api/eye is now the cat_eyes schema (style, iris, play, auto, look, save); GET /api/animations added; GET / serves the embedded page.
 
 Token (`Authorization: Bearer <token>`) on all routes except `GET /api/status`.
 

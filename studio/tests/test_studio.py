@@ -35,11 +35,33 @@ def test_pages_and_devices(tmp_path):
 def test_control_proxy(tmp_path):
     with MockDevice() as m:
         c = client(tmp_path, m)
-        assert c.post("/api/devices/eyes-mock/eye", json={"mood": "happy"}).status_code == 200
+        assert c.post("/api/devices/eyes-mock/eye", json={"style": "anime", "iris": "odd", "play": "wink"}).status_code == 200
+        assert c.post("/api/devices/eyes-mock/eye", json={"look": [0.2, -0.4, 800], "auto": True}).status_code == 200
         assert c.post("/api/devices/eyes-mock/play", json={"clip": "a", "loop": True}).status_code == 200
         assert c.post("/api/devices/eyes-mock/stop").status_code == 200
-        assert m.eye_cmds == [{"mood": "happy"}] and m.play_cmds[0]["clip"] == "a" and m.stops == 1
+        assert m.eye_cmds == [{"style": "anime", "iris": "odd", "play": "wink"}, {"look": [0.2, -0.4, 800], "auto": True}]
+        assert m.eye_state["style"] == "anime" and m.eye_state["anim"] == "wink" and m.eye_state["auto"] is True
+        assert m.play_cmds[0]["clip"] == "a" and m.stops == 1
         assert c.post("/api/devices/nope/stop").status_code == 404
+
+
+def test_eye_rejects_unknown_animation(tmp_path):
+    with MockDevice() as m:
+        c = client(tmp_path, m)
+        r = c.post("/api/devices/eyes-mock/eye", json={"play": "bogus"})
+        assert r.status_code == 400
+        assert r.json()["error"]["code"] == "E_BAD_JSON"
+        assert m.eye_cmds == []
+
+
+def test_animations_proxy(tmp_path):
+    with MockDevice() as m:
+        c = client(tmp_path, m)
+        a = c.get("/api/devices/eyes-mock/animations").json()
+        assert a["styles"][0] == "realistic" and "amber" in a["irises"]
+        assert len(a["animations"]) == 12 and a["specials"]["cute"] == "heart_eyes"
+        assert a["state"]["style"] == "realistic"
+        assert c.get("/api/devices/nope/animations").status_code == 404
 
 
 def test_prepare_send_delete(tmp_path):

@@ -63,17 +63,17 @@ TEST_CASE("stop and interrupt return to eyes") {
     s.apply(Command{StopCmd{}}, 10);
     CHECK(s.current(Eye::Left) == "eyes"); CHECK(s.current(Eye::Right) == "eyes");
     s.apply(Command{play("a", "")}, 20);
-    EyeCmd e; e.interrupt = true; e.mood = eyes::Mood::Happy;
-    s.apply(Command{e}, 30);
+    s.apply(Command{StopCmd{}}, 30);
     CHECK(s.current(Eye::Left) == "eyes");
 }
 
 TEST_CASE("eye commands during a clip apply to the shared model") {
     Scene<FakeClip> s;
     s.apply(Command{play("a", "")}, 0);
-    EyeCmd e; e.mood = eyes::Mood::Angry; e.transition_ms = 0; e.auto_blink = false; e.auto_look = false;
+    EyeCmd e; e.style = 3; e.auto_idle = false;
     s.apply(Command{e}, 5);
     s.tick(10);
     CHECK(s.current(Eye::Left) == "clip");
     CHECK(s.next(Eye::Right, 10).full_redraw);
+    CHECK(Scene<FakeClip>::eye_info().style_name == "anime");
 }

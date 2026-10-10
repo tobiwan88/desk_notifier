@@ -39,6 +39,12 @@ int cmd_token(int argc, char** argv) {
     std::printf("usage: token show | set <t> | new\n");
     return 1;
 }
+int cmd_auth(int argc, char** argv) {
+    if (argc == 2 && !std::strcmp(argv[1], "open")) { settings::set("open", "1"); std::printf("anonymous access ON (reboot to apply)\n"); return 0; }
+    if (argc == 2 && !std::strcmp(argv[1], "token")) { settings::set("open", "0"); std::printf("token required (reboot to apply)\n"); return 0; }
+    std::printf("auth: %s | usage: auth open|token\n", open_access() ? "open" : "token");
+    return 0;
+}
 int cmd_hostname(int argc, char** argv) {
     if (argc != 2) { std::printf("%s\n", hostname().c_str()); return 0; }
     settings::set("hostname", argv[1]);
@@ -53,17 +59,19 @@ int cmd_status(int, char**) {
                 static_cast<unsigned long>(esp_get_free_heap_size()));
     return 0;
 }
-int cmd_eye(int argc, char** argv) {
-    static constexpr const char* names[] = {"neutral", "happy", "angry", "sleepy", "scared", "curious", "asleep"};
-    if (argc != 2) { std::printf("usage: eye <mood>\n"); return 1; }
-    for (int i = 0; i < 7; ++i) {
-        if (!std::strcmp(argv[1], names[i])) {
-            engine::EyeCmd c; c.mood = static_cast<eyes::Mood>(i);
-            return engine::post(engine::Command{c}, 100) ? 0 : 1;
-        }
+int cmd_eye(int argc, char** argv) {  // eye <animation|blink|random>
+    if (argc != 2) { std::printf("usage: eye <animation|blink|random>\n"); return 1; }
+    engine::EyeCmd c;
+    const std::string_view n = argv[1];
+    if (n == "blink") c.play = engine::kPlayBlink;
+    else if (n == "random") c.play = engine::kPlayRandom;
+    else {
+        std::size_t i = 0;
+        while (i < eyes::kAnimNames.size() && eyes::kAnimNames[i] != n) ++i;
+        if (i == eyes::kAnimNames.size()) { std::printf("unknown animation\n"); return 1; }
+        c.play = static_cast<std::uint8_t>(i);
     }
-    std::printf("unknown mood\n");
-    return 1;
+    return engine::post(engine::Command{c}, 100) ? 0 : 1;
 }
 int cmd_play(int argc, char** argv) {
     if (argc < 2) { std::printf("usage: play <clip> [loop]\n"); return 1; }
@@ -110,9 +118,10 @@ std::expected<void, engine::Err> start_console() noexcept {
     const esp_console_cmd_t cmds[] = {
         {.command = "wifi", .help = "wifi <ssid> [password] | wifi show", .hint = nullptr, .func = cmd_wifi, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "token", .help = "token show | set <t> | new", .hint = nullptr, .func = cmd_token, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
+        {.command = "auth", .help = "auth open|token", .hint = nullptr, .func = cmd_auth, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "hostname", .help = "hostname [name]", .hint = nullptr, .func = cmd_hostname, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "status", .help = "show status", .hint = nullptr, .func = cmd_status, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
-        {.command = "eye", .help = "eye <mood>", .hint = nullptr, .func = cmd_eye, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
+        {.command = "eye", .help = "eye <animation|blink|random>", .hint = nullptr, .func = cmd_eye, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "play", .help = "play <clip> [loop]", .hint = nullptr, .func = cmd_play, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "stop", .help = "stop clips", .hint = nullptr, .func = cmd_stop, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "fsbench", .help = "fsbench <clip>", .hint = nullptr, .func = cmd_fsbench, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},

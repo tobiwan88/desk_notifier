@@ -17,6 +17,7 @@ bool has_credentials() noexcept;  // Wi-Fi configured (NVS or Kconfig)
 std::int8_t rssi() noexcept;
 std::string ip() noexcept;
 std::string hostname() noexcept;
+bool open_access() noexcept;   // true: no token required (NVS "open" overrides Kconfig)
 std::string token() noexcept;  // API token (created on first boot)
 
 }  // namespace net

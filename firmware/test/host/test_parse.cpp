@@ -1,4 +1,5 @@
 #include "doctest.h"
+#include "cat_eyes.h"
 #include "engine/core/parse.hpp"
 
 using namespace engine;
@@ -7,48 +8,38 @@ using namespace engine;
 #define BAD(x, c) do { auto r_ = (x); CHECK(!r_); if (!r_) CHECK(r_.error().code == (c)); } while (0)
 
 TEST_CASE("parse_eye basics") {
-    auto r = parse_eye(R"({"mood":"happy","look":[0.5,-1],"blink":"left","pupil":0.5,"brightness":40,"transition_ms":300})");
+    auto r = parse_eye(R"({"style":"anime","iris":"green","play":"wink","auto":false,"look":[0.5,-1,800],"save":true})");
     OK(r); if (!r) return;
-    CHECK(*r->mood == eyes::Mood::Happy);
-    CHECK((*r->look_q8)[0] == 128); CHECK((*r->look_q8)[1] == -256);
-    CHECK(*r->blink == EyeSel::Left);
-    CHECK(*r->pupil == 128); CHECK(*r->brightness == 40); CHECK(*r->transition_ms == 300);
+    CHECK(*r->style == CAT_STYLE_ANIME); CHECK(*r->iris == CAT_IRIS_GREEN); CHECK(*r->play == CAT_ANIM_WINK);
+    CHECK(*r->auto_idle == false); CHECK((*r->look_q8)[0] == 128); CHECK((*r->look_q8)[1] == -256);
+    CHECK(r->hold_ms == 800); CHECK(r->save);
 }
-TEST_CASE("parse_eye blink forms") {
-    auto a = parse_eye(R"({"blink":true})"); OK(a); if (a) CHECK(*a->blink == EyeSel::Both);
-    auto b = parse_eye(R"({"blink":false})"); OK(b); if (b) CHECK(!b->blink);
-    BAD(parse_eye(R"({"blink":"up"})"), Err::BadJson);
-}
-TEST_CASE("parse_eye lids and style") {
-    auto r = parse_eye(R"({"lids":{"top":1,"tilt":-1},"style":{"preset":"robo","iris":{"on":true,"r":40,"color":"#ff8800"},"pupil":{"shape":"slit","slit_w":6}},"save_style":true})");
-    OK(r); if (!r) return;
-    CHECK(*r->lids->top == 255); CHECK(*r->lids->tilt == -127); CHECK(!r->lids->bottom);
-    CHECK(*r->style->preset == 1); CHECK(*r->style->iris_r == 40);
-    CHECK(*r->style->iris_color == gfx::rgb565(0xFF8800));
-    CHECK(*r->style->pupil_shape == eyes::PupilShape::Slit);
-    CHECK(r->save_style);
+TEST_CASE("parse_eye play targets and aliases") {
+    auto a = parse_eye(R"({"play":"blink"})"); OK(a); if (a) CHECK(*a->play == kPlayBlink);
+    auto b = parse_eye(R"({"play":"random"})"); OK(b); if (b) CHECK(*b->play == kPlayRandom);
+    auto c = parse_eye(R"({"play":"heart_eyes"})"); OK(c); if (c) CHECK(*c->play == CAT_ANIM_SPECIAL);
+    auto d = parse_eye(R"({"style":"line_art"})"); OK(d); if (d) CHECK(*d->style == CAT_STYLE_LINE_ART);
+    auto e = parse_eye(R"({"look":[0,0]})"); OK(e); if (e) CHECK(e->hold_ms == 1000);
 }
 TEST_CASE("parse_eye rejects bad input") {
     BAD(parse_eye("not json"), Err::BadJson);
     BAD(parse_eye("[]"), Err::BadJson);
+    BAD(parse_eye(R"({})"), Err::BadJson);
     BAD(parse_eye(R"({"foo":1})"), Err::BadJson);
-    BAD(parse_eye(R"({"mood":"furious"})"), Err::BadJson);
+    BAD(parse_eye(R"({"mood":"happy"})"), Err::BadJson);
+    BAD(parse_eye(R"({"style":"neon"})"), Err::BadJson);
+    BAD(parse_eye(R"({"iris":3})"), Err::BadJson);
+    BAD(parse_eye(R"({"play":"dance"})"), Err::BadJson);
+    BAD(parse_eye(R"({"auto":"yes"})"), Err::BadJson);
     BAD(parse_eye(R"({"look":[1]})"), Err::BadJson);
     BAD(parse_eye(R"({"look":[2,0]})"), Err::BadJson);
-    BAD(parse_eye(R"({"pupil":0.1})"), Err::BadJson);
-    BAD(parse_eye(R"({"brightness":101})"), Err::BadJson);
-    BAD(parse_eye(R"({"brightness":1.5})"), Err::BadJson);
-    BAD(parse_eye(R"({"transition_ms":6000})"), Err::BadJson);
-    BAD(parse_eye(R"({"style":{"bg":"red"}})"), Err::BadJson);
-    BAD(parse_eye(R"({"style":{"sclera":{"w":5}}})"), Err::BadJson);
-    BAD(parse_eye(R"({"style":{"zzz":1}})"), Err::BadJson);
-    BAD(parse_eye(R"({"lids":{"top":2}})"), Err::BadJson);
+    BAD(parse_eye(R"({"look":[0,0,70000]})"), Err::BadJson);
     BAD(parse_eye(std::string(2000, ' ')), Err::TooLarge);
 }
 TEST_CASE("parse_eye error message") {
     auto r = parse_eye(R"({"look":[1]})");
     CHECK(!r);
-    if (!r) CHECK(r.error().message.view() == "look must have 2 items");
+    if (!r) CHECK(r.error().message.view() == "look must be [gx, gy] or [gx, gy, hold_ms]");
 }
 TEST_CASE("parse_play") {
     auto a = parse_play(R"({"clip":"wink"})"); OK(a);

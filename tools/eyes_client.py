@@ -37,7 +37,11 @@ class Device:
         return self._req("GET", "/api/status").json()
 
     def eye(self, **fields) -> None:
+        """POST /api/eye with any subset of style/iris/play/auto/look/save."""
         self._req("POST", "/api/eye", json=fields)
+
+    def animations(self) -> dict[str, Any]:
+        return self._req("GET", "/api/animations").json()
 
     def play(self, clip: str | None = None, *, left: str | None = None, right: str | None = None, loop: bool = False,
              then: str = "eyes") -> None:
