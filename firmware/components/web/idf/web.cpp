@@ -290,6 +290,16 @@ esp_err_t post_ota(httpd_req_t* r) {
 extern const char index_html_start[] asm("_binary_index_html_start");
 extern const char index_html_end[] asm("_binary_index_html_end");
 
+extern const char encoder_js_start[] asm("_binary_clip_encoder_js_start");
+extern const char encoder_js_end[] asm("_binary_clip_encoder_js_end");
+
+esp_err_t get_encoder(httpd_req_t* r) {
+    httpd_resp_set_type(r, "application/javascript");
+    httpd_resp_set_hdr(r, "Cache-Control", "no-cache");
+    httpd_resp_send(r, encoder_js_start, encoder_js_end - encoder_js_start - 1);
+    return ESP_OK;
+}
+
 esp_err_t get_root(httpd_req_t* r) {
     httpd_resp_set_type(r, "text/html; charset=utf-8");
     httpd_resp_set_hdr(r, "Cache-Control", "no-cache");
@@ -340,6 +350,7 @@ std::expected<void, engine::Err> start() noexcept {
     if (httpd_start(&h, &c) != ESP_OK) return std::unexpected(engine::Err::Io);
     const httpd_uri_t routes[] = {
         {.uri = "/", .method = HTTP_GET, .handler = get_root, .user_ctx = nullptr},
+        {.uri = "/clip_encoder.js", .method = HTTP_GET, .handler = get_encoder, .user_ctx = nullptr},
         {.uri = "/api/status", .method = HTTP_GET, .handler = get_status, .user_ctx = nullptr},
         {.uri = "/api/animations", .method = HTTP_GET, .handler = get_animations, .user_ctx = nullptr},
         {.uri = "/api/eye", .method = HTTP_POST, .handler = post_eye, .user_ctx = nullptr},

@@ -64,6 +64,7 @@ On the page you can:
 - turn random idle animations on or off
 - drag on the round pad to make the eyes look somewhere
 - choose what the random mode may play (the **Random pool**): built-in animations and your own clips, and the pause between them
+- add a GIF as a new animation: choose the file, check the round preview, and push **Convert & upload** (needs Chrome, Edge, or Safari)
 - see, play, upload, and delete clips
 
 The board remembers your style, iris color, and idle setting after a restart.
