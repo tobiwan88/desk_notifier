@@ -76,6 +76,9 @@ public:
         return active_[i] == Src::Playing ? clips_[i].fill(r, buf) : views_[i].fill(r, buf);
     }
 
+    // next() reports the whole eye on both displays (after a display re-init or test pattern)
+    void invalidate() noexcept { for (auto& v : views_) v.invalidate(); }
+
     std::string_view current(Eye e) const noexcept {
         return active_[idx(e)] == Src::Playing ? Clip::kName : eyes::CatView::kName;
     }

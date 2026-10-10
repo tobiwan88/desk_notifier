@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
 
@@ -101,6 +102,16 @@ int cmd_fsbench(int argc, char** argv) {
     }
     return 0;
 }
+int cmd_lcd(int argc, char** argv) {  // display diagnostics, see engine::LcdOp
+    const auto arg = [&](int d) { return argc > 2 ? std::atoi(argv[2]) : d; };
+    bool ok = false;
+    if (argc >= 2 && !std::strcmp(argv[1], "swap")) ok = engine::lcd_request(engine::LcdOp::Swap, argc > 2 ? std::strcmp(argv[2], "off") != 0 : 1);
+    else if (argc >= 2 && !std::strcmp(argv[1], "init")) ok = engine::lcd_request(engine::LcdOp::Init, arg(0));
+    else if (argc >= 2 && !std::strcmp(argv[1], "test")) ok = engine::lcd_request(engine::LcdOp::Test, arg(20));
+    else { std::printf("usage: lcd swap [on|off] | lcd init [spi_hz] | lcd test [seconds, 0 = stop]\n"); return 1; }
+    std::printf(ok ? "queued (see render log)\n" : "busy, retry\n");
+    return ok ? 0 : 1;
+}
 int cmd_reboot(int, char**) { esp_restart(); return 0; }
 int cmd_factory(int, char**) { settings::erase_all(); std::printf("NVS erased (clips kept); rebooting\n"); esp_restart(); return 0; }
 
@@ -125,6 +136,7 @@ std::expected<void, engine::Err> start_console() noexcept {
         {.command = "play", .help = "play <clip> [loop]", .hint = nullptr, .func = cmd_play, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "stop", .help = "stop clips", .hint = nullptr, .func = cmd_stop, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "fsbench", .help = "fsbench <clip>", .hint = nullptr, .func = cmd_fsbench, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
+        {.command = "lcd", .help = "lcd swap [on|off] | init [spi_hz] | test [seconds]", .hint = nullptr, .func = cmd_lcd, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "reboot", .help = "reboot", .hint = nullptr, .func = cmd_reboot, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "factory-reset", .help = "erase NVS settings", .hint = nullptr, .func = cmd_factory, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
     };

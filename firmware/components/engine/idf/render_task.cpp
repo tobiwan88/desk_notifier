@@ -35,6 +35,11 @@ void publish_eye_info(const eyes::CatInfo& i) {
     taskEXIT_CRITICAL(&g_info_mux);
 }
 
+struct LcdReq { bool pending = false; LcdOp op = LcdOp::Swap; int arg = 0; };
+portMUX_TYPE g_lcd_mux = portMUX_INITIALIZER_UNLOCKED;
+LcdReq g_lcd_req{};
+std::uint32_t g_test_until = 0;  // render task only; 0 = no test pattern
+
 std::uint32_t now_ms() { return static_cast<std::uint32_t>(esp_timer_get_time() / 1000); }
 
 // Renders one display's plan; returns the first error.
@@ -56,6 +61,34 @@ std::expected<void, Err> draw(Scene<clip::ClipPlayer>& scene, Eye eye, const Fra
         }
     }
     return {};
+}
+
+// Runs a pending display diagnostic; returns true while the test pattern owns the panels.
+bool service_lcd(Scene<clip::ClipPlayer>& scene, std::uint32_t now) {
+    taskENTER_CRITICAL(&g_lcd_mux);
+    const LcdReq req = g_lcd_req;
+    g_lcd_req.pending = false;
+    taskEXIT_CRITICAL(&g_lcd_mux);
+    if (req.pending) {
+        if (req.op == LcdOp::Swap) {
+            (void)display::wait_idle(100);
+            display::set_swap(req.arg != 0);
+        } else if (req.op == LcdOp::Init) {
+            if (!display::reinit(req.arg)) ESP_LOGE(kTag, "lcd re-init failed");
+        } else {
+            g_test_until = req.arg > 0 ? now + static_cast<std::uint32_t>(req.arg) * 1000 : 0;
+        }
+        ESP_LOGI(kTag, "lcd: swap=%d spi=%d Hz test=%s", display::swapped(), display::spi_hz(), g_test_until ? "on" : "off");
+        scene.invalidate();
+    }
+    if (g_test_until == 0) return false;
+    if (static_cast<std::int32_t>(now - g_test_until) >= 0) {
+        g_test_until = 0;
+        scene.invalidate();
+        return false;
+    }
+    for (std::size_t i = 0; i < kEyes; ++i) (void)display::pattern(static_cast<Eye>(i));
+    return true;
 }
 
 void task(void*) {
@@ -89,7 +122,9 @@ void task(void*) {
 
         std::uint32_t next_delay = 100;
         bool failed = false;
-        for (std::size_t i = 0; i < kEyes; ++i) {
+        const bool testing = service_lcd(scene, now);
+        if (testing) next_delay = 33;
+        for (std::size_t i = 0; i < kEyes && !testing; ++i) {
             const Eye eye = static_cast<Eye>(i);
             const FramePlan plan = scene.next(eye, now);
             next_delay = std::min(next_delay, plan.delay_ms);
@@ -139,6 +174,14 @@ std::expected<void, Err> start_render_task() noexcept {
 std::expected<void, Err> post(const Command& c, std::uint32_t timeout_ms) noexcept {
     if (!g_queue) return std::unexpected(Err::Busy);
     return xQueueSend(g_queue, &c, pdMS_TO_TICKS(timeout_ms)) == pdTRUE ? std::expected<void, Err>{} : std::unexpected(Err::Busy);
+}
+
+bool lcd_request(LcdOp op, int arg) noexcept {
+    taskENTER_CRITICAL(&g_lcd_mux);
+    const bool busy = g_lcd_req.pending;
+    if (!busy) g_lcd_req = LcdReq{true, op, arg};
+    taskEXIT_CRITICAL(&g_lcd_mux);
+    return !busy;
 }
 
 eyes::CatInfo eye_info() noexcept {
