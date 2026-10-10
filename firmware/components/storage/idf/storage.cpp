@@ -92,8 +92,8 @@ bool path_for(std::string_view name, char* out, std::size_t cap) noexcept {
            std::snprintf(out, cap, "%s/%.*s.clip", kDir, static_cast<int>(name.size()), name.data()) < static_cast<int>(cap);
 }
 
-std::expected<engine::StaticVec<ClipInfo, 64>, engine::Err> list() noexcept {
-    engine::StaticVec<ClipInfo, 64> out;
+std::expected<std::vector<ClipInfo>, engine::Err> list() noexcept {
+    std::vector<ClipInfo> out;
     DIR* d = opendir(kDir);
     if (!d) return std::unexpected(engine::Err::Io);
     while (dirent* e = readdir(d)) {
@@ -102,7 +102,7 @@ std::expected<engine::StaticVec<ClipInfo, 64>, engine::Err> list() noexcept {
         const std::string_view base = n.substr(0, n.size() - 5);
         char p[96];
         if (!path_for(base, p, sizeof p)) continue;
-        if (auto i = info_of(base, p)) (void)out.push_back(*i);
+        if (auto i = info_of(base, p); i && out.size() < 64) out.push_back(*i);
     }
     closedir(d);
     return out;

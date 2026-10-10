@@ -67,6 +67,18 @@ class Device:
     def delete(self, name: str) -> None:
         self._req("DELETE", f"/api/clips/{name}")
 
+    def pool(self) -> dict[str, Any]:
+        return self._req("GET", "/api/pool").json()
+
+    def set_pool(self, enabled: list[str] | None = None, interval: list[float] | None = None) -> dict[str, Any]:
+        """POST /api/pool. 'enabled' replaces the whole enabled set; omitted fields are left unchanged."""
+        body: dict[str, Any] = {}
+        if enabled is not None:
+            body["enabled"] = list(enabled)
+        if interval is not None:
+            body["interval"] = list(interval)
+        return self._req("POST", "/api/pool", json=body).json()
+
     def ota(self, firmware: bytes | Path) -> None:
         payload = Path(firmware).read_bytes() if isinstance(firmware, Path) else firmware
         self._req("POST", "/api/ota", data=payload, timeout=300)

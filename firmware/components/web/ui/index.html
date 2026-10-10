@@ -12,17 +12,26 @@
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.4 system-ui,-apple-system,sans-serif}
 main{max-width:520px;margin:0 auto;padding:16px}
 h1{font-size:1.4rem;margin:8px 0 12px}
+h2{font-size:1rem;margin:0 0 10px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
 label{display:block;font-size:.85rem;color:var(--muted);margin:8px 0 4px}
-select{width:100%;font:inherit;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+select,.inp{width:100%;font:inherit;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
 .row{display:flex;gap:8px;align-items:flex-end}
 .row>*{flex:1;min-width:0}
 button{font:inherit;padding:10px 6px;border-radius:8px;border:1px solid var(--line);background:var(--btn);color:var(--fg);cursor:pointer;touch-action:manipulation}
 button:active{border-color:var(--accent)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.pool{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
 .check{display:flex;align-items:center;gap:8px;margin:10px 0 0;color:var(--fg);cursor:pointer}
 .check input{width:20px;height:20px;margin:0}
+.pool .check{margin:0}
+.tag{font-size:.7rem;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 4px}
 .more{margin-top:8px}
+.muted{color:var(--muted);font-size:.85rem;font-weight:400}
+.clip{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.clip .info{flex:1;min-width:0;overflow-wrap:anywhere}
+.clip .meta{font-size:.8rem;color:var(--muted)}
+.clip button{padding:6px 10px}
 #pad{width:100%;max-width:280px;aspect-ratio:1;margin:0 auto;border-radius:50%;border:2px solid var(--line);background:radial-gradient(circle,var(--btn),var(--card));position:relative;touch-action:none;cursor:crosshair}
 #dot{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:var(--accent);left:50%;top:50%;pointer-events:none}
 .hint{text-align:center;color:var(--muted);font-size:.85rem;margin:8px 0 0}
@@ -51,6 +60,39 @@ button:active{border-color:var(--accent)}
 </section>
 
 <section>
+  <h2>Random pool</h2>
+  <div class="grid pool" id="plist"></div>
+  <div class="row more">
+    <button id="pall">Select all</button>
+    <button id="pnone">Select none</button>
+  </div>
+  <p class="hint" id="phint" hidden>Nothing selected: random mode stays still</p>
+  <label for="pmin">Pause between animations (s): min / max</label>
+  <div class="row">
+    <input class="inp" id="pmin" type="number" min="0" step="0.1">
+    <input class="inp" id="pmax" type="number" min="0" step="0.1">
+  </div>
+  <div class="hint" id="psave"></div>
+</section>
+
+<section>
+  <h2>Clips <span class="muted" id="free"></span></h2>
+  <div id="clips"></div>
+  <div class="row more">
+    <button id="stop">Stop clip</button>
+  </div>
+  <label for="cfile">Upload</label>
+  <input type="file" id="cfile" accept=".clip">
+  <label for="cname">Name</label>
+  <input class="inp" id="cname" type="text" maxlength="31">
+  <div class="row more">
+    <button id="cup">Upload</button>
+    <span class="muted" id="cprog"></span>
+  </div>
+  <p class="hint">Make a .clip from a GIF or video with: eyesctl add my.gif</p>
+</section>
+
+<section>
   <div id="pad"><div id="dot"></div></div>
   <p class="hint">Drag to look</p>
 </section>
@@ -65,29 +107,41 @@ button:active{border-color:var(--accent)}
   var ui = {
     style: $('style'), iris: $('iris'), auto: $('auto'),
     anims: $('anims'), pad: $('pad'), dot: $('dot'), status: $('status'),
-    err: $('err'), special: null
+    err: $('err'), special: null,
+    plist: $('plist'), pall: $('pall'), pnone: $('pnone'), phint: $('phint'),
+    pmin: $('pmin'), pmax: $('pmax'), psave: $('psave'),
+    clips: $('clips'), free: $('free'), stop: $('stop'),
+    cfile: $('cfile'), cname: $('cname'), cup: $('cup'), cprog: $('cprog')
   };
   var meta = null;
   var last = 0, timer = 0, pending = null, dragging = false;
-
+  var poolTimer = 0;
 
   function setErr(m) { ui.err.textContent = m || ''; }
   function label(s) { return s.replace(/_/g, ' '); }
+  function fail(e) { setErr(e instanceof TypeError ? 'Network error' : e.message); }
 
-  function send(body) {
-    var r;
-    return fetch('/api/eye', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    }).then(function (res) {
+  // Blob bodies are sent raw
+  function api(method, path, body) {
+    var r, opts = { method: method, headers: {} };
+    if (body instanceof Blob) {
+      opts.body = body;
+    } else if (body !== undefined) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(path, opts).then(function (res) {
       r = res;
       return res.json().catch(function () { return {}; });
     }).then(function (j) {
-      if (r.status === 401) { setErr('Device requires a token: run `auth open` on its console'); return; }
-      if (!r.ok) { setErr((j.error && j.error.message) || ('Error ' + r.status)); return; }
-      setErr('');
-    }, function () { setErr('Network error'); });
+      if (r.status === 401) throw new Error('Device requires a token: run `auth open` on its console');
+      if (!r.ok) throw new Error((j.error && j.error.message) || ('Error ' + r.status));
+      return j;
+    });
+  }
+
+  function send(body) {
+    return api('POST', '/api/eye', body).then(function () { setErr(''); }, fail);
   }
 
   // style, iris and idle choices are remembered by the device
@@ -135,6 +189,108 @@ button:active{border-color:var(--accent)}
     }).catch(function () { setErr('Device unreachable'); });
   }
 
+  // Random pool
+  function poolEnabled() {
+    var out = [];
+    [].forEach.call(ui.plist.querySelectorAll('input'), function (c) { if (c.checked) out.push(c.value); });
+    return out;
+  }
+
+  function updatePoolHint() { ui.phint.hidden = poolEnabled().length > 0; }
+
+  function renderPool(p) {
+    if (poolTimer) return; // keep edits that are not saved yet
+    ui.plist.innerHTML = '';
+    p.items.forEach(function (it) {
+      var l = document.createElement('label');
+      l.className = 'check';
+      var c = document.createElement('input');
+      c.type = 'checkbox';
+      c.value = it.name;
+      c.checked = !!it.enabled;
+      c.onchange = schedulePool;
+      l.appendChild(c);
+      l.appendChild(document.createTextNode(' ' + label(it.name)));
+      if (it.kind === 'clip') {
+        var t = document.createElement('span');
+        t.className = 'tag';
+        t.textContent = 'clip';
+        l.appendChild(t);
+      }
+      ui.plist.appendChild(l);
+    });
+    ui.pmin.value = p.interval[0];
+    ui.pmax.value = p.interval[1];
+    updatePoolHint();
+  }
+
+  function schedulePool() {
+    updatePoolHint();
+    clearTimeout(poolTimer);
+    poolTimer = setTimeout(sendPool, 600);
+  }
+
+  function sendPool() {
+    poolTimer = 0;
+    var min = parseFloat(ui.pmin.value), max = parseFloat(ui.pmax.value);
+    if (!(min >= 0 && max >= min)) { setErr('Pause: min must not exceed max'); return; }
+    ui.psave.textContent = 'Saving…';
+    api('POST', '/api/pool', { enabled: poolEnabled(), interval: [min, max] }).then(function (p) {
+      renderPool(p);
+      ui.psave.textContent = 'Saved';
+      setErr('');
+    }, function (e) { ui.psave.textContent = ''; fail(e); });
+  }
+
+  function setAll(on) {
+    [].forEach.call(ui.plist.querySelectorAll('input'), function (c) { c.checked = on; });
+    schedulePool();
+  }
+
+  // Clips
+  function renderClips(j) {
+    ui.free.textContent = (j.free / 1048576).toFixed(1) + ' MB free';
+    ui.clips.innerHTML = j.clips.length ? '' : '<p class="hint">No clips yet</p>';
+    j.clips.forEach(function (c) {
+      var row = document.createElement('div');
+      row.className = 'clip';
+      var info = document.createElement('div');
+      info.className = 'info';
+      var n = document.createElement('div');
+      n.textContent = c.name;
+      var m = document.createElement('div');
+      m.className = 'meta';
+      m.textContent = c.frames + ' frames, ' + c.fps + ' fps, ' + Math.round(c.size / 1024) + ' KB';
+      info.appendChild(n);
+      info.appendChild(m);
+      row.appendChild(info);
+      [['play', 'Play'], ['loop', 'Loop'], ['del', 'Delete']].forEach(function (a) {
+        var b = document.createElement('button');
+        b.dataset.act = a[0];
+        b.dataset.name = c.name;
+        b.textContent = a[1];
+        row.appendChild(b);
+      });
+      ui.clips.appendChild(row);
+    });
+  }
+
+  function play(name, loop) {
+    var body = loop ? { clip: name, loop: true } : { clip: name };
+    api('POST', '/api/play', body).then(function () { setErr(''); }, fail);
+  }
+
+  function refresh() {
+    return Promise.all([
+      api('GET', '/api/clips').then(renderClips),
+      api('GET', '/api/pool').then(renderPool)
+    ]);
+  }
+
+  function defName(f) {
+    return f.name.replace(/\.[^.]*$/, '').toLowerCase().replace(/[^a-z0-9_-]/g, '-').slice(0, 31);
+  }
+
   // Controls
   document.addEventListener('click', function (e) {
     var b = e.target.closest ? e.target.closest('[data-play]') : null;
@@ -144,6 +300,43 @@ button:active{border-color:var(--accent)}
   ui.style.onchange = function () { updateSpecial(); send(withSave({ style: ui.style.value })); };
   ui.iris.onchange = function () { send(withSave({ iris: ui.iris.value })); };
   ui.auto.onchange = function () { send(withSave({ auto: ui.auto.checked })); };
+
+  ui.pall.onclick = function () { setAll(true); };
+  ui.pnone.onclick = function () { setAll(false); };
+  ui.pmin.oninput = ui.pmax.oninput = schedulePool;
+
+  ui.clips.onclick = function (e) {
+    var b = e.target.closest ? e.target.closest('button') : null;
+    if (!b) return;
+    var name = b.dataset.name;
+    if (b.dataset.act === 'del') {
+      if (!confirm('Delete clip ' + name + '?')) return;
+      api('DELETE', '/api/clips/' + encodeURIComponent(name)).then(refresh).then(function () { setErr(''); }, fail);
+    } else {
+      play(name, b.dataset.act === 'loop');
+    }
+  };
+  ui.stop.onclick = function () { api('POST', '/api/stop', {}).then(function () { setErr(''); }, fail); };
+
+  ui.cfile.onchange = function () {
+    var f = ui.cfile.files[0];
+    if (f) ui.cname.value = defName(f);
+  };
+  ui.cup.onclick = function () {
+    var f = ui.cfile.files[0], name = ui.cname.value.trim();
+    if (!f) { setErr('Choose a .clip file'); return; }
+    if (!name) { setErr('Enter a clip name'); return; }
+    ui.cup.disabled = true;
+    ui.cprog.textContent = 'Uploading…';
+    setErr('');
+    api('PUT', '/api/clips/' + encodeURIComponent(name), f).then(function () {
+      ui.cprog.textContent = 'Done';
+      return refresh();
+    }).then(function () { setErr(''); }, function (e) {
+      ui.cprog.textContent = '';
+      fail(e);
+    }).then(function () { ui.cup.disabled = false; });
+  };
 
   // Look pad
   function padPos(e) {
@@ -185,6 +378,7 @@ button:active{border-color:var(--accent)}
     applyState(j.state);
     setInterval(poll, 3000);
   }).catch(function () { setErr('Cannot reach device'); });
+  refresh().catch(fail);
 })();
 </script>
 </body>

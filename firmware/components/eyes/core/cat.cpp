@@ -3,6 +3,9 @@
 #include "cat_eyes.h"
 
 namespace eyes {
+namespace {
+bool g_auto = true;  // random idle on/off; the animation choice is made by engine::Scene, not by cat_eyes
+}
 
 void CatModel::start(std::uint32_t seed, std::uint8_t style, std::uint8_t iris, bool auto_idle) noexcept {
     rng_ = seed | 1u;
@@ -10,13 +13,14 @@ void CatModel::start(std::uint32_t seed, std::uint8_t style, std::uint8_t iris, 
     cat_eyes_set_swap_bytes(true);  // GC9A01 wants big-endian RGB565
     cat_eyes_set_style(static_cast<cat_style_t>(style < CAT_STYLE_COUNT ? static_cast<int>(style) : 0));
     cat_eyes_set_iris(static_cast<cat_iris_t>(iris < CAT_IRIS_COUNT ? static_cast<int>(iris) : 0));
-    cat_eyes_set_auto(auto_idle);
+    g_auto = auto_idle;
+    cat_eyes_set_auto(false);  // saccades and blinks still run; random animation picks are done by the Scene
 }
 
 void CatModel::apply(const engine::EyeCmd& c, std::uint32_t) noexcept {
     if (c.style && *c.style < CAT_STYLE_COUNT) cat_eyes_set_style(static_cast<cat_style_t>(*c.style));
     if (c.iris && *c.iris < CAT_IRIS_COUNT) cat_eyes_set_iris(static_cast<cat_iris_t>(*c.iris));
-    if (c.auto_idle) cat_eyes_set_auto(*c.auto_idle);
+    if (c.auto_idle) g_auto = *c.auto_idle;
     if (c.play) {
         if (*c.play == engine::kPlayBlink) {
             cat_eyes_blink();
@@ -33,6 +37,12 @@ void CatModel::apply(const engine::EyeCmd& c, std::uint32_t) noexcept {
     if (c.save) save_pending_ = true;
 }
 
+bool CatModel::animating() noexcept { return cat_eyes_current_anim() != CAT_ANIM_NONE; }
+bool CatModel::style_has_special() noexcept { return cat_eyes_get_style() >= CAT_STYLE_ANIME; }
+void CatModel::play_anim(int id) noexcept {
+    if (id >= 0 && id < CAT_ANIM_COUNT) cat_eyes_play(static_cast<cat_anim_t>(id));
+}
+
 void CatModel::tick(std::uint32_t now) noexcept { cat_eyes_tick(now); }
 
 CatInfo CatModel::info() noexcept {
@@ -40,7 +50,7 @@ CatInfo CatModel::info() noexcept {
     CatInfo i{};
     i.style = static_cast<std::uint8_t>(style);
     i.iris = static_cast<std::uint8_t>(cat_eyes_get_iris());
-    i.auto_idle = cat_eyes_get_auto();
+    i.auto_idle = g_auto;
     i.anim = cat_eyes_anim_name(cat_eyes_current_anim());
     i.style_name = kStyleNames[i.style < kStyleNames.size() ? i.style : 0];
     i.iris_name = kIrisNames[i.iris < kIrisNames.size() ? i.iris : 0];

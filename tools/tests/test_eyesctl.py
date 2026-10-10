@@ -122,3 +122,101 @@ def test_cli_soak_short(dev, tmp_path, capsys):
     assert dev.eye_cmds and all(set(c) <= {"look", "play"} for c in dev.eye_cmds)
     assert all(c.get("play") in ANIMATIONS + ["random"] for c in dev.eye_cmds if "play" in c)
     assert all(len(c["look"]) == 2 for c in dev.eye_cmds if "look" in c)
+
+
+def gif_file(tmp_path, name="Blink Test.gif"):
+    import numpy as np
+    from PIL import Image
+
+    frames = []
+    for i in range(4):
+        a = np.zeros((50, 50, 3), np.uint8)
+        a[5 + 8 * i:20 + 8 * i, 10:30] = (255, 0, 0)
+        frames.append(Image.fromarray(a))
+    p = tmp_path / name
+    frames[0].save(p, save_all=True, append_images=frames[1:], duration=100)
+    return p
+
+
+def test_mock_pool_defaults_and_rules(dev):
+    d = Device(dev.host, TOKEN)
+    p = d.pool()
+    assert [i["name"] for i in p["items"]] == ANIMATIONS
+    assert all(i["kind"] == "anim" and i["enabled"] for i in p["items"])
+    assert p["interval"] == [2.5, 7.0] and p["auto"] is True
+    d.upload("fire", b"EYCL" + b"\0" * 8)
+    fire = d.pool()["items"][-1]
+    assert fire == {"name": "fire", "kind": "clip", "enabled": False}
+    with pytest.raises(DeviceError) as e:
+        d.set_pool(enabled=["wink", "x"])
+    assert e.value.status == 400 and e.value.message == "unknown item: x"
+    assert dev.pool_enabled == set(ANIMATIONS)  # rejected POST changes nothing
+    for bad in ([0.5, 3], [5, 3], [1, 121]):
+        with pytest.raises(DeviceError):
+            d.set_pool(interval=bad)
+    assert dev.pool_interval == [2.5, 7.0]
+    p = d.set_pool(enabled=["fire", "wink"], interval=[1, 4])
+    assert sorted(i["name"] for i in p["items"] if i["enabled"]) == ["fire", "wink"]
+    assert p["interval"] == [1, 4]
+    d.delete("fire")
+    assert "fire" not in [i["name"] for i in d.pool()["items"]]
+    assert dev.pool_enabled == {"wink"}
+
+
+def test_client_pool_partial_updates(dev):
+    d = Device(dev.host, TOKEN)
+    d.set_pool(enabled=["happy"])
+    assert dev.pool_enabled == {"happy"} and dev.pool_interval == [2.5, 7.0]
+    d.set_pool(interval=[3, 6])
+    assert dev.pool_enabled == {"happy"} and dev.pool_interval == [3, 6]
+
+
+def test_cli_pool_table(dev, capsys):
+    base = ["--host", dev.host, "--token", TOKEN]
+    assert main(base + ["pool"]) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[0].startswith("[x] wink") and "(anim)" in out[0]
+    assert out[-1] == "interval 2.5-7 s, auto on"
+
+
+def test_cli_pool_edit_commands(dev, capsys):
+    base = ["--host", dev.host, "--token", TOKEN]
+    assert main(base + ["pool", "set", "wink", "happy", "--interval", "1", "5"]) == 0
+    assert dev.pool_enabled == {"wink", "happy"} and dev.pool_interval == [1, 5]
+    assert "[x] happy" in capsys.readouterr().out
+    assert main(base + ["pool", "add", "glance"]) == 0
+    assert dev.pool_enabled == {"wink", "happy", "glance"}
+    assert main(base + ["pool", "remove", "wink", "happy"]) == 0
+    assert dev.pool_enabled == {"glance"}
+    assert main(base + ["pool", "all"]) == 0
+    assert dev.pool_enabled == set(ANIMATIONS)
+    assert main(base + ["pool", "none"]) == 0
+    assert dev.pool_enabled == set()
+    assert main(base + ["pool", "set", "wink", "--interval", "9", "3"]) == 1  # min > max
+    assert dev.pool_enabled == set() and dev.pool_interval == [1, 5]  # rejected call changes nothing
+
+
+def test_cli_pool_set_rejects_unknown(dev, capsys):
+    base = ["--host", dev.host, "--token", TOKEN]
+    assert main(base + ["pool", "set", "wink", "nope"]) == 1
+    assert "unknown item: nope" in capsys.readouterr().err
+    assert main(base + ["pool", "add", "ghost"]) == 1
+    assert dev.pool_enabled == set(ANIMATIONS)
+
+
+def test_cli_add_uploads_clip(dev, tmp_path, capsys):
+    base = ["--host", dev.host, "--token", TOKEN]
+    src = gif_file(tmp_path)
+    assert main(base + ["add", str(src), "--pool"]) == 0
+    assert "blink_test" in dev.clips
+    assert dev.clips["blink_test"][:4] == b"EYCL"
+    assert "blink_test" in dev.pool_enabled
+    out = capsys.readouterr().out
+    assert "uploaded blink_test" in out and "4 frames" in out
+    assert main(base + ["add", str(src), "--name", "my_eye", "--max-frames", "2"]) == 0
+    assert dev.clips["my_eye"][:4] == b"EYCL"
+    assert "my_eye" not in dev.pool_enabled
+    assert main(base + ["add", str(src), "--name", "Bad Name"]) == 1
+    assert main(base + ["add", str(src), "--region", "1,2,3"]) == 1
+    assert main(base + ["add", str(tmp_path / "missing.gif")]) == 1
+    assert "blink_test" in dev.clips and "Bad Name" not in dev.clips

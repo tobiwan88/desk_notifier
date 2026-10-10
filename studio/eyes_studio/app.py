@@ -90,6 +90,14 @@ def create_app(registry: Registry | None = None, work_dir: Path | None = None, m
     def clips(id_: str):
         return dev(id_).clips()
 
+    @app.get("/api/devices/{id_}/pool")
+    def get_pool(id_: str):
+        return dev(id_).pool()
+
+    @app.post("/api/devices/{id_}/pool")
+    def set_pool(id_: str, body: dict):
+        return dev(id_).set_pool(enabled=body.get("enabled"), interval=body.get("interval"))
+
     @app.delete("/api/devices/{id_}/clips/{name}")
     def delete(id_: str, name: str):
         dev(id_).delete(name)
