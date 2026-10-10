@@ -1,5 +1,6 @@
 #include "web/idf/web.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <cstring>
@@ -15,6 +16,7 @@
 #include "esp_timer.h"
 #include "net/idf/net.hpp"
 #include "sdkconfig.h"
+#include "storage/idf/storage.hpp"
 
 namespace web {
 namespace {
@@ -97,17 +99,87 @@ esp_err_t post_stop(httpd_req_t* r) {
 esp_err_t get_status(httpd_req_t* r) {
     const auto s = engine::stats();
     const auto* app = esp_app_get_description();
-    char b[640];
+    char b[704];
     std::snprintf(b, sizeof b,
         R"({"version":"%s","idf":"%s","hostname":"%s","uptime_s":%lld,"heap_internal":%u,"heap_min":%u,"psram_free":%u,)"
         R"("fps":%u.%u,"frame_ms_avg":%lu,"frame_ms_max":%lu,"rssi":%d,"ip":"%s","source":{"left":"%.*s","right":"%.*s"},)"
-        R"("fs_free":0,"clip_max_bps":0,"spi_hz":%d})",
+        R"("fs_free":%lu,"clip_max_bps":%d,"spi_hz":%d})",
         app->version, app->idf_ver, net::hostname().c_str(), static_cast<long long>(esp_timer_get_time() / 1000000),
         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)), static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)),
         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)), s.fps_x10 / 10, s.fps_x10 % 10,
         static_cast<unsigned long>(s.frame_us_avg / 1000), static_cast<unsigned long>(s.frame_us_max / 1000), net::rssi(), net::ip().c_str(),
-        static_cast<int>(s.source[0].size()), s.source[0].data(), static_cast<int>(s.source[1].size()), s.source[1].data(), CONFIG_EYES_LCD_SPI_HZ);
+        static_cast<int>(s.source[0].size()), s.source[0].data(), static_cast<int>(s.source[1].size()), s.source[1].data(), static_cast<unsigned long>(storage::free_bytes()),
+        CONFIG_EYES_CLIP_MAX_BPS, CONFIG_EYES_LCD_SPI_HZ);
     send_json(r, "200 OK", b);
+    return ESP_OK;
+}
+
+
+// last path segment of /api/clips/<name>
+std::string_view uri_name(httpd_req_t* r) {
+    std::string_view u = r->uri;
+    if (auto q = u.find('?'); q != std::string_view::npos) u = u.substr(0, q);
+    constexpr std::string_view p = "/api/clips/";
+    return u.size() > p.size() ? u.substr(p.size()) : std::string_view{};
+}
+
+esp_err_t get_clips(httpd_req_t* r) {
+    if (!authorized(r)) return ESP_OK;
+    auto l = storage::list();
+    if (!l) { send_error(r, l.error(), "list failed"); return ESP_OK; }
+    std::string b = R"({"clips":[)";
+    bool first = true;
+    for (const auto& c : *l) {
+        char e[160];
+        std::snprintf(e, sizeof e, R"(%s{"name":"%.31s","size":%lu,"frames":%u,"fps":%u.%u})", first ? "" : ",", c.name.c_str(),
+                      static_cast<unsigned long>(c.size), c.frames, c.fps_x10 / 10, c.fps_x10 % 10);
+        b += e;
+        first = false;
+    }
+    char t[48];
+    std::snprintf(t, sizeof t, R"(],"free":%lu})", static_cast<unsigned long>(storage::free_bytes()));
+    b += t;
+    send_json(r, "200 OK", b.c_str());
+    return ESP_OK;
+}
+
+esp_err_t put_clip(httpd_req_t* r) {
+    if (!authorized(r)) return ESP_OK;
+    const std::string_view name = uri_name(r);
+    if (!engine::clip_name_valid(name)) { send_error(r, engine::Err::BadName, "name must match ^[a-z0-9_-]{1,31}$"); return ESP_OK; }
+    if (r->content_len == 0) { send_error(r, engine::Err::LengthRequired, "Content-Length required"); return ESP_OK; }
+    if (storage::is_playing(name)) { send_error(r, engine::Err::Conflict, "clip is playing"); return ESP_OK; }
+    auto up = storage::Upload::begin(name, static_cast<std::uint32_t>(r->content_len));
+    if (!up) { send_error(r, up.error(), "upload rejected"); return ESP_OK; }
+    constexpr std::size_t kChunk = 4096;
+    auto* buf = static_cast<std::byte*>(heap_caps_malloc(kChunk, MALLOC_CAP_SPIRAM));
+    if (!buf) buf = static_cast<std::byte*>(heap_caps_malloc(kChunk, MALLOC_CAP_DEFAULT));
+    if (!buf) { send_error(r, engine::Err::Io, "no memory"); return ESP_OK; }
+    std::size_t left = r->content_len;
+    engine::Err err = engine::Err::Ok;
+    while (left > 0) {
+        const int n = httpd_req_recv(r, reinterpret_cast<char*>(buf), std::min(left, kChunk));
+        if (n == HTTPD_SOCK_ERR_TIMEOUT) continue;
+        if (n <= 0) { err = engine::Err::Io; break; }
+        if (auto w = up->write({buf, static_cast<std::size_t>(n)}); !w) { err = w.error(); break; }
+        left -= static_cast<std::size_t>(n);
+    }
+    heap_caps_free(buf);
+    if (err != engine::Err::Ok) { send_error(r, err, "upload failed"); return ESP_OK; }
+    auto ci = up->commit();
+    if (!ci) { send_error(r, ci.error(), ci.error() == engine::Err::BadClip ? "invalid clip" : "commit failed"); return ESP_OK; }
+    char b[160];
+    std::snprintf(b, sizeof b, R"({"name":"%.31s","size":%lu,"frames":%u})", ci->name.c_str(), static_cast<unsigned long>(ci->size), ci->frames);
+    send_json(r, "201 Created", b);
+    return ESP_OK;
+}
+
+esp_err_t delete_clip(httpd_req_t* r) {
+    if (!authorized(r)) return ESP_OK;
+    auto d = storage::remove(uri_name(r));
+    if (!d) { send_error(r, d.error(), d.error() == engine::Err::Conflict ? "clip is playing" : "no such clip"); return ESP_OK; }
+    httpd_resp_set_status(r, "204 No Content");
+    httpd_resp_send(r, nullptr, 0);
     return ESP_OK;
 }
 
@@ -135,6 +207,9 @@ std::expected<void, engine::Err> start() noexcept {
         {.uri = "/api/eye", .method = HTTP_POST, .handler = post_eye, .user_ctx = nullptr},
         {.uri = "/api/play", .method = HTTP_POST, .handler = post_play, .user_ctx = nullptr},
         {.uri = "/api/stop", .method = HTTP_POST, .handler = post_stop, .user_ctx = nullptr},
+        {.uri = "/api/clips", .method = HTTP_GET, .handler = get_clips, .user_ctx = nullptr},
+        {.uri = "/api/clips/*", .method = HTTP_PUT, .handler = put_clip, .user_ctx = nullptr},
+        {.uri = "/api/clips/*", .method = HTTP_DELETE, .handler = delete_clip, .user_ctx = nullptr},
     };
     for (const auto& u : routes) httpd_register_uri_handler(h, &u);
     ESP_LOGI(kTag, "http server up");

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "clip/idf/player.hpp"
 #include "config.hpp"
 #include "display/idf/display.hpp"
 #include "engine/core/scene.hpp"
@@ -18,14 +19,14 @@ namespace {
 
 const char* const kTag = "render";
 QueueHandle_t g_queue = nullptr;
-Scene<NoClip>* g_scene = nullptr;
+Scene<clip::ClipPlayer>* g_scene = nullptr;
 portMUX_TYPE g_stats_mux = portMUX_INITIALIZER_UNLOCKED;
 Stats g_stats{};
 
 std::uint32_t now_ms() { return static_cast<std::uint32_t>(esp_timer_get_time() / 1000); }
 
 // Renders one display's plan; returns the first error.
-std::expected<void, Err> draw(Scene<NoClip>& scene, Eye eye, const FramePlan& plan) {
+std::expected<void, Err> draw(Scene<clip::ClipPlayer>& scene, Eye eye, const FramePlan& plan) {
     auto rects = plan.dirty;
     if (plan.full_redraw) { rects.clear(); (void)rects.push_back(gfx::Rect{0, 0, gfx::kScreen, gfx::kScreen}); }
     for (const gfx::Rect& r : rects) {
@@ -44,8 +45,10 @@ std::expected<void, Err> draw(Scene<NoClip>& scene, Eye eye, const FramePlan& pl
 
 void task(void*) {
     esp_task_wdt_add(nullptr);
-    Scene<NoClip> scene(esp_timer_get_time() & 0xFFFFFFFF, settings::load_style().value_or(eyes::kRealistic));
+    Scene<clip::ClipPlayer> scene(esp_timer_get_time() & 0xFFFFFFFF, settings::load_style().value_or(eyes::kRealistic));
     g_scene = &scene;
+    scene.clip(Eye::Left).set_slot(0);
+    scene.clip(Eye::Right).set_slot(1);
     std::uint32_t frame_n = 0;
     std::uint64_t sum_us = 0;
     std::uint32_t max_us = 0, window_start = now_ms();

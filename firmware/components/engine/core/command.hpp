@@ -19,7 +19,7 @@
 namespace engine {
 
 struct FramePlan {
-    StaticVec<gfx::Rect, 8> dirty;
+    StaticVec<gfx::Rect, 16> dirty;
     bool full_redraw = false;
     bool trim = true;
     std::uint32_t delay_ms = 33;
