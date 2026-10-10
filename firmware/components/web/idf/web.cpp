@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -13,6 +14,10 @@
 #include "esp_heap_caps.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "esp_ota_ops.h"
+#include "esp_system.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "esp_timer.h"
 #include "net/idf/net.hpp"
 #include "sdkconfig.h"
@@ -183,6 +188,43 @@ esp_err_t delete_clip(httpd_req_t* r) {
     return ESP_OK;
 }
 
+std::atomic<bool> g_ota_busy{false};
+
+void reboot_later(void*) {
+    vTaskDelay(pdMS_TO_TICKS(800));
+    esp_restart();
+}
+
+esp_err_t post_ota(httpd_req_t* r) {
+    if (!authorized(r)) return ESP_OK;
+    if (r->content_len == 0) { send_error(r, engine::Err::LengthRequired, "Content-Length required"); return ESP_OK; }
+    const esp_partition_t* part = esp_ota_get_next_update_partition(nullptr);
+    if (!part || r->content_len > part->size) { send_error(r, engine::Err::TooLarge, "image larger than the OTA slot"); return ESP_OK; }
+    bool expected = false;
+    if (!g_ota_busy.compare_exchange_strong(expected, true)) { send_error(r, engine::Err::Busy, "update already running"); return ESP_OK; }
+    struct Guard { ~Guard() { g_ota_busy = false; } } guard;
+    esp_ota_handle_t h = 0;
+    if (esp_ota_begin(part, r->content_len, &h) != ESP_OK) { send_error(r, engine::Err::Ota, "ota begin failed"); return ESP_OK; }
+    constexpr std::size_t kChunk = 4096;
+    auto* buf = static_cast<char*>(heap_caps_malloc(kChunk, MALLOC_CAP_SPIRAM));
+    if (!buf) buf = static_cast<char*>(heap_caps_malloc(kChunk, MALLOC_CAP_DEFAULT));
+    if (!buf) { esp_ota_abort(h); send_error(r, engine::Err::Io, "no memory"); return ESP_OK; }
+    std::size_t left = r->content_len;
+    bool ok = true;
+    while (left > 0) {
+        const int n = httpd_req_recv(r, buf, std::min(left, kChunk));
+        if (n == HTTPD_SOCK_ERR_TIMEOUT) continue;
+        if (n <= 0 || esp_ota_write(h, buf, static_cast<std::size_t>(n)) != ESP_OK) { ok = false; break; }
+        left -= static_cast<std::size_t>(n);
+    }
+    heap_caps_free(buf);
+    if (!ok) { esp_ota_abort(h); send_error(r, engine::Err::Ota, "receive or write failed"); return ESP_OK; }
+    if (esp_ota_end(h) != ESP_OK || esp_ota_set_boot_partition(part) != ESP_OK) { send_error(r, engine::Err::Ota, "image rejected"); return ESP_OK; }
+    send_json(r, "200 OK", R"({"rebooting":true})");
+    xTaskCreate(reboot_later, "reboot", 2048, nullptr, 5, nullptr);
+    return ESP_OK;
+}
+
 esp_err_t get_root(httpd_req_t* r) {
     send_json(r, "200 OK", R"({"name":"eyes","hint":"use eyes-studio or /api/status"})");
     return ESP_OK;
@@ -207,6 +249,7 @@ std::expected<void, engine::Err> start() noexcept {
         {.uri = "/api/eye", .method = HTTP_POST, .handler = post_eye, .user_ctx = nullptr},
         {.uri = "/api/play", .method = HTTP_POST, .handler = post_play, .user_ctx = nullptr},
         {.uri = "/api/stop", .method = HTTP_POST, .handler = post_stop, .user_ctx = nullptr},
+        {.uri = "/api/ota", .method = HTTP_POST, .handler = post_ota, .user_ctx = nullptr},
         {.uri = "/api/clips", .method = HTTP_GET, .handler = get_clips, .user_ctx = nullptr},
         {.uri = "/api/clips/*", .method = HTTP_PUT, .handler = put_clip, .user_ctx = nullptr},
         {.uri = "/api/clips/*", .method = HTTP_DELETE, .handler = delete_clip, .user_ctx = nullptr},
