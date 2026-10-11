@@ -47,9 +47,10 @@ void render_clock(const Canvas& cv, const Inputs& in) noexcept {
     if (in.sensor_ok) std::snprintf(inside, sizeof inside, "%.0f^", static_cast<double>(in.reading.temp_c));
     if (in.weather_ok) std::snprintf(outside, sizeof outside, "%.0f^", static_cast<double>(in.weather.temp_c));
     std::snprintf(buf, sizeof buf, "IN %s OUT %s", inside, outside);
-    draw::label(cv, 162, 2, soft, buf);
+    draw::label(cv, 152, 2, soft, buf);
     // a tiny squirrel head peeking from the bottom edge
-    if (in.sensor_ok) draw_squirrel(cv, 120, 270, 0.75f, mood_for(in.quality.level), in.t_ms, outfit_for(in.weather_ok, in.weather.temp_c));
+    // the squirrel sits at the bottom, bigger than a peek
+    draw_squirrel(cv, 120, 248, 0.62f, in.sensor_ok ? mood_for(in.quality.level) : Mood::Sleepy, in.t_ms, outfit_for(in.weather_ok, in.weather.temp_c));
 }
 
 void render_page(const Canvas& cv, Page p, const Inputs& in) noexcept {
