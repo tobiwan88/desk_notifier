@@ -1,58 +1,72 @@
-menu "Eyes"
-    menu "Display pins (shared SPI bus, two GC9A01)"
-        config EYES_LCD_PIN_SCLK
+menu "Desk notifier"
+    menu "Display pins (one GC9A01)"
+        config DESK_LCD_PIN_SCLK
             int "SCLK GPIO"
             default 6
-        config EYES_LCD_PIN_MOSI
+        config DESK_LCD_PIN_MOSI
             int "MOSI GPIO"
             default 5
-        config EYES_LCD_PIN_DC
+        config DESK_LCD_PIN_DC
             int "DC GPIO"
             default 3
-        config EYES_LCD_PIN_RST
+        config DESK_LCD_PIN_RST
             int "RST GPIO"
             default 2
-        config EYES_LCD_PIN_CS_L
-            int "Left display CS GPIO"
+        config DESK_LCD_PIN_CS
+            int "Display CS GPIO"
             default 4
-        config EYES_LCD_PIN_CS_R
-            int "Right display CS GPIO (wired to GPIO7 on the owner's board)"
-            default 7
-        config EYES_LCD_PIN_BL
+        config DESK_LCD_PIN_BL
             int "Backlight PWM GPIO (-1 = none, needs MOSFET mod)"
             default -1
     endmenu
-    config EYES_LCD_SPI_HZ
+    config DESK_LCD_SPI_HZ
         int "SPI clock (Hz), max 40 MHz"
         default 20000000
-    config EYES_LCD_BGR
+    config DESK_LCD_BGR
         bool "Panel colour order is BGR"
         default y
-    config EYES_LCD_INVERT
+    config DESK_LCD_INVERT
         bool "Invert colours (most GC9A01 modules need this)"
         default y
-    config EYES_STRIP_LINES
+    config DESK_STRIP_LINES
         int "Lines per DMA strip"
         default 20
-    config EYES_STRIP_COUNT
+    config DESK_STRIP_COUNT
         int "Number of DMA strip buffers"
         default 3
-    config EYES_WIFI_SSID
+    menu "Sensor and button"
+        config DESK_I2C_SDA
+            int "BME688 SDA GPIO"
+            default 22
+        config DESK_I2C_SCL
+            int "BME688 SCL GPIO"
+            default 23
+        config DESK_BME_ADDR
+            hex "BME688 I2C address (0x76 SDO=GND, 0x77 SDO=VCC)"
+            default 0x76
+        config DESK_BTN
+            int "Acknowledge button GPIO (to GND, -1 = none)"
+            default 24
+    endmenu
+    config DESK_TZ
+        string "POSIX timezone"
+        default "CET-1CEST,M3.5.0,M10.5.0/3"
+    config DESK_WIFI_SSID
         string "Wi-Fi SSID (overridable via UART console)"
         default ""
-    config EYES_WIFI_PASSWORD
+    config DESK_WIFI_PASSWORD
         string "Wi-Fi password"
         default ""
-    config EYES_CLIP_MAX_BPS
+    config DESK_CLIP_MAX_BPS
         int "Sustained clip bytes/s the device can serve (measured by the fs benchmark)"
         default 1500000
-    config EYES_TEST_CRASH_ON_BOOT
+    config DESK_TEST_CRASH_ON_BOOT
         bool "TEST ONLY: abort() right after start (exercises OTA rollback)"
         default n
-    config EYES_OPEN_ACCESS
+    config DESK_OPEN_ACCESS
         bool "Anonymous access (no API token required); changeable at runtime with the console command `auth`"
         default y
-    config EYES_MAX_CLIP_BYTES
+    config DESK_MAX_CLIP_BYTES
         int "Maximum clip size in bytes"
         default 2097152
 endmenu

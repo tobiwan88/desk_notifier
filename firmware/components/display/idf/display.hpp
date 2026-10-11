@@ -1,5 +1,5 @@
-// display: two GC9A01 panels on one SPI bus with a shared DMA strip pool (plan §3.4).
-// Only the render task may call acquire/push/wait_idle/fill.
+// display: one GC9A01 panel with a DMA strip pool.
+// Only the screen task may call acquire/push/wait_idle/fill.
 #pragma once
 
 #include <cstdint>
@@ -16,21 +16,16 @@ struct StripBuf {
     std::uint8_t idx;
 };
 
-[[nodiscard]] std::expected<void, engine::Err> init() noexcept;  // bus, 2 panel IOs, one reset pulse, blank, then DISPON
+[[nodiscard]] std::expected<void, engine::Err> init() noexcept;  // bus, panel IO, reset pulse, blank, then DISPON
 void set_backlight(std::uint8_t pct) noexcept;                   // no-op unless cfg::kHasBacklightPwm
 [[nodiscard]] std::expected<StripBuf, engine::Err> acquire(std::uint32_t timeout_ms) noexcept;
-[[nodiscard]] std::expected<void, engine::Err> push(engine::Eye, StripBuf&&, gfx::Rect) noexcept;
+[[nodiscard]] std::expected<void, engine::Err> push(StripBuf&&, gfx::Rect) noexcept;
 [[nodiscard]] std::expected<void, engine::Err> wait_idle(std::uint32_t timeout_ms) noexcept;  // all strips returned
-[[nodiscard]] std::expected<void, engine::Err> fill(engine::Eye, gfx::Rgb565be) noexcept;
-
-// Diagnostics (render task only; the console posts requests through engine::lcd_request).
-// swap: Eye::Left is drawn on the CS_R panel and vice versa (does a glitch follow the panel or the content?).
-void set_swap(bool) noexcept;
-bool swapped() noexcept;
-// Tear both panels down and bring them up again (reset + init), optionally at another SPI clock (0 = keep).
+[[nodiscard]] std::expected<void, engine::Err> fill(gfx::Rgb565be) noexcept;
+// Tear the panel down and bring it up again, optionally at another SPI clock (0 = keep).
 [[nodiscard]] std::expected<void, engine::Err> reinit(int spi_hz) noexcept;
 int spi_hz() noexcept;
-// Full-screen row-address test pattern (10-row bands, coloured marker rows every 40 rows, red top / green bottom row).
-[[nodiscard]] std::expected<void, engine::Err> pattern(engine::Eye) noexcept;
+// Pushes a full 240x240 frame (row-major, big-endian RGB565) in strips.
+[[nodiscard]] std::expected<void, engine::Err> blit(std::span<const gfx::Rgb565be> frame) noexcept;
 
 }  // namespace display

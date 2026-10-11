@@ -9,10 +9,10 @@
 #include <string_view>
 
 #include "engine/core/errors.hpp"
-#include "engine/core/parse.hpp"
-#include "engine/core/pool.hpp"
-#include "eyes/core/cat.hpp"
-#include "engine/idf/render_task.hpp"
+#include "clock/idf/clock.hpp"
+#include "engine/core/names.hpp"
+#include "screen/idf/screen_task.hpp"
+#include "sensor/idf/bme688.hpp"
 #include "esp_app_desc.h"
 #include "esp_heap_caps.h"
 #include "esp_http_server.h"
@@ -60,75 +60,44 @@ bool authorized(httpd_req_t* r) {
     return true;
 }
 
-// Reads a small JSON body into `buf`; sends the error response itself on failure.
-bool read_body(httpd_req_t* r, std::array<char, engine::kMaxBody + 1>& buf, std::string_view& out) {
-    if (r->content_len > engine::kMaxBody) { send_error(r, engine::Err::TooLarge, "body over 1 KB"); return false; }
-    std::size_t got = 0;
-    while (got < r->content_len) {
-        const int n = httpd_req_recv(r, buf.data() + got, r->content_len - got);
-        if (n <= 0) { send_error(r, engine::Err::Io, "receive failed"); return false; }
-        got += static_cast<std::size_t>(n);
-    }
-    out = {buf.data(), got};
-    return true;
-}
-
-esp_err_t post_eye(httpd_req_t* r) {
-    if (!authorized(r)) return ESP_OK;
-    std::array<char, engine::kMaxBody + 1> buf;
-    std::string_view body;
-    if (!read_body(r, buf, body)) return ESP_OK;
-    auto cmd = engine::parse_eye(body);
-    if (!cmd) { send_error(r, cmd.error().code, cmd.error().message.view()); return ESP_OK; }
-    if (!engine::post(engine::Command{*cmd}, 50)) { send_error(r, engine::Err::Busy, "command queue full"); return ESP_OK; }
-    send_json(r, "202 Accepted", R"({"queued":true})");
-    return ESP_OK;
-}
-
-esp_err_t post_play(httpd_req_t* r) {
-    if (!authorized(r)) return ESP_OK;
-    std::array<char, engine::kMaxBody + 1> buf;
-    std::string_view body;
-    if (!read_body(r, buf, body)) return ESP_OK;
-    auto cmd = engine::parse_play(body);
-    if (!cmd) { send_error(r, cmd.error().code, cmd.error().message.view()); return ESP_OK; }
-    if (!engine::post(engine::Command{*cmd}, 50)) { send_error(r, engine::Err::Busy, "command queue full"); return ESP_OK; }
-    send_json(r, "202 Accepted", R"({"queued":true})");
-    return ESP_OK;
-}
-
-esp_err_t post_stop(httpd_req_t* r) {
-    if (!authorized(r)) return ESP_OK;
-    std::array<char, engine::kMaxBody + 1> buf;
-    std::string_view body;
-    if (!read_body(r, buf, body)) return ESP_OK;  // body ignored
-    if (!engine::post(engine::Command{engine::StopCmd{}}, 50)) { send_error(r, engine::Err::Busy, "command queue full"); return ESP_OK; }
-    send_json(r, "202 Accepted", R"({"queued":true})");
-    return ESP_OK;
-}
-
 esp_err_t get_status(httpd_req_t* r) {
-    const auto s = engine::stats();
-    const auto ei = engine::eye_info();
+    const auto sc = screen::stats();
+    const auto sn = sensor::latest();
     const auto* app = esp_app_get_description();
     char b[1024];
     std::snprintf(b, sizeof b,
         R"({"version":"%s","idf":"%s","hostname":"%s","uptime_s":%lld,"heap_internal":%u,"heap_min":%u,"psram_free":%u,)"
-        R"("fps":%u.%u,"fill_ms_avg":%lu,"frame_ms_avg":%lu,"frame_ms_max":%lu,"rssi":%d,"ip":"%s","source":{"left":"%.*s","right":"%.*s"},)"
-        R"("auth":"%s","resets":"%s","render_stack_free":%u,"eye":{"style":"%.*s","iris":"%.*s","auto":%s,"anim":"%.*s"},"fs_free":%lu,"clip_max_bps":%d,"spi_hz":%d})",
+        R"("frame_ms_avg":%lu,"frame_ms_max":%lu,"rssi":%d,"ip":"%s","time_valid":%s,"auth":"%s","resets":"%s",)"
+        R"("sensor":{"ok":%s,"errors":%d},"alert":%s,"snoozed":%s,"fs_free":%lu,"spi_hz":%d})",
         app->version, app->idf_ver, net::hostname().c_str(), static_cast<long long>(esp_timer_get_time() / 1000000),
         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)), static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)),
-        static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)), s.fps_x10 / 10, s.fps_x10 % 10,
-        static_cast<unsigned long>(s.fill_us_avg / 1000), static_cast<unsigned long>(s.frame_us_avg / 1000), static_cast<unsigned long>(s.frame_us_max / 1000), net::rssi(), net::ip().c_str(),
-        static_cast<int>(s.source[0].size()), s.source[0].data(), static_cast<int>(s.source[1].size()), s.source[1].data(),
-        g_open ? "open" : "token", settings::get("rst").value_or("").c_str(), engine::render_stack_free_bytes(),
-        static_cast<int>(ei.style_name.size()), ei.style_name.data(), static_cast<int>(ei.iris_name.size()), ei.iris_name.data(),
-        ei.auto_idle ? "true" : "false", static_cast<int>(ei.anim.size()), ei.anim.data(), static_cast<unsigned long>(storage::free_bytes()),
-        CONFIG_EYES_CLIP_MAX_BPS, CONFIG_EYES_LCD_SPI_HZ);
+        static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)),
+        static_cast<unsigned long>(sc.frame_us_avg / 1000), static_cast<unsigned long>(sc.frame_us_max / 1000), net::rssi(), net::ip().c_str(),
+        clock_sync::valid() ? "true" : "false", g_open ? "open" : "token", settings::get("rst").value_or("").c_str(),
+        sn.ok ? "true" : "false", sn.errors, sc.alert ? "true" : "false", sc.snoozed ? "true" : "false",
+        static_cast<unsigned long>(storage::free_bytes()), CONFIG_DESK_LCD_SPI_HZ);
     send_json(r, "200 OK", b);
     return ESP_OK;
 }
 
+esp_err_t get_sensor(httpd_req_t* r) {
+    const auto s = sensor::latest();
+    char b[320];
+    std::snprintf(b, sizeof b,
+        R"({"ok":%s,"temp_c":%.2f,"humidity":%.1f,"pressure_hpa":%.1f,"gas_ohm":%.0f,"gas_valid":%s,"score":%d,"level":"%s","age_ms":%lu})",
+        s.ok ? "true" : "false", static_cast<double>(s.reading.temp_c), static_cast<double>(s.reading.rh),
+        static_cast<double>(s.reading.hpa), static_cast<double>(s.reading.gas_ohm), s.reading.gas_valid ? "true" : "false",
+        s.quality.score, sensor::level_name(s.quality.level), static_cast<unsigned long>(s.age_ms));
+    send_json(r, "200 OK", b);
+    return ESP_OK;
+}
+
+esp_err_t post_ack(httpd_req_t* r) {
+    if (!authorized(r)) return ESP_OK;
+    screen::ack();
+    send_json(r, "202 Accepted", R"({"acked":true})");
+    return ESP_OK;
+}
 
 // last path segment of /api/clips/<name>
 std::string_view uri_name(httpd_req_t* r) {
@@ -136,58 +105,6 @@ std::string_view uri_name(httpd_req_t* r) {
     if (auto q = u.find('?'); q != std::string_view::npos) u = u.substr(0, q);
     constexpr std::string_view p = "/api/clips/";
     return u.size() > p.size() ? u.substr(p.size()) : std::string_view{};
-}
-
-// GET/POST /api/pool: which animations and clips the random mode may pick, and the pause between picks.
-std::string pool_body(const engine::Pool& p) {
-    std::string b = "{\"items\":[";
-    bool first = true;
-    auto item = [&](std::string_view name, const char* kind, bool on) {
-        if (!first) b += ',';
-        first = false;
-        b += "{\"name\":\""; b.append(name); b += "\",\"kind\":\""; b += kind; b += "\",\"enabled\":"; b += on ? "true}" : "false}";
-    };
-    for (std::size_t i = 0; i < eyes::kAnimNames.size(); ++i) item(eyes::kAnimNames[i], "anim", (p.anim_mask >> i) & 1);
-    if (auto l = storage::list()) {
-        for (const auto& c : *l) {
-            bool on = false;
-            for (const auto& n : p.clips) on |= (n.view() == c.name.view());
-            item(c.name.view(), "clip", on);
-        }
-    }
-    char t[96];
-    std::snprintf(t, sizeof t, "],\"interval\":[%.1f,%.1f],\"auto\":%s}", p.min_ds / 10.0, p.max_ds / 10.0,
-                  engine::eye_info().auto_idle ? "true" : "false");
-    return b + t;
-}
-
-esp_err_t get_pool(httpd_req_t* r) {
-    if (!authorized(r)) return ESP_OK;
-    send_json(r, "200 OK", pool_body(engine::pool_get()).c_str());
-    return ESP_OK;
-}
-
-esp_err_t post_pool(httpd_req_t* r) {
-    if (!authorized(r)) return ESP_OK;
-    std::array<char, engine::kMaxBody + 1> buf;
-    std::string_view body;
-    if (!read_body(r, buf, body)) return ESP_OK;
-    auto patch = engine::parse_pool(body);
-    if (!patch) { send_error(r, patch.error().code, patch.error().message.view()); return ESP_OK; }
-    for (const auto& c : patch->clips) {  // every named clip must exist on the device
-        if (!storage::info(c.view())) {
-            std::string m = "unknown item: ";
-            m.append(c.view());
-            send_error(r, engine::Err::BadJson, m);
-            return ESP_OK;
-        }
-    }
-    engine::Pool p = engine::pool_get();
-    engine::apply(p, *patch);
-    engine::pool_set(p);
-    settings::set("pool", engine::pool_to_json(p));
-    send_json(r, "200 OK", pool_body(p).c_str());
-    return ESP_OK;
 }
 
 esp_err_t get_clips(httpd_req_t* r) {
@@ -307,32 +224,6 @@ esp_err_t get_root(httpd_req_t* r) {
     return ESP_OK;
 }
 
-void append_list(std::string& out, const char* key, const auto& names) {
-    out += '"'; out += key; out += "\":[";
-    bool first = true;
-    for (const auto n : names) { if (!first) out += ','; first = false; out += '"'; out.append(n); out += '"'; }
-    out += ']';
-}
-
-esp_err_t get_animations(httpd_req_t* r) {  // catalogue + current state; no auth (nothing sensitive)
-    std::string b = "{";
-    append_list(b, "styles", eyes::kStyleNames); b += ',';
-    append_list(b, "irises", eyes::kIrisNames); b += ',';
-    append_list(b, "animations", eyes::kAnimNames); b += ",\"specials\":{";
-    bool first = true;
-    for (std::size_t i = 0; i < eyes::kSpecialNames.size(); ++i) {
-        if (eyes::kSpecialNames[i].empty()) continue;
-        if (!first) b += ',';
-        first = false;
-        b += '"'; b.append(eyes::kStyleNames[i]); b += "\":\""; b.append(eyes::kSpecialNames[i]); b += '"';
-    }
-    const auto i = engine::eye_info();
-    b += "},\"state\":{\"style\":\""; b.append(i.style_name); b += "\",\"iris\":\""; b.append(i.iris_name);
-    b += "\",\"auto\":"; b += i.auto_idle ? "true" : "false"; b += ",\"anim\":\""; b.append(i.anim); b += "\"}}";
-    send_json(r, "200 OK", b.c_str());
-    return ESP_OK;
-}
-
 }  // namespace
 
 std::expected<void, engine::Err> start() noexcept {
@@ -352,13 +243,9 @@ std::expected<void, engine::Err> start() noexcept {
         {.uri = "/", .method = HTTP_GET, .handler = get_root, .user_ctx = nullptr},
         {.uri = "/clip_encoder.js", .method = HTTP_GET, .handler = get_encoder, .user_ctx = nullptr},
         {.uri = "/api/status", .method = HTTP_GET, .handler = get_status, .user_ctx = nullptr},
-        {.uri = "/api/animations", .method = HTTP_GET, .handler = get_animations, .user_ctx = nullptr},
-        {.uri = "/api/eye", .method = HTTP_POST, .handler = post_eye, .user_ctx = nullptr},
-        {.uri = "/api/play", .method = HTTP_POST, .handler = post_play, .user_ctx = nullptr},
-        {.uri = "/api/stop", .method = HTTP_POST, .handler = post_stop, .user_ctx = nullptr},
+        {.uri = "/api/sensor", .method = HTTP_GET, .handler = get_sensor, .user_ctx = nullptr},
+        {.uri = "/api/ack", .method = HTTP_POST, .handler = post_ack, .user_ctx = nullptr},
         {.uri = "/api/ota", .method = HTTP_POST, .handler = post_ota, .user_ctx = nullptr},
-        {.uri = "/api/pool", .method = HTTP_GET, .handler = get_pool, .user_ctx = nullptr},
-        {.uri = "/api/pool", .method = HTTP_POST, .handler = post_pool, .user_ctx = nullptr},
         {.uri = "/api/clips", .method = HTTP_GET, .handler = get_clips, .user_ctx = nullptr},
         {.uri = "/api/clips/*", .method = HTTP_PUT, .handler = put_clip, .user_ctx = nullptr},
         {.uri = "/api/clips/*", .method = HTTP_DELETE, .handler = delete_clip, .user_ctx = nullptr},

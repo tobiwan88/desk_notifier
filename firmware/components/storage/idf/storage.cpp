@@ -12,7 +12,7 @@
 
 #include "clip/core/clip.hpp"
 #include "config.hpp"
-#include "engine/core/command.hpp"
+#include "engine/core/names.hpp"
 #include "esp_littlefs.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -127,7 +127,7 @@ std::uint32_t free_bytes() noexcept {
     return static_cast<std::uint32_t>(total - used);
 }
 
-std::uint32_t max_clip_bytes() noexcept { return CONFIG_EYES_MAX_CLIP_BYTES; }
+std::uint32_t max_clip_bytes() noexcept { return CONFIG_DESK_MAX_CLIP_BYTES; }
 
 void mark_playing(int slot, std::string_view name) noexcept {
     taskENTER_CRITICAL(&g_mux);
