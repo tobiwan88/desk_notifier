@@ -40,12 +40,39 @@ def on_bezel(frame: Image.Image, mask: Image.Image) -> Image.Image:
     return out
 
 
+SKIES = ["no weather", "clear", "partly cloudy", "cloudy", "fog", "drizzle", "rain", "snow", "thunder"]
+MOODS = ["very good", "good", "okay", "bad", "warming up"]
+COLS = ["day cold", "day 15C", "day hot", "night cold", "night 15C", "night hot"]
+
+
+def matrix_sheets(frames: list[Image.Image], mask: Image.Image, out: Path) -> None:
+    """One sheet per weather: rows = air mood, columns = day/night x temperature."""
+    w, label = SIZE + 20, 70
+    per_sky = len(MOODS) * len(COLS)
+    for si, sky in enumerate(SKIES):
+        sheet = Image.new("RGB", (label + len(COLS) * w, 20 + len(MOODS) * w), (24, 24, 28))
+        d = ImageDraw.Draw(sheet)
+        d.text((4, 4), sky, fill=(255, 255, 255))
+        for ci, c in enumerate(COLS):
+            d.text((label + ci * w + 10, 6), c, fill=(220, 220, 220))
+        for mi, mood in enumerate(MOODS):
+            d.text((4, 20 + mi * w + w // 2), mood, fill=(220, 220, 220))
+            for ci in range(len(COLS)):
+                frame = frames[si * per_sky + mi * len(COLS) + ci]
+                sheet.paste(on_bezel(frame, mask), (label + ci * w, 20 + mi * w))
+        sheet.save(out / f"matrix_{si}_{sky.replace(' ', '_')}.png")
+
+
 def main(argv: list[str]) -> int:
     out = Path(argv[0]) if argv else ROOT / "build" / "preview"
     out.mkdir(parents=True, exist_ok=True)
     exe = ROOT / "build" / "host" / "page_preview"
     subprocess.run([str(exe), str(out), *argv[1:]], check=True)
     mask = round_mask()
+    matrix = out / "matrix.rgb"
+    if matrix.exists():
+        matrix_sheets(load_frames(matrix), mask, out)
+        matrix.unlink()
     firsts: list[tuple[str, Image.Image]] = []
     for raw in sorted(out.glob("*.rgb")):
         frames = [on_bezel(f, mask) for f in load_frames(raw)]

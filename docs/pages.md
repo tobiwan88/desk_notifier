@@ -7,7 +7,7 @@ The display turns through three pages and fades between them. It draws 10 frames
 | Page | Shows | Time on screen |
 |---|---|---|
 | Clock | Time, date, indoor and outdoor temperature, a small squirrel peeking in | 12 s |
-| Air | The squirrel mascot, indoor temperature and humidity, the air level and score | 15 s |
+| Air | The squirrel mascot in front of the outdoor weather, indoor temperature and humidity, the air level and score | 15 s |
 | Weather | Today's forecast for Munich as a small animated sky, the outdoor temperature, high and low, chance of rain | 12 s |
 
 ![The rotation](media/pages_tour.gif)
@@ -23,6 +23,17 @@ The squirrel shows the indoor air from the BME688:
 | OKAY (35–49) | Half-closed eyes, flat mouth, acorn put down, tail droops a bit |
 | BAD (below 35) | Worried face, sweat drop, fans the air with its paw, grey haze. The text switches between BAD and OPEN WINDOW |
 | Sensor warming up | Sleeps under the stars, Zzz |
+
+Behind the squirrel the sky shows the weather outside, the same as on the weather page: sun, moon and stars at night, clouds, rain, snow (the hill turns white), fog, thunderstorms with lightning. Under rain and storms the hill gets darker.
+
+The squirrel dresses for the outdoor temperature:
+
+| Outside | Squirrel |
+|---|---|
+| below 8 °C | Knitted hat with a pom-pom and a scarf |
+| 25 °C and more | Strawberry ice cream with a cherry, slowly melting. It holds it in both paws (very good, good, okay), in the free paw while it fans the air (bad), or puts it down next to it (sleeping) |
+
+Before the first forecast arrives the air page uses its own colours for each air level and no outfit.
 
 When the air is BAD the air page stays on screen and its sky pulses red until you press the button or call `POST /api/ack` (15 minutes snooze).
 
@@ -60,3 +71,9 @@ uv run python tools/preview_pages.py     # GIFs and sheet.png in build/preview
 ```
 
 The preview uses the same drawing code as the board.
+
+To check every combination, add `matrix`: one sheet per weather (`build/preview/matrix_*.png`), rows are the air levels, columns are day and night at -2, 15 and 29 °C:
+
+```sh
+uv run python tools/preview_pages.py build/preview matrix
+```

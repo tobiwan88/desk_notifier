@@ -17,7 +17,7 @@ ESP32-C61 MAC xx:xx:xx:xx:xx:xx, host `desk-xxxxxx` (192.168.1.x). Flash over th
 GitHub: https://github.com/tobiwan88/desk_notifier (remote `desk`; `origin` is still the local esp_eyes clone source).
 
 ## Status
-Three pages rotate with a fade at CONFIG_DESK_FPS (default 10): clock (+ date, in/out temperature, peeking squirrel), air (squirrel mascot, mood = air level: VERY GOOD/GOOD/OKAY/BAD, sleepy while warming up), weather (today's Open-Meteo forecast for Munich, animated sun/moon/clouds/rain/snow/fog/thunder + outdoor temperature). Poor air pins the air page until ack; button = ack during an alert, else next page. API: `GET /api/status`, `GET /api/sensor`, `GET`/`POST /api/weather`, `POST /api/page`, `POST /api/ack`, `POST /api/ota`, clips CRUD. Console: `page`, `weather`.
-Preview pages on the host: build host tests, then `uv run python tools/preview_pages.py` (GIFs + sheet.png in build/preview).
+Three pages rotate with a fade at CONFIG_DESK_FPS (default 10): clock (+ date, in/out temperature, peeking squirrel), air (squirrel mascot, mood = air level: VERY GOOD/GOOD/OKAY/BAD, sleepy while warming up; sky behind it = outdoor weather via `screen/core/sky`; hat+scarf below 8 C, ice cream from 25 C outside), weather (today's Open-Meteo forecast for Munich, animated sun/moon/clouds/rain/snow/fog/thunder + outdoor temperature). Poor air pins the air page until ack; button = ack during an alert, else next page. API: `GET /api/status`, `GET /api/sensor`, `GET`/`POST /api/weather`, `POST /api/page`, `POST /api/ack`, `POST /api/ota`, clips CRUD. Console: `page`, `weather`.
+Preview pages on the host: build host tests, then `uv run python tools/preview_pages.py` (GIFs + sheet.png in build/preview; add `matrix` for all weather x mood x day/night x temperature sheets).
 The C61 has no FPU: keep per-pixel work integer (see `draw::fill`), floats only per span/row.
 Next: pushed pictures until ack, BSEC2.

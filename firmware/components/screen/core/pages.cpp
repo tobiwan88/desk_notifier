@@ -49,7 +49,7 @@ void render_clock(const Canvas& cv, const Inputs& in) noexcept {
     std::snprintf(buf, sizeof buf, "IN %s OUT %s", inside, outside);
     draw::label(cv, 162, 2, soft, buf);
     // a tiny squirrel head peeking from the bottom edge
-    if (in.sensor_ok) draw_squirrel(cv, 120, 270, 0.75f, mood_for(in.quality.level), in.t_ms);
+    if (in.sensor_ok) draw_squirrel(cv, 120, 270, 0.75f, mood_for(in.quality.level), in.t_ms, outfit_for(in.weather_ok, in.weather.temp_c));
 }
 
 void render_page(const Canvas& cv, Page p, const Inputs& in) noexcept {
@@ -59,6 +59,7 @@ void render_page(const Canvas& cv, Page p, const Inputs& in) noexcept {
         case Page::Air: {
             AirData a;
             a.sensor_ok = in.sensor_ok; a.reading = in.reading; a.quality = in.quality; a.alert = in.alert; a.t_ms = in.t_ms;
+            a.weather_ok = in.weather_ok; a.weather = in.weather;
             render_air(cv, a);
             return;
         }

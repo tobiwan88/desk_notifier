@@ -45,6 +45,14 @@ int main(int argc, char** argv) {
         {"air_okay", screen::Page::Air, 40, [](screen::Inputs& i) { i.quality = {41, sensor::Level::Stale}; }},
         {"air_bad", screen::Page::Air, 50, [](screen::Inputs& i) { i.quality = {22, sensor::Level::Poor}; i.alert = true; }},
         {"air_sleepy", screen::Page::Air, 40, [](screen::Inputs& i) { i.quality = {0, sensor::Level::WarmingUp}; }},
+        {"mix_cold_snow", screen::Page::Air, 40, [](screen::Inputs& i) { i.quality = {88, sensor::Level::Good}; i.weather = {-3.0f, true, 73, weather::Sky::Snow, 0, -6, 70}; }},
+        {"mix_hot_sunny", screen::Page::Air, 40, [](screen::Inputs& i) { i.quality = {62, sensor::Level::Fair}; i.weather = {29.5f, true, 0, weather::Sky::Clear, 31, 18, 0}; }},
+        {"mix_hot_okay", screen::Page::Air, 40, [](screen::Inputs& i) { i.quality = {40, sensor::Level::Stale}; i.weather = {27.0f, true, 2, weather::Sky::PartlyCloudy, 29, 17, 10}; }},
+        {"mix_bad_rain", screen::Page::Air, 50, [](screen::Inputs& i) { i.quality = {22, sensor::Level::Poor}; i.alert = true; i.weather = {9.1f, true, 63, weather::Sky::Rain, 11, 6, 80}; }},
+        {"mix_bad_cold", screen::Page::Air, 50, [](screen::Inputs& i) { i.quality = {22, sensor::Level::Poor}; i.weather = {2.0f, true, 3, weather::Sky::Cloudy, 4, -1, 20}; }},
+        {"mix_good_thunder", screen::Page::Air, 40, [](screen::Inputs& i) { i.quality = {62, sensor::Level::Fair}; i.weather = {21.0f, true, 95, weather::Sky::Thunder, 26, 15, 90}; }},
+        {"mix_night_sleepy", screen::Page::Air, 40, [](screen::Inputs& i) { i.quality = {0, sensor::Level::WarmingUp}; i.weather = {5.0f, false, 0, weather::Sky::Clear, 12, 3, 0}; }},
+        {"mix_fog", screen::Page::Air, 40, [](screen::Inputs& i) { i.quality = {88, sensor::Level::Good}; i.weather = {10.0f, true, 45, weather::Sky::Fog, 12, 6, 5}; }},
         {"wx_sunny", screen::Page::Weather, 40, [](screen::Inputs& i) { i.weather = {18.6f, true, 0, weather::Sky::Clear, 21, 9, 0}; }},
         {"wx_partly", screen::Page::Weather, 40, [](screen::Inputs& i) { i.weather = {14.2f, true, 2, weather::Sky::PartlyCloudy, 16, 7, 10}; }},
         {"wx_cloudy", screen::Page::Weather, 40, [](screen::Inputs&) {}},
@@ -74,6 +82,30 @@ int main(int argc, char** argv) {
             screen::draw::dim({fb}, fr.brightness);
             write_frame(f, fb);
         }
+        std::fclose(f);
+    }
+    bool want_matrix = false;
+    for (int a = 2; a < argc; ++a) want_matrix |= std::strcmp(argv[a], "matrix") == 0;
+    if (want_matrix) {  // one frame per combination: sky x mood x day/night x cold/normal/hot (+ no weather)
+        std::FILE* f = std::fopen((std::string(argv[1]) + "/matrix.rgb").c_str(), "wb");
+        if (!f) return 1;
+        static const sensor::Level kLevels[] = {sensor::Level::Good, sensor::Level::Fair, sensor::Level::Stale,
+                                                sensor::Level::Poor, sensor::Level::WarmingUp};
+        static const float kTemps[] = {-2.0f, 15.0f, 29.0f};
+        for (int sky = -1; sky <= static_cast<int>(weather::Sky::Thunder); ++sky)
+            for (const sensor::Level lvl : kLevels)
+                for (int day = 1; day >= 0; --day)
+                    for (const float temp : kTemps) {
+                        screen::Inputs in = base_inputs();
+                        in.quality = {lvl == sensor::Level::Poor ? 22 : 70, lvl};
+                        in.alert = lvl == sensor::Level::Poor;
+                        in.weather_ok = sky >= 0;
+                        in.weather = {temp, day == 1, 0, static_cast<weather::Sky>(sky < 0 ? 0 : sky), temp + 3, temp - 5, 40};
+                        in.t_ms = 100300;
+                        std::fill(fb.begin(), fb.end(), gfx::Rgb565be{0});
+                        screen::render_page({fb}, screen::Page::Air, in);
+                        write_frame(f, fb);
+                    }
         std::fclose(f);
     }
     for (const Scene& s : kScenes) {

@@ -169,3 +169,58 @@ TEST_CASE("every page renders something for every state") {
     screen::render_page({a}, Page::Clock, in);
     CHECK(count_color(a, gfx::rgb565_rt(255, 255, 255)) > 400);
 }
+
+TEST_CASE("the squirrel dresses for the outdoor temperature") {
+    CHECK_FALSE(screen::outfit_for(false, -10).hat);  // no forecast: no outfit
+    CHECK(screen::outfit_for(true, 7.9f).hat);
+    CHECK_FALSE(screen::outfit_for(true, 8.0f).hat);
+    CHECK_FALSE(screen::outfit_for(true, 24.9f).ice_cream);
+    CHECK(screen::outfit_for(true, 25.0f).ice_cream);
+    CHECK_FALSE(screen::outfit_for(true, 30).hat);
+}
+
+TEST_CASE("air page shows the outdoor weather behind the squirrel") {
+    std::vector<gfx::Rgb565be> a(240 * 240), b(240 * 240);
+    screen::Inputs in;
+    in.sensor_ok = true; in.reading = {22, 45, 1013, 90000, true}; in.quality = {80, sensor::Level::Good};
+    in.t_ms = 5000;
+    screen::render_page({a}, Page::Air, in);
+    in.weather_ok = true;
+    in.weather = {-4, true, 73, Sky::Snow, 0, -8, 80};
+    screen::render_page({b}, Page::Air, in);
+    CHECK(a != b);
+    for (const Sky s : {Sky::Clear, Sky::Rain, Sky::Thunder, Sky::Fog}) {
+        in.weather.sky = s;
+        in.weather.temp_c = 30;  // ice cream
+        screen::render_page({a}, Page::Air, in);
+        CHECK(a != b);
+    }
+}
+
+TEST_CASE("every weather x air mood x day/night x temperature combination renders") {
+    // Runs under ASan/UBSan: catches out-of-bounds drawing in any combination.
+    std::vector<gfx::Rgb565be> fb(240 * 240), prev(240 * 240);
+    screen::Inputs in;
+    in.sensor_ok = true;
+    in.reading = {22, 45, 1013, 90000, true};
+    int n = 0;
+    for (int sky = 0; sky <= static_cast<int>(Sky::Thunder); ++sky)
+        for (int lvl = 0; lvl < 5; ++lvl)
+            for (const bool day : {true, false})
+                for (const float temp : {-12.0f, 15.0f, 34.0f}) {
+                    in.quality = {50, static_cast<sensor::Level>(lvl)};
+                    in.alert = in.quality.level == sensor::Level::Poor;
+                    in.weather_ok = true;
+                    in.weather = {temp, day, 0, static_cast<Sky>(sky), temp + 2, temp - 4, 50};
+                    for (const std::uint32_t t : {0u, 3210u, 987654u}) {
+                        in.t_ms = t;
+                        screen::render_page({fb}, Page::Air, in);
+                        screen::render_page({fb}, Page::Clock, in);
+                    }
+                    screen::render_page({fb}, Page::Air, in);
+                    CHECK(fb != prev);  // each combination looks different from the one before
+                    prev = fb;
+                    ++n;
+                }
+    CHECK(n == 8 * 5 * 2 * 3);
+}
