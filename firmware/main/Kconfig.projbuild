@@ -25,6 +25,12 @@ menu "Desk notifier"
     config DESK_LCD_BGR
         bool "Panel colour order is BGR"
         default y
+    config DESK_LCD_MIRROR_X
+        bool "Mirror the panel horizontally"
+        default y
+    config DESK_LCD_MIRROR_Y
+        bool "Mirror the panel vertically"
+        default n
     config DESK_LCD_INVERT
         bool "Invert colours (most GC9A01 modules need this)"
         default y
@@ -43,7 +49,7 @@ menu "Desk notifier"
             default 23
         config DESK_BME_ADDR
             hex "BME688 I2C address (0x76 SDO=GND, 0x77 SDO=VCC)"
-            default 0x76
+            default 0x77
         config DESK_BTN
             int "Acknowledge button GPIO (to GND, -1 = none)"
             default 24

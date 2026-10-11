@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <expected>
+#include <string>
 
 #include "engine/core/types.hpp"
 #include "sensor/core/airq.hpp"
@@ -19,5 +20,6 @@ struct Snapshot {
 
 [[nodiscard]] std::expected<void, engine::Err> start() noexcept;  // I2C bus + probe + sampling task
 Snapshot latest() noexcept;
+std::string i2c_scan() noexcept;  // "0x76,0x77" - addresses that answered the last bus scan
 
 }  // namespace sensor

@@ -68,13 +68,13 @@ esp_err_t get_status(httpd_req_t* r) {
     std::snprintf(b, sizeof b,
         R"({"version":"%s","idf":"%s","hostname":"%s","uptime_s":%lld,"heap_internal":%u,"heap_min":%u,"psram_free":%u,)"
         R"("frame_ms_avg":%lu,"frame_ms_max":%lu,"rssi":%d,"ip":"%s","time_valid":%s,"auth":"%s","resets":"%s",)"
-        R"("sensor":{"ok":%s,"errors":%d},"alert":%s,"snoozed":%s,"fs_free":%lu,"spi_hz":%d})",
+        R"("sensor":{"ok":%s,"errors":%d,"i2c":"%s"},"alert":%s,"snoozed":%s,"fs_free":%lu,"spi_hz":%d})",
         app->version, app->idf_ver, net::hostname().c_str(), static_cast<long long>(esp_timer_get_time() / 1000000),
         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)), static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)),
         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)),
         static_cast<unsigned long>(sc.frame_us_avg / 1000), static_cast<unsigned long>(sc.frame_us_max / 1000), net::rssi(), net::ip().c_str(),
         clock_sync::valid() ? "true" : "false", g_open ? "open" : "token", settings::get("rst").value_or("").c_str(),
-        sn.ok ? "true" : "false", sn.errors, sc.alert ? "true" : "false", sc.snoozed ? "true" : "false",
+        sn.ok ? "true" : "false", sn.errors, sensor::i2c_scan().c_str(), sc.alert ? "true" : "false", sc.snoozed ? "true" : "false",
         static_cast<unsigned long>(storage::free_bytes()), CONFIG_DESK_LCD_SPI_HZ);
     send_json(r, "200 OK", b);
     return ESP_OK;

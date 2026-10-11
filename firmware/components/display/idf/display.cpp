@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "config.hpp"
+#include "sdkconfig.h"
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
 #include "esp_heap_caps.h"
@@ -35,6 +36,17 @@ extern "C" IRAM_ATTR bool on_color_done(esp_lcd_panel_io_handle_t, esp_lcd_panel
     xSemaphoreGiveFromISR(static_cast<SemaphoreHandle_t>(ctx), &woken);
     return woken == pdTRUE;
 }
+
+#ifdef CONFIG_DESK_LCD_MIRROR_X
+constexpr bool kMirrorX = true;
+#else
+constexpr bool kMirrorX = false;
+#endif
+#ifdef CONFIG_DESK_LCD_MIRROR_Y
+constexpr bool kMirrorY = true;
+#else
+constexpr bool kMirrorY = false;
+#endif
 
 // GC9A01 needs up to 120 ms after RESX/SWRESET (reset cancel) before it accepts SLPOUT and register writes.
 constexpr std::uint32_t kResetCancelMs = 120;
@@ -76,6 +88,7 @@ std::expected<void, engine::Err> bring_up() noexcept {
     vTaskDelay(pdMS_TO_TICKS(kResetCancelMs));
     if (esp_lcd_panel_init(g_panel) != ESP_OK) return std::unexpected(engine::Err::Io);
     esp_lcd_panel_invert_color(g_panel, CONFIG_DESK_LCD_INVERT);
+    esp_lcd_panel_mirror(g_panel, kMirrorX, kMirrorY);
     (void)fill(0);  // blank before DISPON
     esp_lcd_panel_disp_on_off(g_panel, true);
     ESP_LOGI(kTag, "panel up, spi=%d Hz", g_hz);

@@ -1,7 +1,9 @@
 #include "sensor/idf/bme688.hpp"
 
 #include <array>
+#include <cstdio>
 #include <cstring>
+#include <string>
 
 #include "config.hpp"
 #include "driver/i2c_master.h"
@@ -101,6 +103,52 @@ void task(void*) {
         else ESP_LOGW(kTag, "read failed (%d in a row)", errors);
         vTaskDelay(pdMS_TO_TICKS(kPeriodMs));
     }
+
+}  // namespace
+
+std::string g_scan;  // addresses that ACKed on the bus (diagnostics)
+
+bool attach(int addr) {
+    if (g_dev) { i2c_master_bus_rm_device(g_dev); g_dev = nullptr; }
+    i2c_device_config_t dc = {};
+    dc.dev_addr_length = I2C_ADDR_BIT_LEN_7;
+    dc.device_address = static_cast<std::uint16_t>(addr);
+    dc.scl_speed_hz = 100000;
+    if (i2c_master_bus_add_device(g_bus, &dc, &g_dev) != ESP_OK) return false;
+    g_bme = {};
+    g_bme.intf = BME68X_I2C_INTF;
+    g_bme.read = i2c_read;
+    g_bme.write = i2c_write;
+    g_bme.delay_us = delay_us;
+    g_bme.intf_ptr = nullptr;
+    g_bme.amb_temp = 22;
+    return bme68x_init(&g_bme) == BME68X_OK && configure();
+}
+
+void scan() {
+    g_scan.clear();
+    for (int a = 0x08; a < 0x78; ++a) {
+        if (i2c_master_probe(g_bus, static_cast<std::uint16_t>(a), 20) == ESP_OK) {
+            char b[8];
+            std::snprintf(b, sizeof b, "%s0x%02x", g_scan.empty() ? "" : ",", a);
+            g_scan += b;
+        }
+    }
+    ESP_LOGI(kTag, "I2C scan (SDA=%d SCL=%d): [%s]", cfg::kI2cSda, cfg::kI2cScl, g_scan.c_str());
+}
+
+void init_task(void*) {  // keeps trying until a BME68x answers, then becomes the sampling task
+    for (;;) {
+        scan();
+        for (int addr : {cfg::kBmeAddr, 0x76, 0x77}) {
+            if (attach(addr)) {
+                ESP_LOGI(kTag, "BME68x up at 0x%02x (variant %d)", addr, g_bme.variant_id);
+                task(nullptr);
+            }
+        }
+        ESP_LOGE(kTag, "no BME68x found: check 3V3, GND, SDA=%d, SCL=%d", cfg::kI2cSda, cfg::kI2cScl);
+        vTaskDelay(pdMS_TO_TICKS(10000));
+    }
 }
 
 }  // namespace
@@ -114,26 +162,12 @@ std::expected<void, engine::Err> start() noexcept {
     bc.glitch_ignore_cnt = 7;
     bc.flags.enable_internal_pullup = true;
     if (i2c_new_master_bus(&bc, &g_bus) != ESP_OK) return std::unexpected(engine::Err::Io);
-    i2c_device_config_t dc = {};
-    dc.dev_addr_length = I2C_ADDR_BIT_LEN_7;
-    dc.device_address = static_cast<std::uint16_t>(cfg::kBmeAddr);
-    dc.scl_speed_hz = 100000;
-    if (i2c_master_bus_add_device(g_bus, &dc, &g_dev) != ESP_OK) return std::unexpected(engine::Err::Io);
-
-    g_bme.intf = BME68X_I2C_INTF;
-    g_bme.read = i2c_read;
-    g_bme.write = i2c_write;
-    g_bme.delay_us = delay_us;
-    g_bme.intf_ptr = nullptr;
-    g_bme.amb_temp = 22;
-    if (int8_t rc = bme68x_init(&g_bme); rc != BME68X_OK) {
-        ESP_LOGE(kTag, "no BME68x at 0x%02x (rc=%d): check wiring, SDA=%d SCL=%d", cfg::kBmeAddr, rc, cfg::kI2cSda, cfg::kI2cScl);
-        return std::unexpected(engine::Err::Io);
-    }
-    if (!configure()) return std::unexpected(engine::Err::Io);
-    ESP_LOGI(kTag, "BME68x up (chip variant %d), addr 0x%02x", g_bme.variant_id, cfg::kBmeAddr);
-    if (xTaskCreate(task, "bme688", 4096, nullptr, 3, nullptr) != pdPASS) return std::unexpected(engine::Err::Io);
+    if (xTaskCreate(init_task, "bme688", 4096, nullptr, 3, nullptr) != pdPASS) return std::unexpected(engine::Err::Io);
     return {};
+}
+
+std::string i2c_scan() noexcept {
+    return g_scan;  // diagnostics only; a torn read is harmless
 }
 
 Snapshot latest() noexcept {
