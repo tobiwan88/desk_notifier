@@ -25,6 +25,8 @@ constexpr std::uint32_t kStaleS = 3 * 3600;
 portMUX_TYPE g_mux = portMUX_INITIALIZER_UNLOCKED;
 Forecast g_forecast{};
 bool g_have = false;
+Forecast g_demo{};
+std::int64_t g_demo_until_us = 0;  // 0 = no demo
 std::int64_t g_fetched_us = 0;
 int g_errors = 0, g_http = 0;
 TaskHandle_t g_task = nullptr;
@@ -33,7 +35,7 @@ std::string url() {
     const std::string lat = settings::get("wx_lat").value_or(CONFIG_DESK_WEATHER_LAT);
     const std::string lon = settings::get("wx_lon").value_or(CONFIG_DESK_WEATHER_LON);
     return std::string(CONFIG_DESK_WEATHER_URL) + "?latitude=" + lat + "&longitude=" + lon +
-           "&current=temperature_2m,is_day,weather_code"
+           "&current=temperature_2m,is_day,weather_code,wind_speed_10m"
            "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
            "&timezone=auto&forecast_days=1";
 }
@@ -107,12 +109,26 @@ Status latest() noexcept {
     s.http_status = g_http;
     const bool have = g_have;
     const std::int64_t at = g_fetched_us;
+    const Forecast demo = g_demo;
+    const std::int64_t demo_until = g_demo_until_us;
     taskEXIT_CRITICAL(&g_mux);
+    if (demo_until != 0 && esp_timer_get_time() < demo_until) {
+        s.forecast = demo;
+        s.ok = true;
+        return s;
+    }
     if (have) {
         s.age_s = static_cast<std::uint32_t>((esp_timer_get_time() - at) / 1000000);
         s.ok = s.age_s < kStaleS;
     }
     return s;
+}
+
+void set_demo(const Forecast& f, std::uint32_t seconds) noexcept {
+    taskENTER_CRITICAL(&g_mux);
+    g_demo = f;
+    g_demo_until_us = seconds ? esp_timer_get_time() + static_cast<std::int64_t>(seconds) * 1000000 : 0;
+    taskEXIT_CRITICAL(&g_mux);
 }
 
 void refresh() noexcept {

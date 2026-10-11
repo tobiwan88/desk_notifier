@@ -20,7 +20,9 @@ struct Status {
 
 [[nodiscard]] std::expected<void, engine::Err> start() noexcept;  // call after net::init()
 Status latest() noexcept;
-void refresh() noexcept;       // fetch again now
+void refresh() noexcept;
+// Shows this forecast instead of the real one for `seconds` (0 = back to the real one). For trying the squirrel outfits.
+void set_demo(const Forecast& f, std::uint32_t seconds) noexcept;       // fetch again now
 std::string place() noexcept;  // the name shown on the page, e.g. "MUNICH"
 
 }  // namespace weather
