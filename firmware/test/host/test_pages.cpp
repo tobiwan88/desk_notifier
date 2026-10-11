@@ -36,6 +36,14 @@ TEST_CASE("open-meteo parse") {
     CHECK(f->max_c == doctest::Approx(14.8));
     CHECK(f->min_c == doctest::Approx(-1.5));
     CHECK(f->precip_pct == 45);
+    CHECK(f->wind_kmh == doctest::Approx(0));  // not in this payload
+}
+
+TEST_CASE("open-meteo parse: wind") {
+    const auto f = weather::parse_open_meteo(
+        R"({"current":{"temperature_2m":9,"is_day":1,"weather_code":2,"wind_speed_10m":37.4},"daily":{"weather_code":[2]}})");
+    if (!f) { FAIL_CHECK("no forecast"); return; }
+    CHECK(f->wind_kmh == doctest::Approx(37.4));
 }
 
 TEST_CASE("open-meteo parse: missing parts and nulls") {
@@ -170,13 +178,55 @@ TEST_CASE("every page renders something for every state") {
     CHECK(count_color(a, gfx::rgb565_rt(255, 255, 255)) > 400);
 }
 
+namespace {
+weather::Forecast wx(float temp, weather::Sky sky, bool day = true, float wind = 0) {
+    weather::Forecast f;
+    f.temp_c = temp; f.sky = sky; f.is_day = day; f.wind_kmh = wind;
+    return f;
+}
+}  // namespace
+
 TEST_CASE("the squirrel dresses for the outdoor temperature") {
-    CHECK_FALSE(screen::outfit_for(false, -10).hat);  // no forecast: no outfit
-    CHECK(screen::outfit_for(true, 7.9f).hat);
-    CHECK_FALSE(screen::outfit_for(true, 8.0f).hat);
-    CHECK_FALSE(screen::outfit_for(true, 24.9f).ice_cream);
-    CHECK(screen::outfit_for(true, 25.0f).ice_cream);
-    CHECK_FALSE(screen::outfit_for(true, 30).hat);
+    using weather::Sky;
+    CHECK_FALSE(screen::outfit_for(false, wx(-10, Sky::Clear)).hat);  // no forecast: no outfit
+    CHECK(screen::outfit_for(true, wx(7.9f, Sky::Cloudy)).hat);
+    CHECK_FALSE(screen::outfit_for(true, wx(8.0f, Sky::Cloudy)).hat);
+    CHECK_FALSE(screen::outfit_for(true, wx(24.9f, Sky::Cloudy)).ice_cream);
+    CHECK(screen::outfit_for(true, wx(25.0f, Sky::Cloudy)).ice_cream);
+    CHECK_FALSE(screen::outfit_for(true, wx(30, Sky::Cloudy)).hat);
+}
+
+TEST_CASE("the squirrel dresses for sun, rain and wind") {
+    using weather::Sky;
+    CHECK(screen::outfit_for(true, wx(18, Sky::Clear)).sunglasses);
+    CHECK(screen::outfit_for(true, wx(18, Sky::PartlyCloudy)).sunglasses);
+    CHECK_FALSE(screen::outfit_for(true, wx(18, Sky::Clear, false)).sunglasses);  // not at night
+    CHECK_FALSE(screen::outfit_for(true, wx(18, Sky::Cloudy)).sunglasses);
+    for (Sky s : {Sky::Drizzle, Sky::Rain, Sky::Thunder}) CHECK(screen::outfit_for(true, wx(15, s)).umbrella);
+    CHECK_FALSE(screen::outfit_for(true, wx(-2, Sky::Snow)).umbrella);
+    CHECK_FALSE(screen::outfit_for(true, wx(15, Sky::Clear)).umbrella);
+    CHECK_FALSE(screen::outfit_for(true, wx(15, Sky::Clear, true, 29.9f)).windy);
+    CHECK(screen::outfit_for(true, wx(15, Sky::Clear, true, 30)).windy);
+    CHECK(screen::outfit_for(true, wx(15, Sky::Clear, true, 30)).umbrella);  // the glider always has one
+    const auto stack = screen::outfit_for(true, wx(3, Sky::Rain, true, 40));  // cold + rain + wind
+    CHECK(stack.hat); CHECK(stack.umbrella); CHECK(stack.windy); CHECK_FALSE(stack.sunglasses);
+    CHECK_FALSE(screen::outfit_for(true, wx(28, Sky::Rain)).ice_cream);  // paws are busy with the umbrella
+    CHECK(screen::outfit_for(true, wx(28, Sky::Clear)).ice_cream);
+}
+
+TEST_CASE("each accessory changes the picture") {
+    using weather::Sky;
+    std::vector<gfx::Rgb565be> a(240 * 240), b(240 * 240);
+    auto shot = [&](std::vector<gfx::Rgb565be>& fb, screen::Outfit o) {
+        screen::draw_squirrel({fb}, 120, 150, 0.9f, screen::Mood::Good, 1000, o);
+    };
+    shot(a, {});
+    for (int i = 0; i < 5; ++i) {
+        screen::Outfit o;
+        (&o.hat)[i] = true;  // hat, ice_cream, sunglasses, umbrella, windy
+        shot(b, o);
+        CHECK(a != b);
+    }
 }
 
 TEST_CASE("air page shows the outdoor weather behind the squirrel") {
@@ -218,7 +268,10 @@ TEST_CASE("every weather x air mood x day/night x temperature combination render
                         screen::render_page({fb}, Page::Clock, in);
                     }
                     screen::render_page({fb}, Page::Air, in);
-                    CHECK(fb != prev);  // each combination looks different from the one before
+                    // each combination looks different from the one before, except hot vs mild in the rain:
+                    // the umbrella replaces the ice cream, so the squirrel looks the same
+                    const bool wet = sky == static_cast<int>(Sky::Drizzle) || sky == static_cast<int>(Sky::Rain) || sky == static_cast<int>(Sky::Thunder);
+                    CHECK((fb != prev || (wet && temp == 34.0f)));
                     prev = fb;
                     ++n;
                 }

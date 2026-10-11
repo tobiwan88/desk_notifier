@@ -25,6 +25,19 @@ Planned: pictures that stay on screen until acknowledged, Bosch BSEC2 for a prop
 - A push button (optional)
 - USB cable
 
+## The squirrel
+The squirrel's mood follows the indoor air quality. What it wears follows the weather outside (Open-Meteo, Munich by default):
+
+| Outside | Squirrel |
+|---|---|
+| below 8 °C | knitted hat and scarf |
+| 25 °C or more | ice cream |
+| sunny, daytime | sunglasses |
+| drizzle, rain, thunder | umbrella |
+| wind of 30 km/h or more | glides under the umbrella, tail streaming |
+
+Items stack (cold, rainy and windy gives hat, umbrella and gliding). Preview every look on your computer with `uv run python tools/preview_pages.py out/` after `scripts/check.sh --quick`.
+
 ## Wiring
 | Signal | GPIO | Note |
 |---|---|---|

@@ -50,7 +50,9 @@ void render_clock(const Canvas& cv, const Inputs& in) noexcept {
     draw::label(cv, 152, 2, soft, buf);
     // a tiny squirrel head peeking from the bottom edge
     // the squirrel sits at the bottom, bigger than a peek
-    draw_squirrel(cv, 120, 248, 0.62f, in.sensor_ok ? mood_for(in.quality.level) : Mood::Sleepy, in.t_ms, outfit_for(in.weather_ok, in.weather.temp_c));
+    Outfit o = outfit_for(in.weather_ok, in.weather);
+    o.umbrella = o.windy = false;  // too tall for the peeking squirrel
+    draw_squirrel(cv, 120, 248, 0.62f, in.sensor_ok ? mood_for(in.quality.level) : Mood::Sleepy, in.t_ms, o);
 }
 
 void render_page(const Canvas& cv, Page p, const Inputs& in) noexcept {

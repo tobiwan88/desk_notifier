@@ -97,11 +97,11 @@ esp_err_t get_weather(httpd_req_t* r) {
     const auto w = weather::latest();
     char b[320];
     std::snprintf(b, sizeof b,
-        R"({"ok":%s,"place":"%s","temp_c":%.1f,"is_day":%s,"code":%d,"sky":"%s","max_c":%.1f,"min_c":%.1f,"precip_pct":%d,)"
+        R"({"ok":%s,"place":"%s","temp_c":%.1f,"is_day":%s,"code":%d,"sky":"%s","max_c":%.1f,"min_c":%.1f,"precip_pct":%d,"wind_kmh":%.1f,)"
         R"("age_s":%lu,"errors":%d,"http":%d})",
         w.ok ? "true" : "false", weather::place().c_str(), static_cast<double>(w.forecast.temp_c), w.forecast.is_day ? "true" : "false",
         w.forecast.code, weather::sky_name(w.forecast.sky, w.forecast.is_day), static_cast<double>(w.forecast.max_c),
-        static_cast<double>(w.forecast.min_c), w.forecast.precip_pct, static_cast<unsigned long>(w.age_s), w.errors, w.http_status);
+        static_cast<double>(w.forecast.min_c), w.forecast.precip_pct, static_cast<double>(w.forecast.wind_kmh), static_cast<unsigned long>(w.age_s), w.errors, w.http_status);
     send_json(r, "200 OK", b);
     return ESP_OK;
 }

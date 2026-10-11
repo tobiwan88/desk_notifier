@@ -33,7 +33,7 @@ std::string url() {
     const std::string lat = settings::get("wx_lat").value_or(CONFIG_DESK_WEATHER_LAT);
     const std::string lon = settings::get("wx_lon").value_or(CONFIG_DESK_WEATHER_LON);
     return std::string(CONFIG_DESK_WEATHER_URL) + "?latitude=" + lat + "&longitude=" + lon +
-           "&current=temperature_2m,is_day,weather_code"
+           "&current=temperature_2m,is_day,weather_code,wind_speed_10m"
            "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max"
            "&timezone=auto&forecast_days=1";
 }

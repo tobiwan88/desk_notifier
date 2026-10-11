@@ -92,6 +92,7 @@ std::optional<Forecast> parse_open_meteo(std::string_view json) noexcept {
     if (!number(day, "temperature_2m_max", f.max_c)) f.max_c = f.temp_c;
     if (!number(day, "temperature_2m_min", f.min_c)) f.min_c = f.temp_c;
     if (number(day, "precipitation_probability_max", v)) f.precip_pct = static_cast<int>(v + 0.5f);
+    if (number(cur, "wind_speed_10m", v) && v > 0) f.wind_kmh = v;
     return f;
 }
 
