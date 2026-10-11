@@ -55,13 +55,13 @@ std::string hostname() noexcept {
     std::uint8_t mac[6]{};
     esp_read_mac(mac, ESP_MAC_WIFI_STA);
     char b[20];
-    std::snprintf(b, sizeof b, "eyes-%02x%02x%02x", mac[3], mac[4], mac[5]);
+    std::snprintf(b, sizeof b, "desk-%02x%02x%02x", mac[3], mac[4], mac[5]);
     return b;
 }
 
 bool open_access() noexcept {
     if (auto o = settings::get("open")) return *o == "1";
-    return CONFIG_EYES_OPEN_ACCESS;
+    return CONFIG_DESK_OPEN_ACCESS;
 }
 
 std::string token() noexcept {
@@ -86,8 +86,8 @@ std::expected<void, engine::Err> init() noexcept {
     esp_wifi_set_mode(WIFI_MODE_STA);
     esp_wifi_set_ps(WIFI_PS_NONE);
 
-    std::string ssid = settings::get("ssid").value_or(CONFIG_EYES_WIFI_SSID);
-    std::string pass = settings::get("pass").value_or(CONFIG_EYES_WIFI_PASSWORD);
+    std::string ssid = settings::get("ssid").value_or(CONFIG_DESK_WIFI_SSID);
+    std::string pass = settings::get("pass").value_or(CONFIG_DESK_WIFI_PASSWORD);
     if (ssid.empty()) {
         ESP_LOGW(kTag, "no Wi-Fi credentials: use the console command `wifi <ssid> <password>`");
         esp_wifi_start();  // started without config: STA_START triggers connect which fails quietly
@@ -106,15 +106,15 @@ std::expected<void, engine::Err> start_mdns() noexcept {
     if (mdns_init() != ESP_OK) return std::unexpected(engine::Err::Io);
     const std::string h = hostname();
     mdns_hostname_set(h.c_str());
-    mdns_instance_name_set("eyes");
-    mdns_service_add(nullptr, "_eyes", "_tcp", 80, nullptr, 0);
+    mdns_instance_name_set("desk");
+    mdns_service_add(nullptr, "_desk", "_tcp", 80, nullptr, 0);
     mdns_service_add(nullptr, "_http", "_tcp", 80, nullptr, 0);
     ESP_LOGI(kTag, "mDNS: %s.local", h.c_str());
     return {};
 }
 
 bool connected() noexcept { return g_connected; }
-bool has_credentials() noexcept { return !settings::get("ssid").value_or(CONFIG_EYES_WIFI_SSID).empty(); }
+bool has_credentials() noexcept { return !settings::get("ssid").value_or(CONFIG_DESK_WIFI_SSID).empty(); }
 std::int8_t rssi() noexcept {
     wifi_ap_record_t ap{};
     return esp_wifi_sta_get_ap_info(&ap) == ESP_OK ? ap.rssi : 0;

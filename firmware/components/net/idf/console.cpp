@@ -7,8 +7,10 @@
 #include <cstring>
 #include <string>
 
-#include "engine/core/command.hpp"
-#include "engine/idf/render_task.hpp"
+#include "clock/idf/clock.hpp"
+#include "display/idf/display.hpp"
+#include "screen/idf/screen_task.hpp"
+#include "sensor/idf/bme688.hpp"
 #include "driver/gpio.h"
 #include "esp_console.h"
 #include "freertos/FreeRTOS.h"
@@ -58,35 +60,11 @@ int cmd_hostname(int argc, char** argv) {
 }
 int cmd_status(int, char**) {
     std::printf("resets: %s\n", settings::get("rst").value_or("").c_str());
-    const auto s = engine::stats();
-    std::printf("host=%s ip=%s rssi=%d fps=%u.%u frame_avg=%luus src=%.*s/%.*s heap=%lu\n", hostname().c_str(), ip().c_str(),
-                rssi(), s.fps_x10 / 10, s.fps_x10 % 10, static_cast<unsigned long>(s.frame_us_avg),
-                static_cast<int>(s.source[0].size()), s.source[0].data(), static_cast<int>(s.source[1].size()), s.source[1].data(),
-                static_cast<unsigned long>(esp_get_free_heap_size()));
+    const auto st = screen::stats();
+    std::printf("host=%s ip=%s rssi=%d frame_avg=%luus time=%d heap=%lu\n", hostname().c_str(), ip().c_str(), rssi(),
+                static_cast<unsigned long>(st.frame_us_avg), clock_sync::valid(), static_cast<unsigned long>(esp_get_free_heap_size()));
     return 0;
 }
-int cmd_eye(int argc, char** argv) {  // eye <animation|blink|random>
-    if (argc != 2) { std::printf("usage: eye <animation|blink|random>\n"); return 1; }
-    engine::EyeCmd c;
-    const std::string_view n = argv[1];
-    if (n == "blink") c.play = engine::kPlayBlink;
-    else if (n == "random") c.play = engine::kPlayRandom;
-    else {
-        std::size_t i = 0;
-        while (i < eyes::kAnimNames.size() && eyes::kAnimNames[i] != n) ++i;
-        if (i == eyes::kAnimNames.size()) { std::printf("unknown animation\n"); return 1; }
-        c.play = static_cast<std::uint8_t>(i);
-    }
-    return engine::post(engine::Command{c}, 100) ? 0 : 1;
-}
-int cmd_play(int argc, char** argv) {
-    if (argc < 2) { std::printf("usage: play <clip> [loop]\n"); return 1; }
-    engine::PlayCmd p;
-    p.clip[0].assign(argv[1]); p.clip[1].assign(argv[1]);
-    p.loop = argc > 2;
-    return engine::post(engine::Command{p}, 100) ? 0 : 1;
-}
-int cmd_stop(int, char**) { return engine::post(engine::Command{engine::StopCmd{}}, 100) ? 0 : 1; }
 int cmd_fsbench(int argc, char** argv) {
     if (argc < 2) { std::printf("usage: fsbench <clip>\n"); return 1; }
     char path[96];
@@ -107,26 +85,30 @@ int cmd_fsbench(int argc, char** argv) {
     }
     return 0;
 }
-int cmd_lcd(int argc, char** argv) {  // display diagnostics, see engine::LcdOp
-    const auto arg = [&](int d) { return argc > 2 ? std::atoi(argv[2]) : d; };
-    bool ok = false;
-    if (argc >= 2 && !std::strcmp(argv[1], "swap")) ok = engine::lcd_request(engine::LcdOp::Swap, argc > 2 ? std::strcmp(argv[2], "off") != 0 : 1);
-    else if (argc >= 2 && !std::strcmp(argv[1], "init")) ok = engine::lcd_request(engine::LcdOp::Init, arg(0));
-    else if (argc >= 2 && !std::strcmp(argv[1], "test")) ok = engine::lcd_request(engine::LcdOp::Test, arg(20));
-    else if (argc >= 2 && !std::strcmp(argv[1], "pins")) {  // idle levels: CS lines must read 1 between transfers
-        const int pins[] = {CONFIG_EYES_LCD_PIN_CS_L, CONFIG_EYES_LCD_PIN_CS_R, CONFIG_EYES_LCD_PIN_DC, CONFIG_EYES_LCD_PIN_RST};
-        const char* names[] = {"CS_L", "CS_R", "DC", "RST"};
-        for (int n = 0; n < 6; ++n) {
-            for (int i = 0; i < 4; ++i) std::printf("%s(gpio%d)=%d ", names[i], pins[i], gpio_get_level(static_cast<gpio_num_t>(pins[i])));
-            std::printf("\n");
-            vTaskDelay(pdMS_TO_TICKS(37));
-        }
+int cmd_lcd(int argc, char** argv) {  // display diagnostics
+    if (argc >= 2 && !std::strcmp(argv[1], "init")) {
+        const auto r = display::reinit(argc > 2 ? std::atoi(argv[2]) : 0);
+        std::printf(r ? "ok, spi=%d Hz\n" : "failed\n", display::spi_hz());
+        return r ? 0 : 1;
+    }
+    if (argc >= 2 && !std::strcmp(argv[1], "pins")) {  // idle levels: CS must read 1 between transfers
+        const int pins[] = {CONFIG_DESK_LCD_PIN_CS, CONFIG_DESK_LCD_PIN_DC, CONFIG_DESK_LCD_PIN_RST};
+        const char* names[] = {"CS", "DC", "RST"};
+        for (int i = 0; i < 3; ++i) std::printf("%s(gpio%d)=%d ", names[i], pins[i], gpio_get_level(static_cast<gpio_num_t>(pins[i])));
+        std::printf("\n");
         return 0;
     }
-    else { std::printf("usage: lcd pins | lcd swap [on|off] | lcd init [spi_hz] | lcd test [seconds, 0 = stop]\n"); return 1; }
-    std::printf(ok ? "queued (see render log)\n" : "busy, retry\n");
-    return ok ? 0 : 1;
+    std::printf("usage: lcd pins | lcd init [spi_hz]\n");
+    return 1;
 }
+int cmd_sensor(int, char**) {
+    const auto s = sensor::latest();
+    std::printf("ok=%d temp=%.2fC rh=%.1f%% p=%.1fhPa gas=%.0fohm valid=%d score=%d level=%s errors=%d\n", s.ok,
+                static_cast<double>(s.reading.temp_c), static_cast<double>(s.reading.rh), static_cast<double>(s.reading.hpa),
+                static_cast<double>(s.reading.gas_ohm), s.reading.gas_valid, s.quality.score, sensor::level_name(s.quality.level), s.errors);
+    return 0;
+}
+int cmd_ack(int, char**) { screen::ack(); return 0; }
 int cmd_reboot(int, char**) { esp_restart(); return 0; }
 int cmd_factory(int, char**) { settings::erase_all(); std::printf("NVS erased (clips kept); rebooting\n"); esp_restart(); return 0; }
 
@@ -135,7 +117,7 @@ int cmd_factory(int, char**) { settings::erase_all(); std::printf("NVS erased (c
 std::expected<void, engine::Err> start_console() noexcept {
     esp_console_repl_t* repl = nullptr;
     esp_console_repl_config_t rc = ESP_CONSOLE_REPL_CONFIG_DEFAULT();
-    rc.prompt = "eyes> ";
+    rc.prompt = "desk> ";
     rc.task_stack_size = 4096;
     rc.task_priority = 2;
     esp_console_dev_usb_serial_jtag_config_t dc = ESP_CONSOLE_DEV_USB_SERIAL_JTAG_CONFIG_DEFAULT();
@@ -147,11 +129,10 @@ std::expected<void, engine::Err> start_console() noexcept {
         {.command = "auth", .help = "auth open|token", .hint = nullptr, .func = cmd_auth, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "hostname", .help = "hostname [name]", .hint = nullptr, .func = cmd_hostname, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "status", .help = "show status", .hint = nullptr, .func = cmd_status, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
-        {.command = "eye", .help = "eye <animation|blink|random>", .hint = nullptr, .func = cmd_eye, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
-        {.command = "play", .help = "play <clip> [loop]", .hint = nullptr, .func = cmd_play, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
-        {.command = "stop", .help = "stop clips", .hint = nullptr, .func = cmd_stop, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "fsbench", .help = "fsbench <clip>", .hint = nullptr, .func = cmd_fsbench, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
-        {.command = "lcd", .help = "lcd swap [on|off] | init [spi_hz] | test [seconds]", .hint = nullptr, .func = cmd_lcd, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
+        {.command = "lcd", .help = "lcd pins | init [spi_hz]", .hint = nullptr, .func = cmd_lcd, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
+        {.command = "sensor", .help = "show BME688 reading", .hint = nullptr, .func = cmd_sensor, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
+        {.command = "ack", .help = "acknowledge (snooze) the alert", .hint = nullptr, .func = cmd_ack, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "reboot", .help = "reboot", .hint = nullptr, .func = cmd_reboot, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "factory-reset", .help = "erase NVS settings", .hint = nullptr, .func = cmd_factory, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
     };
