@@ -26,6 +26,7 @@
 #include "sdkconfig.h"
 #include "settings/idf/settings.hpp"
 #include "storage/idf/storage.hpp"
+#include "weather/idf/client.hpp"
 
 namespace web {
 namespace {
@@ -68,14 +69,14 @@ esp_err_t get_status(httpd_req_t* r) {
     std::snprintf(b, sizeof b,
         R"({"version":"%s","idf":"%s","hostname":"%s","uptime_s":%lld,"heap_internal":%u,"heap_min":%u,"psram_free":%u,)"
         R"("frame_ms_avg":%lu,"frame_ms_max":%lu,"rssi":%d,"ip":"%s","time_valid":%s,"auth":"%s","resets":"%s",)"
-        R"("sensor":{"ok":%s,"errors":%d,"i2c":"%s"},"alert":%s,"snoozed":%s,"fs_free":%lu,"spi_hz":%d})",
+        R"("sensor":{"ok":%s,"errors":%d,"i2c":"%s"},"alert":%s,"snoozed":%s,"fs_free":%lu,"spi_hz":%d,"page":"%s"})",
         app->version, app->idf_ver, net::hostname().c_str(), static_cast<long long>(esp_timer_get_time() / 1000000),
         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)), static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)),
         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)),
         static_cast<unsigned long>(sc.frame_us_avg / 1000), static_cast<unsigned long>(sc.frame_us_max / 1000), net::rssi(), net::ip().c_str(),
         clock_sync::valid() ? "true" : "false", g_open ? "open" : "token", settings::get("rst").value_or("").c_str(),
         sn.ok ? "true" : "false", sn.errors, sensor::i2c_scan().c_str(), sc.alert ? "true" : "false", sc.snoozed ? "true" : "false",
-        static_cast<unsigned long>(storage::free_bytes()), CONFIG_DESK_LCD_SPI_HZ);
+        static_cast<unsigned long>(storage::free_bytes()), CONFIG_DESK_LCD_SPI_HZ, screen::page_name(screen::page()));
     send_json(r, "200 OK", b);
     return ESP_OK;
 }
@@ -89,6 +90,76 @@ esp_err_t get_sensor(httpd_req_t* r) {
         static_cast<double>(s.reading.hpa), static_cast<double>(s.reading.gas_ohm), s.reading.gas_valid ? "true" : "false",
         s.quality.score, sensor::level_name(s.quality.level), static_cast<unsigned long>(s.age_ms));
     send_json(r, "200 OK", b);
+    return ESP_OK;
+}
+
+esp_err_t get_weather(httpd_req_t* r) {
+    const auto w = weather::latest();
+    char b[320];
+    std::snprintf(b, sizeof b,
+        R"({"ok":%s,"place":"%s","temp_c":%.1f,"is_day":%s,"code":%d,"sky":"%s","max_c":%.1f,"min_c":%.1f,"precip_pct":%d,)"
+        R"("age_s":%lu,"errors":%d,"http":%d})",
+        w.ok ? "true" : "false", weather::place().c_str(), static_cast<double>(w.forecast.temp_c), w.forecast.is_day ? "true" : "false",
+        w.forecast.code, weather::sky_name(w.forecast.sky, w.forecast.is_day), static_cast<double>(w.forecast.max_c),
+        static_cast<double>(w.forecast.min_c), w.forecast.precip_pct, static_cast<unsigned long>(w.age_s), w.errors, w.http_status);
+    send_json(r, "200 OK", b);
+    return ESP_OK;
+}
+
+// Value of "key" in a flat JSON object, as text (quotes removed). Empty if missing.
+std::string json_value(std::string_view b, std::string_view key) {
+    const std::string k = std::string("\"") + std::string(key) + "\"";
+    std::size_t p = b.find(k);
+    if (p == std::string_view::npos) return {};
+    p = b.find(':', p + k.size());
+    if (p == std::string_view::npos) return {};
+    ++p;
+    while (p < b.size() && (b[p] == ' ' || b[p] == '"')) ++p;
+    std::size_t e = p;
+    while (e < b.size() && b[e] != '"' && b[e] != ',' && b[e] != '}' && b[e] != ' ') ++e;
+    return std::string(b.substr(p, e - p));
+}
+
+// {"lat":48.137,"lon":11.575,"place":"Munich"}: saves the forecast location and fetches again.
+esp_err_t post_weather(httpd_req_t* r) {
+    if (!authorized(r)) return ESP_OK;
+    char body[128]{};
+    const int n = httpd_req_recv(r, body, std::min<std::size_t>(r->content_len, sizeof body - 1));
+    if (n <= 0) { send_error(r, engine::Err::BadJson, "empty body"); return ESP_OK; }
+    const std::string_view b(body, static_cast<std::size_t>(n));
+    const std::string lat = json_value(b, "lat"), lon = json_value(b, "lon"), place = json_value(b, "place");
+    auto numeric = [](const std::string& v) {
+        return !v.empty() && v.size() < 12 && v.find_first_not_of("+-.0123456789") == std::string::npos;
+    };
+    if (!numeric(lat) || !numeric(lon)) { send_error(r, engine::Err::BadJson, "lat and lon must be numbers"); return ESP_OK; }
+    settings::set("wx_lat", lat);
+    settings::set("wx_lon", lon);
+    if (!place.empty() && place.size() < 20) settings::set("wx_place", place);
+    weather::refresh();
+    send_json(r, "202 Accepted", R"({"saved":true,"note":"the place name shows after a reboot"})");
+    return ESP_OK;
+}
+
+// {"page":"clock"|"air"|"weather"} or {"page":"next"}; {"refresh_weather":true} fetches the forecast again.
+esp_err_t post_page(httpd_req_t* r) {
+    if (!authorized(r)) return ESP_OK;
+    char body[96]{};
+    const int n = httpd_req_recv(r, body, std::min<std::size_t>(r->content_len, sizeof body - 1));
+    if (n <= 0) { send_error(r, engine::Err::BadJson, "empty body"); return ESP_OK; }
+    const std::string_view b(body, static_cast<std::size_t>(n));
+    if (b.find("refresh_weather") != std::string_view::npos) weather::refresh();
+    if (b.find("\"next\"") != std::string_view::npos) {
+        screen::next_page();
+    } else {
+        bool found = false;
+        for (int i = 0; i < screen::kPageCount; ++i) {
+            const auto p = static_cast<screen::Page>(i);
+            const std::string quoted = std::string("\"") + screen::page_name(p) + "\"";
+            if (b.find(quoted) != std::string_view::npos) { screen::show_page(p); found = true; break; }
+        }
+        if (!found && b.find("refresh_weather") == std::string_view::npos) { send_error(r, engine::Err::BadJson, "page must be clock, air, weather or next"); return ESP_OK; }
+    }
+    send_json(r, "202 Accepted", R"({"ok":true})");
     return ESP_OK;
 }
 
@@ -245,6 +316,9 @@ std::expected<void, engine::Err> start() noexcept {
         {.uri = "/api/status", .method = HTTP_GET, .handler = get_status, .user_ctx = nullptr},
         {.uri = "/api/sensor", .method = HTTP_GET, .handler = get_sensor, .user_ctx = nullptr},
         {.uri = "/api/ack", .method = HTTP_POST, .handler = post_ack, .user_ctx = nullptr},
+        {.uri = "/api/weather", .method = HTTP_GET, .handler = get_weather, .user_ctx = nullptr},
+        {.uri = "/api/weather", .method = HTTP_POST, .handler = post_weather, .user_ctx = nullptr},
+        {.uri = "/api/page", .method = HTTP_POST, .handler = post_page, .user_ctx = nullptr},
         {.uri = "/api/ota", .method = HTTP_POST, .handler = post_ota, .user_ctx = nullptr},
         {.uri = "/api/clips", .method = HTTP_GET, .handler = get_clips, .user_ctx = nullptr},
         {.uri = "/api/clips/*", .method = HTTP_PUT, .handler = put_clip, .user_ctx = nullptr},

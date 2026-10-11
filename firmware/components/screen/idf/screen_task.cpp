@@ -14,17 +14,31 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "screen/core/view.hpp"
+#include "screen/core/draw.hpp"
+#include "screen/core/pages.hpp"
 #include "sensor/idf/bme688.hpp"
+#include "weather/idf/client.hpp"
+
+#include <cstring>
 
 namespace screen {
 namespace {
 
 const char* const kTag = "screen";
-constexpr std::uint32_t kFramePeriodMs = 1000;
+constexpr std::uint32_t kFramePeriodMs = 1000 / CONFIG_DESK_FPS;
 constexpr std::uint32_t kSnoozeMs = 15u * 60u * 1000u;
 
 std::atomic<bool> g_ack{false};
+std::atomic<int> g_show{-1};       // page requested by the API (-1 none, kPageCount = next)
+std::atomic<int> g_page{0};
+
+Rotator::Config rotation_config() {
+    Rotator::Config c;
+    c.dwell_ms[static_cast<int>(Page::Clock)] = CONFIG_DESK_PAGE_CLOCK_S * 1000u;
+    c.dwell_ms[static_cast<int>(Page::Air)] = CONFIG_DESK_PAGE_AIR_S * 1000u;
+    c.dwell_ms[static_cast<int>(Page::Weather)] = CONFIG_DESK_PAGE_WEATHER_S * 1000u;
+    return c;
+}
 portMUX_TYPE g_mux = portMUX_INITIALIZER_UNLOCKED;
 Stats g_stats{};
 
@@ -58,51 +72,83 @@ void task(void*) {
         gpio_config(&io);
     }
 
+    Rotator rot(rotation_config());
+    const std::string place = weather::place();
     std::uint32_t snooze_until = 0, next_frame = 0, sum_us = 0, max_us = 0, n = 0;
     int stalls = 0;
     for (;;) {
         const std::uint32_t now = now_ms();
-        if (g_ack.exchange(false) || button_pressed(now)) {
+        const auto snap = sensor::latest();
+        const bool snoozed = static_cast<std::int32_t>(snooze_until - now) > 0;
+        const bool alert = snap.ok && snap.quality.level == sensor::Level::Poor && !snoozed;
+        const bool pressed = button_pressed(now);
+        if (g_ack.exchange(false) || (pressed && alert)) {
             snooze_until = now + kSnoozeMs;
             next_frame = 0;  // redraw right away
             ESP_LOGI(kTag, "ack: alert snoozed for 15 min");
+        } else if (pressed) {
+            rot.next(now);  // without an alert the button flips to the next page
+        }
+        if (const int req = g_show.exchange(-1); req >= 0) {
+            if (req >= kPageCount) rot.next(now);
+            else rot.show(static_cast<Page>(req), now);
         }
         if (static_cast<std::int32_t>(now - next_frame) >= 0) {
             next_frame = now + kFramePeriodMs;
-            const auto snap = sensor::latest();
-            HomeData d;
-            d.t_ms = now;
+            Inputs in;
+            in.t_ms = now;
             std::tm tm{};
-            if (clock_sync::local(tm)) { d.time_valid = true; d.hour = tm.tm_hour; d.minute = tm.tm_min; d.second = tm.tm_sec; }
-            d.sensor_ok = snap.ok;
-            d.reading = snap.reading;
-            d.quality = snap.quality;
-            const bool snoozed = static_cast<std::int32_t>(snooze_until - now) > 0;
-            d.alert = snap.ok && snap.quality.level == sensor::Level::Poor && !snoozed;
+            if (clock_sync::local(tm)) {
+                in.time_valid = true;
+                in.hour = tm.tm_hour; in.minute = tm.tm_min; in.second = tm.tm_sec;
+                in.weekday = tm.tm_wday; in.day = tm.tm_mday; in.month = tm.tm_mon + 1;
+            }
+            in.sensor_ok = snap.ok;
+            in.reading = snap.reading;
+            in.quality = snap.quality;
+            in.alert = alert;
+            const auto wx = weather::latest();
+            in.weather_ok = wx.ok;
+            in.weather = wx.forecast;
+            std::strncpy(in.place, place.c_str(), sizeof in.place - 1);
+
+            unsigned avail = 0;
+            if (CONFIG_DESK_PAGE_CLOCK_S > 0) avail |= 1u << static_cast<int>(Page::Clock);
+            if (CONFIG_DESK_PAGE_AIR_S > 0) avail |= 1u << static_cast<int>(Page::Air);
+            if (CONFIG_DESK_PAGE_WEATHER_S > 0 && wx.ok) avail |= 1u << static_cast<int>(Page::Weather);
+            // bad air: the squirrel stays on screen until the alert is acknowledged
+            const auto frame = rot.tick(now, avail, alert ? std::optional<Page>(Page::Air) : std::nullopt);
+            g_page = static_cast<int>(frame.page);
+
             const std::int64_t t0 = esp_timer_get_time();
-            render_home(cv, d);
+            render_page(cv, frame.page, in);
+            draw::dim(cv, frame.brightness);
             const bool ok = static_cast<bool>(display::blit(cv.px));
             const auto us = static_cast<std::uint32_t>(esp_timer_get_time() - t0);
             stalls = ok ? 0 : stalls + 1;
             if (stalls >= 3) { ESP_LOGE(kTag, "display stalled, rebooting"); esp_restart(); }
+            if (n >= 1000) { sum_us = 0; max_us = 0; n = 0; }  // keep the average recent
             sum_us += us; max_us = us > max_us ? us : max_us; ++n;
             taskENTER_CRITICAL(&g_mux);
-            g_stats = Stats{sum_us / n, max_us, n, d.alert, snoozed};
+            g_stats = Stats{sum_us / n, max_us, g_stats.frames + 1, alert, snoozed};
             taskEXIT_CRITICAL(&g_mux);
         }
         esp_task_wdt_reset();
-        vTaskDelay(pdMS_TO_TICKS(20));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
 }  // namespace
 
 std::expected<void, engine::Err> start() noexcept {
-    if (xTaskCreate(task, "screen", 5120, nullptr, 8, nullptr) != pdPASS) return std::unexpected(engine::Err::Io);
+    if (xTaskCreate(task, "screen", 6144, nullptr, 8, nullptr) != pdPASS) return std::unexpected(engine::Err::Io);
     return {};
 }
 
 void ack() noexcept { g_ack = true; }
+void show_page(Page p) noexcept { g_show = static_cast<int>(p); }
+void next_page() noexcept { g_show = kPageCount; }
+Page page() noexcept { return static_cast<Page>(g_page.load()); }
 
 Stats stats() noexcept {
     taskENTER_CRITICAL(&g_mux);

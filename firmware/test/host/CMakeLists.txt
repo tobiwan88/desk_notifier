@@ -10,3 +10,7 @@ file(GLOB CORE_SRCS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../../componen
 add_executable(host_tests main.cpp ${TESTS} ${CORE_SRCS})
 target_include_directories(host_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/../../components)
 target_compile_definitions(host_tests PRIVATE GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/../golden")
+
+# Renders the pages to raw frames for tools/preview_pages.py (not a test).
+add_executable(page_preview preview.cpp ${CORE_SRCS})
+target_include_directories(page_preview PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../components)

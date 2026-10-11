@@ -36,7 +36,7 @@ gfx::Rgb565be hue_color(int h, int v) noexcept {
                           static_cast<std::uint8_t>(b * v / 255));
 }
 
-void render_home(const Canvas& cv, const HomeData& d) noexcept {
+void render_background(const Canvas& cv, const HomeData& d) noexcept {
     // Background: vertical gradient between two hues that rotate slowly. Alert: warm red tones.
     const int base = static_cast<int>(static_cast<std::uint64_t>(d.t_ms % kDriftPeriodMs) * 1536 / kDriftPeriodMs);
     const int h0 = d.alert ? 0 : base, h1 = d.alert ? 60 : base + 220;
@@ -45,6 +45,10 @@ void render_home(const Canvas& cv, const HomeData& d) noexcept {
         const gfx::Rgb565be c = hue_color(h, 70 + 35 * y / gfx::kScreen);
         for (int x = 0; x < gfx::kScreen; ++x) cv.px[static_cast<std::size_t>(y) * gfx::kScreen + x] = c;
     }
+}
+
+void render_home(const Canvas& cv, const HomeData& d) noexcept {
+    render_background(cv, d);
 
     char buf[24];
     if (d.time_valid) std::snprintf(buf, sizeof buf, (d.second & 1) ? "%02d:%02d" : "%02d %02d", d.hour, d.minute);
