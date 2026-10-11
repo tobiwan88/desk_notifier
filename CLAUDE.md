@@ -9,7 +9,7 @@ Desk notifier on an ESP32-C61: one GC9A01 round display, a BME688 (I2C), SNTP cl
 
 ## Layout
 `firmware/components/<name>/{core,idf}`; `core/` is pure C++ (no `esp_*`/`freertos/` includes) and host-tested.
-- `sensor` (airq score, BME688 driver, vendored Bosch BME68x API in `third_party/`), `screen` (font, home view, render task), `clock` (SNTP/TZ), `display`, `gfx`, `net`, `web`, `settings`, `storage` + `clip` (pictures, not yet shown), `engine` (errors/types only).
+- `sensor` (airq score, BME688 driver, vendored Bosch BME68x API in `third_party/`), `screen` (font, AA shape rasterizer `draw.hpp`, pages: clock / squirrel air page / weather page, `Rotator`, render task), `weather` (Open-Meteo parse in core, HTTP fetch task in idf), `clock` (SNTP/TZ), `display`, `gfx`, `net`, `web`, `settings`, `storage` + `clip` (pictures, not yet shown), `engine` (errors/types only).
 - Kconfig prefix `DESK_*`. NVS namespace is still `eyes` (keeps Wi-Fi credentials from the old firmware).
 
 ## Board
@@ -17,5 +17,7 @@ ESP32-C61 MAC d8:85:ac:60:0e:d0, host `desk-600ed0` (192.168.178.86). Flash over
 GitHub: https://github.com/tobiwan88/desk_notifier (remote `desk`; `origin` is still the local esp_eyes clone source).
 
 ## Status
-Home screen shows time, temperature, humidity, pressure and an air-quality score (gas baseline, not BSEC). Alert after Poor air; button or `POST /api/ack` snoozes 15 min. API: `GET /api/status`, `GET /api/sensor`, `POST /api/ack`, `POST /api/ota`, clips CRUD.
-Next: pages (time, air, temperature, outside weather), pushed pictures until ack, BSEC2, weather client.
+Three pages rotate with a fade at CONFIG_DESK_FPS (default 10): clock (+ date, in/out temperature, peeking squirrel), air (squirrel mascot, mood = air level: VERY GOOD/GOOD/OKAY/BAD, sleepy while warming up), weather (today's Open-Meteo forecast for Munich, animated sun/moon/clouds/rain/snow/fog/thunder + outdoor temperature). Poor air pins the air page until ack; button = ack during an alert, else next page. API: `GET /api/status`, `GET /api/sensor`, `GET`/`POST /api/weather`, `POST /api/page`, `POST /api/ack`, `POST /api/ota`, clips CRUD. Console: `page`, `weather`.
+Preview pages on the host: build host tests, then `uv run python tools/preview_pages.py` (GIFs + sheet.png in build/preview).
+The C61 has no FPU: keep per-pixel work integer (see `draw::fill`), floats only per span/row.
+Next: pushed pictures until ack, BSEC2.

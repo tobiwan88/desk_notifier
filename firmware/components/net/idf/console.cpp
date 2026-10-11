@@ -22,6 +22,7 @@
 #include "esp_system.h"
 #include "net/idf/net.hpp"
 #include "settings/idf/settings.hpp"
+#include "weather/idf/client.hpp"
 
 namespace net {
 namespace {
@@ -109,6 +110,29 @@ int cmd_sensor(int, char**) {
     return 0;
 }
 int cmd_ack(int, char**) { screen::ack(); return 0; }
+int cmd_page(int argc, char** argv) {  // page clock|air|weather|next
+    if (argc == 2 && !std::strcmp(argv[1], "next")) { screen::next_page(); return 0; }
+    if (argc == 2) if (const auto p = screen::page_from_name(argv[1])) { screen::show_page(*p); return 0; }
+    std::printf("now: %s\nusage: page clock|air|weather|next\n", screen::page_name(screen::page()));
+    return 1;
+}
+int cmd_weather(int argc, char** argv) {  // weather | weather refresh | weather at <lat> <lon> [name]
+    if (argc >= 4 && !std::strcmp(argv[1], "at")) {
+        settings::set("wx_lat", argv[2]);
+        settings::set("wx_lon", argv[3]);
+        if (argc >= 5) settings::set("wx_place", argv[4]);
+        std::printf("saved (place name shows after a reboot)\n");
+        weather::refresh();
+        return 0;
+    }
+    if (argc == 2 && !std::strcmp(argv[1], "refresh")) { weather::refresh(); return 0; }
+    const auto w = weather::latest();
+    std::printf("%s ok=%d %.1f C code=%d %s hi=%.1f lo=%.1f rain=%d%% age=%lus errors=%d http=%d\n", weather::place().c_str(), w.ok,
+                static_cast<double>(w.forecast.temp_c), w.forecast.code, weather::sky_name(w.forecast.sky, w.forecast.is_day),
+                static_cast<double>(w.forecast.max_c), static_cast<double>(w.forecast.min_c), w.forecast.precip_pct,
+                static_cast<unsigned long>(w.age_s), w.errors, w.http_status);
+    return 0;
+}
 int cmd_reboot(int, char**) { esp_restart(); return 0; }
 int cmd_factory(int, char**) { settings::erase_all(); std::printf("NVS erased (clips kept); rebooting\n"); esp_restart(); return 0; }
 
@@ -131,6 +155,8 @@ std::expected<void, engine::Err> start_console() noexcept {
         {.command = "status", .help = "show status", .hint = nullptr, .func = cmd_status, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "fsbench", .help = "fsbench <clip>", .hint = nullptr, .func = cmd_fsbench, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "lcd", .help = "lcd pins | init [spi_hz]", .hint = nullptr, .func = cmd_lcd, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
+        {.command = "page", .help = "page clock|air|weather|next", .hint = nullptr, .func = cmd_page, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
+        {.command = "weather", .help = "weather | weather refresh | weather at <lat> <lon> [name]", .hint = nullptr, .func = cmd_weather, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "sensor", .help = "show BME688 reading", .hint = nullptr, .func = cmd_sensor, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "ack", .help = "acknowledge (snooze) the alert", .hint = nullptr, .func = cmd_ack, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "reboot", .help = "reboot", .hint = nullptr, .func = cmd_reboot, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
