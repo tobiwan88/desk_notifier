@@ -15,7 +15,10 @@ void render_weather(const Canvas& cv, const Inputs& in) noexcept {
     const weather::Sky s = in.weather_ok ? w.sky : weather::Sky::Cloudy;
     const bool day = !in.weather_ok || w.is_day;
     sky::draw(cv, s, day, t, 150, 70, 0.8f, sky::colors(s, day, t));
-    draw_squirrel(cv, 74, 92, 0.55f, in.sensor_ok ? mood_for(in.quality.level) : Mood::Sleepy, t, outfit_for(in.weather_ok, w.temp_c));
+    // with an umbrella the squirrel stands lower and smaller so the canopy stays clear of the place name
+    const Outfit o = outfit_for(in.weather_ok, w);
+    draw_squirrel(cv, o.windy ? 90 : (o.umbrella ? 76 : 74), o.umbrella ? 112 : 92, o.umbrella ? 0.5f : 0.55f,
+                  in.sensor_ok ? mood_for(in.quality.level) : Mood::Sleepy, t, o);
 
     const auto white = draw::hex(0xFFFFFF);
     draw::label(cv, 18, 2, white, in.place);

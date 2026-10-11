@@ -57,7 +57,7 @@ struct Anim {
     bool blink = false;
 };
 
-Anim animate(Mood m, std::uint32_t t) noexcept {
+Anim animate(Mood m, std::uint32_t t, bool windy) noexcept {
     Anim a;
     switch (m) {
         case Mood::VeryGood:
@@ -86,6 +86,13 @@ Anim animate(Mood m, std::uint32_t t) noexcept {
             a.tail = 0.05f;
             a.ear = 0.2f;
             break;
+    }
+    if (windy) {  // lifted off the ground by the umbrella, the tail streaming behind
+        a.dy = -16.0f + wave(t, 1500) * 4.0f;
+        a.dx = wave(t, 1100) * 2.5f;
+        a.tail = -1.5f + wave(t, 450) * 0.15f;
+        a.ear = 0.3f + wave(t, 300) * 0.1f;
+        a.blink = false;
     }
     return a;
 }
@@ -220,13 +227,65 @@ void ice_cream(const Pen& p, std::uint32_t t, bool paws = true) {
     }
 }
 
+void sunglasses(const Pen& p) {
+    for (const float x : {111.0f, 139.0f}) {
+        p.ellipse(x, 99, 12, 9, 0x14141C);
+        p.ellipse(x - 3.5f, 95.5f, 4.5f, 2.2f, kWhite, -0.5f, 110);  // glint
+    }
+    p.line(122, 97.5f, 128, 97.5f, 1.4f, 0x14141C);  // bridge
+    p.line(100, 96, 93, 91, 1.2f, 0x14141C);         // arms towards the ears
+    p.line(150, 96, 157, 91, 1.2f, 0x14141C);
+}
+
+// Umbrella held in the right paw. tilt (radians) leans the canopy; positive = to the right.
+void umbrella(const Pen& p, float tilt) {
+    constexpr float hx = 165, hy = 128, len = 72, R = 54, H = 28;
+    constexpr std::uint32_t kPanelA = 0x3F6FD8, kPanelB = 0x9CC0F5, kEdge = 0x24428C, kShaft = 0x4A3A30;
+    const float c = std::cos(tilt), sn = std::sin(tilt);
+    const float ux = sn, uy = -c;              // up along the shaft
+    const float bx = hx + ux * len, by = hy + uy * len;  // canopy base centre
+    auto at = [&](float lx, float ly) { return Pt{p.X(bx + lx * c + ly * ux), p.Y(by + lx * sn + ly * uy)}; };
+    p.line(hx, hy, bx, by, 1.4f, kShaft);              // shaft
+    p.arc(hx - 4.5f, hy, 4.5f, 0.0f, kPi, 1.4f, kShaft);  // hook
+    constexpr int kSeg = 6, kStep = 4;
+    for (int pass = 0; pass < 2; ++pass) {  // pass 0: dark rim, pass 1: panels
+        const float r = pass == 0 ? R + 2.5f : R, h = pass == 0 ? H + 2.5f : H;
+        for (int k = 0; k < kSeg; ++k) {
+            Pt poly[kStep + 2];
+            int n = 0;
+            poly[n++] = at(0, pass == 0 ? -1.5f : 0);
+            for (int j = 0; j <= kStep; ++j) {
+                const float a = kPi * (static_cast<float>(k) + static_cast<float>(j) / kStep) / kSeg;
+                poly[n++] = at(r * std::cos(a), h * std::sin(a));
+            }
+            draw::polygon(p.cv, poly, n, hex(pass == 0 ? kEdge : (k & 1 ? kPanelB : kPanelA)));
+        }
+    }
+    p.line(bx + ux * (H + 1), by + uy * (H + 1), bx + ux * (H + 6), by + uy * (H + 6), 1.2f, kShaft);  // tip
+}
+
+void wind_streaks(const Pen& p, std::uint32_t t) {
+    for (int i = 0; i < 4; ++i) {
+        const float k = ph(t + static_cast<std::uint32_t>(i) * 330u, 1300);
+        const float y = 64 + static_cast<float>(i) * 34 + wave(t + static_cast<std::uint32_t>(i) * 200u, 900) * 3;
+        const float x = -30 + k * 230;
+        const int al = static_cast<int>(200 * std::sin(kPi * k));
+        p.line(x, y, x + 30 + 8.0f * static_cast<float>(i & 1), y, 1.1f, kWhite, al);
+    }
+}
+
 }  // namespace
 
-Outfit outfit_for(bool weather_ok, float outdoor_c) noexcept {
+Outfit outfit_for(bool weather_ok, const weather::Forecast& w) noexcept {
     Outfit o;
     if (!weather_ok) return o;
-    o.hat = outdoor_c < kColdC;
-    o.ice_cream = outdoor_c >= kHotC;
+    using weather::Sky;
+    o.hat = w.temp_c < kColdC;
+    o.ice_cream = w.temp_c >= kHotC;
+    o.sunglasses = w.is_day && (w.sky == Sky::Clear || w.sky == Sky::PartlyCloudy);
+    o.windy = w.wind_kmh >= kWindyKmh;
+    o.umbrella = o.windy || w.sky == Sky::Drizzle || w.sky == Sky::Rain || w.sky == Sky::Thunder;
+    if (o.umbrella) o.ice_cream = false;  // the paws hold the umbrella
     return o;
 }
 
@@ -253,9 +312,9 @@ const char* mood_label(Mood m) noexcept {
 }
 
 void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, std::uint32_t t, Outfit o) noexcept {
-    const Anim a = animate(m, t);
+    const Anim a = animate(m, t, o.windy);
     // the ice cream replaces the acorn; a fanning (bad air) or sleeping squirrel keeps its pose
-    const bool cone = o.ice_cream && (m == Mood::VeryGood || m == Mood::Good || m == Mood::Okay);
+    const bool cone = o.ice_cream && !o.umbrella && (m == Mood::VeryGood || m == Mood::Good || m == Mood::Okay);
     const Pen p{cv, cx + a.dx * scale, cy + a.dy * scale, scale};
 
     tail(p, a.tail);
@@ -325,6 +384,7 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
     }
     eye(p, 112, 99, m, a.blink);
     eye(p, 138, 99, m, a.blink);
+    if (o.sunglasses) sunglasses(p);
     if (m == Mood::Bad) {  // worried brows (under the hat cuff they sit lower)
         const float by = o.hat ? 4.0f : 0.0f;
         p.line(106, 90 + by, 116, 86 + by, 1.5f, kFurDark);
@@ -362,6 +422,14 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
         ice_cream(Pen{cv, p.ox + (101 - 125) * p.s, p.oy + 2 * p.s, p.s * 0.85f}, t);
     else if (o.ice_cream && m == Mood::Sleepy)  // put down next to it for later
         ice_cream(Pen{cv, p.ox + (170 - 125) * p.s, p.oy + 18 * p.s, p.s * 1.0f}, t, false);
+
+    if (o.umbrella) {
+        p.line(138, 141, 165, 129, 5.5f, kFurDark);  // the arm reaching out to the handle
+        p.line(138, 141, 165, 129, 4.3f, kFur);
+        umbrella(p, o.windy ? -0.32f + wave(t, 1700) * 0.07f : 0.06f);
+        p.circle(165, 128, 4.6f, kFur);
+    }
+    if (o.windy) wind_streaks(p, t);
 
     if (m == Mood::Bad) {  // sweat drop sliding down
         const float k = ph(t, 1800), y = 84 + k * 12;
@@ -446,7 +514,9 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
     };
     if (m == Mood::Bad) haze(0, 3, 110);
 
-    draw_squirrel(cv, 146, 136, 0.92f, m, t, outfit_for(d.weather_ok, d.weather.temp_c));
+    const Outfit outfit = outfit_for(d.weather_ok, d.weather);
+    if (outfit.umbrella) draw_squirrel(cv, 144, 156, 0.78f, m, t, outfit);  // smaller, canopy clear of the top text
+    else draw_squirrel(cv, 146, 136, 0.92f, m, t, outfit);
 
     if (m == Mood::Bad) haze(3, 5, 70);
     if (m == Mood::VeryGood) {
