@@ -140,6 +140,34 @@ esp_err_t post_weather(httpd_req_t* r) {
     return ESP_OK;
 }
 
+// {"temp":3,"sky":"rain","day":true,"wind":45,"seconds":60}: shows a made-up forecast for a while (outfit demo).
+// sky: clear, partly, cloudy, fog, drizzle, rain, snow, thunder. {"seconds":0} switches the demo off.
+esp_err_t post_weather_demo(httpd_req_t* r) {
+    if (!authorized(r)) return ESP_OK;
+    char body[160]{};
+    const int n = httpd_req_recv(r, body, std::min<std::size_t>(r->content_len, sizeof body - 1));
+    if (n <= 0) { send_error(r, engine::Err::BadJson, "empty body"); return ESP_OK; }
+    const std::string_view b(body, static_cast<std::size_t>(n));
+    auto num = [&](const char* key, float d) {
+        const std::string v = json_value(b, key);
+        return v.empty() ? d : static_cast<float>(std::atof(v.c_str()));
+    };
+    static constexpr const char* kSkies[] = {"clear", "partly", "cloudy", "fog", "drizzle", "rain", "snow", "thunder"};
+    weather::Forecast f;
+    f.temp_c = num("temp", 15);
+    f.max_c = f.temp_c + 2;
+    f.min_c = f.temp_c - 4;
+    f.wind_kmh = num("wind", 0);
+    f.is_day = json_value(b, "day") != "false";
+    const std::string sky = json_value(b, "sky");
+    for (int i = 0; i < 8; ++i)
+        if (sky == kSkies[i]) f.sky = static_cast<weather::Sky>(i);
+    f.precip_pct = (f.sky >= weather::Sky::Drizzle && f.sky != weather::Sky::Snow) ? 80 : 10;
+    weather::set_demo(f, static_cast<std::uint32_t>(num("seconds", 60)));
+    send_json(r, "202 Accepted", R"({"ok":true})");
+    return ESP_OK;
+}
+
 // {"page":"clock"|"air"|"weather"} or {"page":"next"}; {"refresh_weather":true} fetches the forecast again.
 esp_err_t post_page(httpd_req_t* r) {
     if (!authorized(r)) return ESP_OK;
@@ -318,6 +346,7 @@ std::expected<void, engine::Err> start() noexcept {
         {.uri = "/api/ack", .method = HTTP_POST, .handler = post_ack, .user_ctx = nullptr},
         {.uri = "/api/weather", .method = HTTP_GET, .handler = get_weather, .user_ctx = nullptr},
         {.uri = "/api/weather", .method = HTTP_POST, .handler = post_weather, .user_ctx = nullptr},
+        {.uri = "/api/weather/demo", .method = HTTP_POST, .handler = post_weather_demo, .user_ctx = nullptr},
         {.uri = "/api/page", .method = HTTP_POST, .handler = post_page, .user_ctx = nullptr},
         {.uri = "/api/ota", .method = HTTP_POST, .handler = post_ota, .user_ctx = nullptr},
         {.uri = "/api/clips", .method = HTTP_GET, .handler = get_clips, .user_ctx = nullptr},
