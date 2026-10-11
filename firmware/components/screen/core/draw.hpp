@@ -134,12 +134,12 @@ struct EllipseSpan {
     }
 };
 
-// Convex polygon (any winding), up to 8 points.
+// Convex polygon (any winding), up to 16 points.
 struct PolySpan {
-    Pt p[8];
+    Pt p[16];
     int n = 0;
     float top = 1e9f, bottom = -1e9f;
-    PolySpan(const Pt* pts, int count) noexcept : n(std::min(count, 8)) {
+    PolySpan(const Pt* pts, int count) noexcept : n(std::min(count, 16)) {
         for (int i = 0; i < n; ++i) { p[i] = pts[i]; top = std::min(top, pts[i].y); bottom = std::max(bottom, pts[i].y); }
     }
     Span operator()(float y) const noexcept {

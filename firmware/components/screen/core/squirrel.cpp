@@ -4,6 +4,7 @@
 #include <cstdio>
 
 #include "screen/core/draw.hpp"
+#include "screen/core/sky.hpp"
 
 namespace screen {
 namespace {
@@ -23,7 +24,9 @@ float wave(std::uint32_t t, std::uint32_t period) noexcept { return std::sin(2 *
 constexpr std::uint32_t kFur = 0xE0873A, kFurDark = 0xB0602A, kFurLight = 0xF4AE66, kBelly = 0xFBE4C4,
                         kEarIn = 0xF4A6A0, kEye = 0x2A1810, kNose = 0x5B2B1A, kCheek = 0xFF8C9A,
                         kAcorn = 0xB37B40, kAcornCap = 0x6E4220, kMouth = 0x7A2430, kTongue = 0xF07C8A,
-                        kWhite = 0xFFFFFF;
+                        kWhite = 0xFFFFFF, kHat = 0xE0505E, kHatShade = 0xB23A48, kHatStripe = 0xFFD6DC,
+                        kHatCuff = 0xF6F3EE, kHatCuffShade = 0xC9C2BA, kCone = 0xE2A85A, kConeLine = 0xB37A36,
+                        kScoop = 0xFF9EC4, kScoopShade = 0xE57BA6;
 
 // Maps squirrel design coordinates (body centre at 125,150) to the screen.
 struct Pen {
@@ -157,7 +160,75 @@ void acorn(const Pen& p, float x, float y, float ang = 0) {
     p.line(x, y - 8, x + 1.5f, y - 11.5f, 1.3f, kAcornCap);
 }
 
+// Knitted beanie with a pom-pom; the ears poke out through it.
+void hat_dome(const Pen& p) {
+    constexpr float cx = 125, cy = 91, rx = 32, ry = 27;
+    Pt dome[13];
+    for (int i = 0; i <= 12; ++i) {  // top half of an ellipse
+        const float a = kPi + kPi * static_cast<float>(i) / 12;
+        dome[i] = {p.X(cx + rx * std::cos(a)), p.Y(cy + ry * std::sin(a))};
+    }
+    draw::polygon(p.cv, dome, 13, hex(kHat));
+    for (const float y : {79.0f, 71.0f}) {  // knit stripes, inset to the dome's width at that height
+        const float d = (y - cy) / ry, half = rx * std::sqrt(std::max(0.0f, 1 - d * d)) - 4;
+        p.line(cx - half, y, cx + half, y, 2.2f, kHatStripe, 220);
+    }
+}
+
+void hat_cuff(const Pen& p, std::uint32_t t) {
+    p.line(95, 90, 155, 90, 6, kHatCuffShade);
+    p.line(95, 89, 155, 89, 5.2f, kHatCuff);
+    for (int i = 0; i < 6; ++i) p.line(100 + i * 10.0f, 86.5f, 100 + i * 10.0f, 91.5f, 0.6f, kHatCuffShade, 170);  // ribbing
+    const float bob = wave(t, 900) * 0.8f;
+    p.circle(125, 62 + bob, 8, kHatCuffShade);
+    p.circle(125, 61.5f + bob, 7, kHatCuff);
+    p.circle(122.5f, 59 + bob, 2.5f, kWhite, 200);
+}
+
+void scarf(const Pen& p) {
+    p.line(141, 131, 148, 151, 4.4f, kHatShade);
+    p.line(141, 131, 148, 151, 3.6f, kHat);
+    p.line(144.5f, 145, 148.5f, 144, 1.1f, kHatStripe);
+    p.line(102, 129, 148, 129, 6, kHatShade);
+    p.line(102, 128, 148, 128, 5.2f, kHat);
+    for (int i = 0; i < 4; ++i) p.line(109 + i * 11.0f, 124, 107 + i * 11.0f, 132, 1.1f, kHatStripe, 200);
+}
+
+// Strawberry ice cream on a waffle cone, slowly melting.
+void ice_cream(const Pen& p, std::uint32_t t, bool paws = true) {
+    const Pt cone[3] = {{p.X(117.5f), p.Y(139)}, {p.X(132.5f), p.Y(139)}, {p.X(125), p.Y(160)}};
+    draw::polygon(p.cv, cone, 3, hex(kCone));
+    p.line(120, 143, 127, 151, 0.7f, kConeLine);
+    p.line(130, 143, 123, 151, 0.7f, kConeLine);
+    p.line(122, 141, 129, 148, 0.7f, kConeLine);
+    p.line(128, 141, 121, 148, 0.7f, kConeLine);
+    p.circle(125, 133, 8.5f, kScoopShade);
+    p.circle(125, 132.5f, 8, kScoop);
+    p.circle(119, 138.5f, 3, kScoop);
+    p.circle(131, 138.5f, 3, kScoop);
+    p.circle(122, 129.5f, 2.6f, kWhite, 150);
+    for (int i = 0; i < 4; ++i)  // sprinkles
+        p.line(120 + i * 3.5f, 133 - (i & 1) * 3.0f, 121.5f + i * 3.5f, 134 - (i & 1) * 3.0f, 0.7f, i & 1 ? 0x6FD0F0 : 0xFFE14D);
+    const float k = ph(t, 2600);  // a drip running down the cone
+    p.circle(131.5f, 139 + k * 9, 1.6f, kScoop, static_cast<int>(256 * (1 - k)));
+    p.line(127, 124.5f, 129, 121, 0.7f, 0x3A7A2A);  // cherry
+    p.circle(126.5f, 124.5f, 2.8f, 0xE53950);
+    p.circle(125.7f, 123.6f, 0.9f, kWhite, 200);
+    if (paws) {  // holding the cone
+        p.circle(117.5f, 146, 4.2f, kFur);
+        p.circle(132.5f, 146, 4.2f, kFur);
+    }
+}
+
 }  // namespace
+
+Outfit outfit_for(bool weather_ok, float outdoor_c) noexcept {
+    Outfit o;
+    if (!weather_ok) return o;
+    o.hat = outdoor_c < kColdC;
+    o.ice_cream = outdoor_c >= kHotC;
+    return o;
+}
 
 Mood mood_for(sensor::Level l) noexcept {
     switch (l) {
@@ -181,8 +252,10 @@ const char* mood_label(Mood m) noexcept {
     return "";
 }
 
-void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, std::uint32_t t) noexcept {
+void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, std::uint32_t t, Outfit o) noexcept {
     const Anim a = animate(m, t);
+    // the ice cream replaces the acorn; a fanning (bad air) or sleeping squirrel keeps its pose
+    const bool cone = o.ice_cream && (m == Mood::VeryGood || m == Mood::Good || m == Mood::Okay);
     const Pen p{cv, cx + a.dx * scale, cy + a.dy * scale, scale};
 
     tail(p, a.tail);
@@ -199,7 +272,10 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
     p.ellipse(148, 182, 13, 6, kFurDark);
 
     // arms and paws
-    switch (m) {
+    if (cone) {
+        p.ellipse(114, 139, 6, 10, kFur, 0.6f);
+        p.ellipse(136, 139, 6, 10, kFur, -0.6f);
+    } else switch (m) {
         case Mood::VeryGood:
         case Mood::Good:
             p.ellipse(114, 139, 6, 10, kFur, 0.6f);
@@ -228,21 +304,31 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
     }
 
     // head
-    ear(p, 104, 76, -0.35f - a.ear);
-    ear(p, 146, 76, 0.35f + a.ear);
+    if (!o.hat) {
+        ear(p, 104, 76, -0.35f - a.ear);
+        ear(p, 146, 76, 0.35f + a.ear);
+    }
     p.ellipse(125, 103, 33, 29, kFurDark);
     p.ellipse(125, 103, 31, 27, kFur);
     p.ellipse(118, 92, 12, 7, kFurLight, -0.2f, 120);  // forehead shine
     p.ellipse(125, 114, 16, 11, kBelly);
-    if (m != Mood::Bad) {
-        p.circle(103, 112, 6, kCheek, m == Mood::VeryGood ? 200 : 130);
-        p.circle(147, 112, 6, kCheek, m == Mood::VeryGood ? 200 : 130);
+    if (o.hat) {
+        hat_dome(p);
+        ear(p, 102, 72, -0.45f - a.ear);  // through the hat
+        ear(p, 148, 72, 0.45f + a.ear);
+        hat_cuff(p, t);
+        scarf(p);
+    }
+    if (m != Mood::Bad || o.hat) {  // rosy cheeks, also from the cold
+        p.circle(103, 112, 6, kCheek, m == Mood::VeryGood || o.hat ? 200 : 130);
+        p.circle(147, 112, 6, kCheek, m == Mood::VeryGood || o.hat ? 200 : 130);
     }
     eye(p, 112, 99, m, a.blink);
     eye(p, 138, 99, m, a.blink);
-    if (m == Mood::Bad) {  // worried brows
-        p.line(106, 90, 116, 86, 1.5f, kFurDark);
-        p.line(134, 86, 144, 90, 1.5f, kFurDark);
+    if (m == Mood::Bad) {  // worried brows (under the hat cuff they sit lower)
+        const float by = o.hat ? 4.0f : 0.0f;
+        p.line(106, 90 + by, 116, 86 + by, 1.5f, kFurDark);
+        p.line(134, 86 + by, 144, 90 + by, 1.5f, kFurDark);
     }
 
     // mouth (before the nose so the nose sits on top)
@@ -271,6 +357,11 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
     }
     p.ellipse(125, 108, 4.5f, 3.2f, kNose);
     p.circle(123.8f, 107, 1.1f, kWhite, 150);
+    if (cone) ice_cream(Pen{cv, p.ox, p.oy + 1.5f * p.s, p.s * 1.3f}, t);  // 1.3x, anchored at the paws
+    else if (o.ice_cream && m == Mood::Bad)  // the free paw holds it while the other one fans
+        ice_cream(Pen{cv, p.ox + (101 - 125) * p.s, p.oy + 2 * p.s, p.s * 0.85f}, t);
+    else if (o.ice_cream && m == Mood::Sleepy)  // put down next to it for later
+        ice_cream(Pen{cv, p.ox + (170 - 125) * p.s, p.oy + 18 * p.s, p.s * 1.0f}, t, false);
 
     if (m == Mood::Bad) {  // sweat drop sliding down
         const float k = ph(t, 1800), y = 84 + k * 12;
@@ -294,25 +385,40 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
         case Mood::Bad: top = 0x948BA3; bottom = 0xCBC3CD; hill = 0x85896A; hill_back = 0xA2A286; break;
         case Mood::Sleepy: top = 0x162447; bottom = 0x3B3D74; hill = 0x2C4A3B; hill_back = 0x24403A; break;
     }
-    if (d.alert) top = draw::lerp_rgb(top, 0xFF8A7A, static_cast<int>((wave(t, 1600) + 1) * 70));
-    draw::vgradient(cv, top, bottom);
-
-    if (m == Mood::Sleepy) {
-        static constexpr Pt kStars[] = {{50, 60}, {78, 32}, {176, 40}, {202, 96}, {40, 120}, {150, 22}, {205, 150}};
-        for (int i = 0; i < 7; ++i) {
-            const float tw = (wave(t + static_cast<std::uint32_t>(i) * 437u, 2200) + 1) * 0.5f;
-            draw::sparkle(cv, kStars[i].x, kStars[i].y, 2.5f + tw * 2.5f, hex(0xFFF6C8), 120 + static_cast<int>(tw * 136));
+    const bool wx = d.weather_ok;
+    const auto& w = d.weather;
+    const bool snowy = wx && w.sky == weather::Sky::Snow;
+    if (wx) {
+        // the sky shows the weather outside; the air quality tints it and colours the hill
+        sky::Palette pal = sky::colors(w.sky, w.is_day, t);
+        if (m == Mood::Bad) pal = {draw::lerp_rgb(pal.top, 0x8E8699, 110), draw::lerp_rgb(pal.bottom, 0xB8B0BC, 110)};
+        if (d.alert) pal.top = draw::lerp_rgb(pal.top, 0xFF8A7A, static_cast<int>((wave(t, 1600) + 1) * 70));
+        sky::draw(cv, w.sky, w.is_day, t, 200, 98, 0.55f, pal, false);
+        if (m == Mood::Sleepy) { hill = 0x7DBD66; hill_back = 0xA5CF91; }  // the night colours come from the sky now
+        if (snowy) { hill = 0xC9D8E8; hill_back = 0xE4ECF4; }
+        const int gl = sky::gloom(w.sky);  // grey light under clouds and rain
+        hill = draw::lerp_rgb(hill, 0x4A5A55, gl); hill_back = draw::lerp_rgb(hill_back, 0x4A5A55, gl);
+        if (!w.is_day) { hill = draw::lerp_rgb(hill, 0x16302A, 130); hill_back = draw::lerp_rgb(hill_back, 0x16302A, 150); }
+    } else {
+        if (d.alert) top = draw::lerp_rgb(top, 0xFF8A7A, static_cast<int>((wave(t, 1600) + 1) * 70));
+        draw::vgradient(cv, top, bottom);
+        if (m == Mood::Sleepy) {
+            static constexpr Pt kStars[] = {{50, 60}, {78, 32}, {176, 40}, {202, 96}, {40, 120}, {150, 22}, {205, 150}};
+            for (int i = 0; i < 7; ++i) {
+                const float tw = (wave(t + static_cast<std::uint32_t>(i) * 437u, 2200) + 1) * 0.5f;
+                draw::sparkle(cv, kStars[i].x, kStars[i].y, 2.5f + tw * 2.5f, hex(0xFFF6C8), 120 + static_cast<int>(tw * 136));
+            }
         }
-    }
-    if (m == Mood::VeryGood || m == Mood::Good) {  // a little sun peeking in
-        draw::circle(cv, 192, 56, 20, hex(0xFFE27A), 110);
-        draw::circle(cv, 192, 56, 14, hex(0xFFD23F));
+        if (m == Mood::VeryGood || m == Mood::Good) {  // a little sun peeking in
+            draw::circle(cv, 192, 56, 20, hex(0xFFE27A), 110);
+            draw::circle(cv, 192, 56, 14, hex(0xFFD23F));
+        }
     }
 
     draw::circle(cv, 30, 296, 125, hex(hill_back));
     draw::circle(cv, 125, 312, 143, hex(hill));
 
-    if (m == Mood::VeryGood || m == Mood::Good) {  // flowers on the hill
+    if ((m == Mood::VeryGood || m == Mood::Good) && !snowy) {  // flowers on the hill
         static constexpr Pt kFlowers[] = {{30, 184}, {44, 196}, {200, 204}};
         for (int i = 0; i < 3; ++i) {
             const float sw = wave(t + static_cast<std::uint32_t>(i) * 300u, 2600) * 1.5f;
@@ -326,6 +432,8 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
         }
     }
 
+    if (wx) sky::precipitation(cv, w.sky, t);  // in front of the hills, behind the squirrel
+
     // the haze of bad air drifts past, partly behind and partly in front of the squirrel
     auto haze = [&](int from, int to, int alpha) {
         for (int i = from; i < to; ++i) {
@@ -338,11 +446,11 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
     };
     if (m == Mood::Bad) haze(0, 3, 110);
 
-    draw_squirrel(cv, 146, 136, 0.92f, m, t);
+    draw_squirrel(cv, 146, 136, 0.92f, m, t, outfit_for(d.weather_ok, d.weather.temp_c));
 
     if (m == Mood::Bad) haze(3, 5, 70);
     if (m == Mood::VeryGood) {
-        static constexpr Pt kSpark[] = {{52, 64}, {196, 112}, {40, 150}, {150, 40}};
+        static constexpr Pt kSpark[] = {{52, 64}, {206, 146}, {40, 150}, {186, 40}};
         for (int i = 0; i < 4; ++i) {
             const float tw = std::fabs(wave(t + static_cast<std::uint32_t>(i) * 330u, 1400));
             draw::sparkle(cv, kSpark[i].x, kSpark[i].y, 3 + tw * 6, hex(i & 1 ? 0xFFFFFF : 0xFFF07A), static_cast<int>(tw * 256));
@@ -352,10 +460,17 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
         for (int i = 0; i < 3; ++i) {
             const float k = ph(t + static_cast<std::uint32_t>(i) * 1000u, 3000);
             if (k > 0.85f) continue;
-            draw_text(cv, static_cast<int>(176 + k * 18), static_cast<int>(92 - k * 44), 1 + (k > 0.3f) + (k > 0.6f),
+            draw_text(cv, static_cast<int>(174 + k * 12), static_cast<int>(82 - k * 34), 1 + (k > 0.3f) + (k > 0.6f),
                       hex(0xE8E8FF), "Z");
         }
     }
+
+    // soft dark plates behind the text, so it reads on bright snow and sky as well
+    auto plate = [&](int y, int h, int w) {
+        draw::capsule(cv, 120 - w / 2.0f, y + h / 2.0f, 120 + w / 2.0f, y + h / 2.0f, h / 2.0f + 3, hex(0x1A2233), 70);
+    };
+    plate(22, 14, 116);
+    plate(180, 42, 136);
 
     const auto white = hex(kWhite);
     char buf[24];
