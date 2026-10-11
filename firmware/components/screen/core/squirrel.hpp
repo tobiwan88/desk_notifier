@@ -16,14 +16,18 @@ enum class Mood : std::uint8_t { Sleepy, VeryGood, Good, Okay, Bad };
 [[nodiscard]] Mood mood_for(sensor::Level l) noexcept;
 [[nodiscard]] const char* mood_label(Mood m) noexcept;  // "VERY GOOD", "GOOD", "OKAY", "BAD", ...
 
-// What the squirrel wears for the outdoor temperature: a knitted hat and scarf below kColdC, an ice cream
-// from kHotC on.
+// What the squirrel wears for the outdoor weather. Items stack: a knitted hat and scarf below kColdC, an ice
+// cream from kHotC on, sunglasses on a sunny day, an umbrella in rain (always when windy), and from kWindyKmh on
+// it glides under the umbrella instead of standing.
 struct Outfit {
     bool hat = false;
     bool ice_cream = false;
+    bool sunglasses = false;
+    bool umbrella = false;
+    bool windy = false;
 };
-inline constexpr float kColdC = 8.0f, kHotC = 25.0f;
-[[nodiscard]] Outfit outfit_for(bool weather_ok, float outdoor_c) noexcept;
+inline constexpr float kColdC = 8.0f, kHotC = 25.0f, kWindyKmh = 30.0f;
+[[nodiscard]] Outfit outfit_for(bool weather_ok, const weather::Forecast& w) noexcept;
 
 struct AirData {
     bool sensor_ok = false;
