@@ -54,6 +54,39 @@ menu "Desk notifier"
             int "Acknowledge button GPIO (to GND, -1 = none)"
             default 24
     endmenu
+    menu "Pages"
+        config DESK_FPS
+            int "Frames per second of the animated pages"
+            range 1 20
+            default 10
+        config DESK_PAGE_CLOCK_S
+            int "Seconds on the clock page (0 = skip the page)"
+            default 12
+        config DESK_PAGE_AIR_S
+            int "Seconds on the air (squirrel) page (0 = skip the page)"
+            default 15
+        config DESK_PAGE_WEATHER_S
+            int "Seconds on the weather page (0 = skip the page)"
+            default 12
+    endmenu
+    menu "Weather (Open-Meteo, no API key)"
+        config DESK_WEATHER_URL
+            string "Forecast endpoint"
+            default "http://api.open-meteo.com/v1/forecast"
+        config DESK_WEATHER_LAT
+            string "Latitude (console: set wx_lat)"
+            default "48.137"
+        config DESK_WEATHER_LON
+            string "Longitude (console: set wx_lon)"
+            default "11.575"
+        config DESK_WEATHER_PLACE
+            string "Place name on the page"
+            default "Munich"
+        config DESK_WEATHER_REFRESH_MIN
+            int "Refresh interval (minutes)"
+            range 10 180
+            default 20
+    endmenu
     config DESK_TZ
         string "POSIX timezone"
         default "CET-1CEST,M3.5.0,M10.5.0/3"

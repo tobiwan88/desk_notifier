@@ -13,6 +13,7 @@
 #include "net/idf/net.hpp"
 #include "settings/idf/settings.hpp"
 #include "storage/idf/storage.hpp"
+#include "weather/idf/client.hpp"
 #include "web/idf/web.hpp"
 
 static const char* const kTag = "desk";
@@ -74,6 +75,7 @@ extern "C" void app_main(void) {
     // The screen runs even if networking fails.
     if (!net::init()) ESP_LOGE(kTag, "net init failed");
     clock_sync::start();
+    if (!weather::start()) ESP_LOGE(kTag, "weather task failed");
     if (!net::start_mdns()) ESP_LOGE(kTag, "mdns failed");
     if (!web::start()) ESP_LOGE(kTag, "web failed");
     if (!net::start_console()) ESP_LOGE(kTag, "console failed");

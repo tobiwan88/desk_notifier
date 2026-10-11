@@ -1,17 +1,22 @@
 # Desk notifier
 
-A small desk display on an ESP32-C61. A round 240x240 GC9A01 screen shows the time, the room temperature and humidity, and an air-quality score from a BME688 sensor. When the air gets stale it turns red and says "FRESH AIR!" until you press a button. The background colour drifts slowly over the day.
+A small desk display on an ESP32-C61. A round 240x240 GC9A01 screen turns through three animated pages: a clock, a cute squirrel that shows the indoor air quality from a BME688 sensor, and today's weather for Munich. When the air gets bad the squirrel stays on screen and asks you to open a window until you press a button.
+
+![The pages](docs/media/pages_tour.gif)
 
 It started as the esp_eyes project (animated eyes on two displays) and was cut down to one display. The git history keeps the old work.
 
 ## What works today
-- Home screen: time (set over the internet), temperature, humidity, pressure, air-quality label and score.
-- Fresh-air alert, snoozed for 15 minutes by the button or by `POST /api/ack`.
+- Rotating pages with fades, 10 frames per second. See [docs/pages.md](docs/pages.md).
+  - Clock: time (set over the internet), date, indoor and outdoor temperature.
+  - Air: a squirrel mascot whose mood shows the air level (very good, good, okay, bad), with temperature, humidity and score.
+  - Weather: today's forecast from Open-Meteo as a small animated sky (sun, clouds, rain, snow, fog, thunder) and the outdoor temperature.
+- Bad-air alert: the air page stays on, snoozed for 15 minutes by the button or by `POST /api/ack`. Without an alert the button shows the next page.
 - Web page at `http://<device>.local/` and a small HTTP API.
 - Wi-Fi, over-the-air updates, and a serial console.
 - Picture upload (the clip format from esp_eyes) is stored but not shown yet.
 
-Planned: rotating pages (time, air, temperature, outside weather), pictures that stay on screen until acknowledged, Bosch BSEC2 for a proper IAQ value.
+Planned: pictures that stay on screen until acknowledged, Bosch BSEC2 for a proper IAQ value.
 
 ## What you need
 - ESP32-C61 board (8 MB flash)
@@ -51,17 +56,20 @@ By default the API needs no password (change with the console command `auth toke
 curl http://desk-xxxxxx.local/api/sensor     # temperature, humidity, pressure, gas, score
 curl http://desk-xxxxxx.local/api/status     # uptime, memory, Wi-Fi, sensor state
 curl -X POST http://desk-xxxxxx.local/api/ack   # snooze the alert
+curl http://desk-xxxxxx.local/api/weather    # the last forecast
+curl -X POST http://desk-xxxxxx.local/api/page -d '{"page":"weather"}'   # clock, air, weather or next
+curl -X POST http://desk-xxxxxx.local/api/weather -d '{"lat":48.137,"lon":11.575,"place":"Munich"}'   # change the place
 curl -X POST --data-binary @firmware.bin http://desk-xxxxxx.local/api/ota
 ```
 
 ## Console commands
-`wifi`, `status`, `sensor`, `ack`, `lcd pins`, `lcd init [hz]`, `hostname`, `auth open|token`, `token`, `reboot`, `factory-reset`.
+`wifi`, `status`, `sensor`, `ack`, `page clock|air|weather|next`, `weather [refresh | at <lat> <lon> [name]]`, `lcd pins`, `lcd init [hz]`, `hostname`, `auth open|token`, `token`, `reboot`, `factory-reset`.
 
 ## About the air-quality score
 It is a simple estimate, not Bosch BSEC. 25 points come from humidity (best at 40 %) and 75 from the gas resistance compared with the highest value seen recently. It needs about 3 minutes to warm up and a stretch of clean air to be meaningful. The sensor also reads a little warm because it sits next to the board.
 
 ## For developers
-`scripts/check.sh` runs the host tests (C++23, sanitizers), the Python tests and the firmware build. `--quick` skips the build. Pure logic lives in `firmware/components/*/core` and is tested on the PC. See [CLAUDE.md](CLAUDE.md) for the layout.
+`scripts/check.sh` runs the host tests (C++23, sanitizers), the Python tests and the firmware build. `--quick` skips the build. `uv run python tools/preview_pages.py` draws all pages as GIFs on your computer (after a host build). Pure logic lives in `firmware/components/*/core` and is tested on the PC. See [CLAUDE.md](CLAUDE.md) for the layout.
 
 ## License
 MIT. The BME68x driver in `firmware/components/sensor/third_party` is from Bosch Sensortec (BSD-3-Clause).
