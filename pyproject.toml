@@ -25,5 +25,5 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-pythonpath = ["clipprep", "studio", "tools"]
-testpaths = ["clipprep/tests", "studio/tests", "tools/tests"]
+pythonpath = ["clipprep", "tools"]
+testpaths = ["clipprep/tests", "tools/tests"]
