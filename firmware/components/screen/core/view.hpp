@@ -21,6 +21,8 @@ struct HomeData {
 // Colour at hue h (0..1535, one wheel) with value v (0..255).
 [[nodiscard]] gfx::Rgb565be hue_color(int h, int v) noexcept;
 
+// Slowly drifting hue gradient (warm red while `alert`).
+void render_background(const Canvas& cv, const HomeData& d) noexcept;
 void render_home(const Canvas& cv, const HomeData& d) noexcept;
 
 }  // namespace screen
