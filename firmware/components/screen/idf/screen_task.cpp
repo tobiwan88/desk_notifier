@@ -1,6 +1,7 @@
 #include "screen/idf/screen_task.hpp"
 
 #include <atomic>
+#include <cctype>
 #include <ctime>
 
 #include "clock/idf/clock.hpp"
@@ -74,6 +75,15 @@ void task(void*) {
     Schedule schedule;
     schedule.wake = CONFIG_DESK_DAY_WAKE; schedule.work = CONFIG_DESK_DAY_WORK; schedule.lunch = CONFIG_DESK_DAY_LUNCH;
     schedule.end = CONFIG_DESK_DAY_END; schedule.bed = CONFIG_DESK_DAY_BED;
+    schedule.birthday = CONFIG_DESK_DAY_BIRTHDAY; schedule.anniversary = CONFIG_DESK_DAY_ANNIVERSARY;
+    {
+        const char* name = CONFIG_DESK_DAY_BIRTHDAY_NAME;
+        std::size_t i = 0;
+        for (; name[i] && i + 1 < sizeof schedule.birthday_name; ++i)
+            schedule.birthday_name[i] = static_cast<char>(std::toupper(static_cast<unsigned char>(name[i])));
+        schedule.birthday_name[i] = 0;
+    }
+    AirTrend trend;
     std::uint32_t snooze_until = 0, next_frame = 0, sum_us = 0, max_us = 0, n = 0;
     int stalls = 0;
     for (;;) {
@@ -101,11 +111,13 @@ void task(void*) {
             if (clock_sync::local(tm)) {
                 in.time_valid = true;
                 in.hour = tm.tm_hour; in.minute = tm.tm_min; in.second = tm.tm_sec;
-                in.weekday = tm.tm_wday; in.day = tm.tm_mday; in.month = tm.tm_mon + 1;
+                in.weekday = tm.tm_wday; in.day = tm.tm_mday; in.month = tm.tm_mon + 1; in.year = tm.tm_year + 1900;
             }
             in.sensor_ok = snap.ok;
             in.reading = snap.reading;
             in.quality = snap.quality;
+            trend.add(now, snap.quality.score, snap.ok && snap.quality.level != sensor::Level::WarmingUp);
+            in.air_drop = trend.sudden_drop();
             in.alert = alert;
             const auto wx = weather::latest();
             in.weather_ok = wx.ok;

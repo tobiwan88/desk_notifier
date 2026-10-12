@@ -50,11 +50,57 @@ The day page shows what the squirrel is doing at home. It follows the clock, nev
 | 18:30–22:59 | Reads a book under the desk lamp, a page turns now and then | READING |
 | 23:00–06:29 | In bed with a nightcap, the blanket rises and falls, Zzz | GOOD NIGHT |
 
-On Saturday and Sunday it sleeps 90 minutes longer, has coffee for two hours, lunch as usual, and reads the rest of the day.
+On Saturday, Sunday and Bavarian public holidays it sleeps 90 minutes longer, has coffee for two hours, lunch as usual, and reads the rest of the day.
+
+### The room's climate and the weather
+
+The measured air and the forecast change what the squirrel does. The first match wins:
+
+| When | Squirrel | Text |
+|---|---|---|
+| 31 Dec from 22:00 until 00:30 | Party hat, sparkler, fireworks in the window | COUNTDOWN, HAPPY NEW YEAR |
+| The air score dropped 15 points within half an hour | Holds its nose, green stink lines | STINKY AIR! |
+| Thunder in the evening or at night | Blanket pulled up to the nose, flinches at each flash | THUNDER! |
+| Air OKAY or BAD, outside 10–24 °C, dry, calm | Opens the window, the curtain blows in | AIR OUT |
+| Room 26 °C or more, outside 3° cooler, evening | Opens the window | COOL OFF |
+| Air OKAY or BAD during work (and too wet to air out) | Yawns over the laptop | STUFFY AIR |
+| Room 26 °C or more | Fans itself with a leaf, red thermometer | TOO WARM |
+| Room below 18 °C | Knitted shawl, a cup of tea, blue thermometer | CHILLY |
+| Humidity over 65 % | Steamed-up window, a mushroom on the sill | TOO HUMID |
+| Humidity under 35 % | Sips water, mists the plant | DRY AIR |
+| Rain likely (60 %+) on a work morning | An umbrella leans against the desk | TAKE UMBRELLA |
+| Rain or snow in the evening | Cocoa next to the book | COSY EVENING |
+| Sunny, 15 °C or more, on a day off | Waters the plant | WATERING |
+
+The window shows the weather on the glass too: raindrops, frost in the corners on freezing mornings, a fogged pane with a wiped peephole, leaves blowing past at 30 km/h or more, a snowman on snowy days.
+
+### Special days
+
+| Day | Decoration | Text |
+|---|---|---|
+| Birthday (menuconfig, off by default) | Cake with a candle, party hat, garland, confetti | HAPPY BIRTHDAY, then the name |
+| Wedding anniversary (menuconfig, off by default) | A rose, hearts, heart garland | ANNIVERSARY, LOVE YOU! |
+| 24–26 Dec | Christmas tree, Santa hat | MERRY XMAS |
+| 31 Dec | Garland | NEW YEAR'S EVE |
+| 1 Jan | Confetti, sleeps in even longer | HAPPY NEW YEAR |
+| Easter Sunday and Monday | Basket of eggs | HAPPY EASTER |
+| Advent | A wreath with one to four candles; on Sundays the text says which Advent | 2. ADVENT |
+| 6 Dec | Boot with an orange and nuts, Santa hat | NIKOLAUS |
+| 11 Nov, evening | A paper lantern in the window | ST. MARTIN |
+| 31 Oct | Carved pumpkin, lit in the evening | HALLOWEEN |
+| Last Sunday of March and October | The wall clock spins forward or back | CLOCKS FORWARD, CLOCKS GO BACK |
+| Oktoberfest (from the Saturday 15 days before the first Sunday of October) | Pretzel, Lederhosen braces | O'ZAPFT IS! |
+| 21 Jan, Squirrel Appreciation Day | Crown, acorn cake, garland | SQUIRREL DAY |
+| 14 Feb | Pink mug, a rose, hearts | VALENTINE |
+| 1 Apr | The wall clock runs backwards | APRIL FOOL! |
+| Friday after work | Party hat | WEEKEND! |
+| Monday morning | The big mug | MONDAY... |
+
+When there is more than one text, they take turns every 4 seconds.
 
 The window shows the weather outside (sun, moon, clouds, rain, snow, fog, thunder), the wall clock the real time, and the room gets darker in the evening. The face still follows the indoor air. The page is left out until the time is known.
 
-Change the times in `idf.py menuconfig` → Desk notifier → Squirrel's day (as HHMM, so 630 is 06:30). Bedtime may be after midnight (e.g. 30).
+Change the times, the birthday (with the name) and the anniversary in `idf.py menuconfig` → Desk notifier → Squirrel's day (times as HHMM, so 630 is 06:30; dates as MMDD, so 315 is 15 March, 0 turns it off). Bedtime may be after midnight (e.g. 30).
 
 ## Weather
 
@@ -90,6 +136,12 @@ uv run python tools/preview_pages.py     # GIFs and sheet.png in build/preview
 ```
 
 The preview uses the same drawing code as the board.
+
+The props of the day page (pumpkin, wreath, leaf fan, rain on the glass, ...) have their own sheet, one row per prop at scene size and enlarged:
+
+```sh
+cmake --build build/host --target prop_sheet && uv run python tools/prop_sheet.py   # build/props/sheet.png
+```
 
 To check every combination, add `matrix`: one sheet per weather (`build/preview/matrix_*.png`), rows are the air levels, columns are day and night at -2, 15 and 29 °C:
 

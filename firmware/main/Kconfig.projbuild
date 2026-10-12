@@ -69,7 +69,7 @@ menu "Desk notifier"
             int "Seconds on the day (squirrel at home) page (0 = skip the page)"
             default 12
     endmenu
-    menu "Squirrel's day (times as HHMM, 630 = 06:30; weekends start 90 min later, no work)"
+    menu "Squirrel's day (times as HHMM, 630 = 06:30; weekends and Bavarian holidays start 90 min later, no work)"
         config DESK_DAY_WAKE
             int "Wake up, coffee"
             range 0 2359
@@ -90,6 +90,17 @@ menu "Desk notifier"
             int "Bedtime (sleeps until wake up)"
             range 0 2359
             default 2300
+        config DESK_DAY_BIRTHDAY
+            int "Birthday as MMDD (315 = 15 March, 0 = none): cake, party hat, garland"
+            range 0 1231
+            default 0
+        config DESK_DAY_BIRTHDAY_NAME
+            string "Name shown on the birthday"
+            default ""
+        config DESK_DAY_ANNIVERSARY
+            int "Wedding anniversary as MMDD (614 = 14 June, 0 = none): rose, hearts"
+            range 0 1231
+            default 0
     endmenu
     menu "Weather (Open-Meteo, no API key)"
         config DESK_WEATHER_URL

@@ -23,10 +23,12 @@ struct Inputs {
     bool time_valid = false;
     int hour = 0, minute = 0, second = 0;
     int weekday = 0, day = 1, month = 1;  // weekday 0 = Sunday, month 1..12
+    int year = 2026;
     bool sensor_ok = false;
     sensor::Reading reading{};
     sensor::Quality quality{};
     bool alert = false;      // poor air and not snoozed
+    bool air_drop = false;   // the air score fell suddenly (AirTrend)
     bool weather_ok = false;
     weather::Forecast weather{};
     Schedule schedule{};     // the squirrel's day plan

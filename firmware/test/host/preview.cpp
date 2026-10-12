@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "screen/core/day.hpp"
 #include "screen/core/draw.hpp"
 #include "screen/core/pages.hpp"
 
@@ -22,6 +23,12 @@ void write_frame(std::FILE* f, const std::vector<gfx::Rgb565be>& fb) {
     std::fwrite(rgb.data(), 1, rgb.size(), f);
 }
 
+// Sets the date and time (and the matching weekday) of a scene.
+void at(screen::Inputs& i, int y, int m, int d, int h, int mi) {
+    i.year = y; i.month = m; i.day = d; i.hour = h; i.minute = mi;
+    i.weekday = screen::cal::weekday(y, m, d);
+}
+
 screen::Inputs base_inputs() {
     screen::Inputs in;
     in.time_valid = true; in.hour = 9; in.minute = 41; in.weekday = 0; in.day = 11; in.month = 10;
@@ -30,6 +37,9 @@ screen::Inputs base_inputs() {
     in.quality = {84, sensor::Level::Good};
     in.weather_ok = true;
     in.weather = {12.4f, true, 3, weather::Sky::Cloudy, 15.2f, 6.1f, 20};
+    in.schedule.birthday = 202;
+    std::strcpy(in.schedule.birthday_name, "MAYA");
+    in.schedule.anniversary = 1023;
     return in;
 }
 
@@ -61,6 +71,42 @@ int main(int argc, char** argv) {
         {"day_sleep", screen::Page::Day, 40, [](screen::Inputs& i) { i.weekday = 3; i.hour = 2; i.minute = 50; i.weather = {-2.0f, false, 73, weather::Sky::Snow, 0, -5, 70}; }},
         {"day_work_bad_air", screen::Page::Day, 40, [](screen::Inputs& i) { i.weekday = 2; i.hour = 15; i.minute = 0; i.quality = {22, sensor::Level::Poor}; i.weather = {21.0f, true, 95, weather::Sky::Thunder, 26, 15, 90}; }},
         {"day_weekend_coffee", screen::Page::Day, 60, [](screen::Inputs& i) { i.weekday = 6; i.hour = 9; i.minute = 0; i.weather = {19.0f, true, 0, weather::Sky::Clear, 22, 10, 0, 8}; }},
+        // situations: the indoor climate and the weather change what the squirrel does
+        {"sit_party", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 12, 31, 23, 40); i.weather = {-1.0f, false, 0, weather::Sky::Clear, 2, -4, 0}; }},
+        {"sit_smell", screen::Page::Day, 40, [](screen::Inputs& i) { at(i, 2026, 10, 12, 10, 0); i.air_drop = true; i.quality = {50, sensor::Level::Fair}; }},
+        {"sit_storm", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 10, 14, 21, 0); i.weather = {16.0f, false, 95, weather::Sky::Thunder, 20, 12, 90}; }},
+        {"sit_air_out", screen::Page::Day, 40, [](screen::Inputs& i) { at(i, 2026, 10, 12, 10, 0); i.quality = {40, sensor::Level::Stale}; i.weather = {18.0f, true, 2, weather::Sky::PartlyCloudy, 20, 9, 10}; }},
+        {"sit_cool_down", screen::Page::Day, 40, [](screen::Inputs& i) { at(i, 2026, 7, 15, 20, 30); i.reading.temp_c = 27.5f; i.weather = {19.0f, false, 0, weather::Sky::Clear, 31, 17, 0}; }},
+        {"sit_yawn", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 10, 12, 10, 0); i.quality = {40, sensor::Level::Stale}; i.weather = {9.0f, true, 63, weather::Sky::Rain, 11, 6, 80}; }},
+        {"sit_hot_room", screen::Page::Day, 40, [](screen::Inputs& i) { at(i, 2026, 10, 12, 14, 0); i.reading.temp_c = 27.5f; }},
+        {"sit_cold_room", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 10, 12, 10, 0); i.reading.temp_c = 16.5f; }},
+        {"sit_humid", screen::Page::Day, 40, [](screen::Inputs& i) { at(i, 2026, 10, 12, 12, 30); i.reading.rh = 72; }},
+        {"sit_dry_air", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 10, 12, 10, 0); i.reading.rh = 28; }},
+        {"sit_umbrella", screen::Page::Day, 40, [](screen::Inputs& i) { at(i, 2026, 10, 13, 7, 30); i.weather = {10.0f, true, 61, weather::Sky::Cloudy, 12, 7, 80}; }},
+        {"sit_cocoa", screen::Page::Day, 40, [](screen::Inputs& i) { at(i, 2026, 10, 14, 20, 30); i.weather = {8.0f, false, 63, weather::Sky::Rain, 11, 6, 85}; }},
+        {"sit_watering", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 10, 17, 15, 0); i.weather = {20.0f, true, 0, weather::Sky::Clear, 22, 10, 0}; }},
+        {"glass_fog", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2026, 10, 12, 10, 0); i.weather = {6.0f, true, 45, weather::Sky::Fog, 9, 3, 5}; }},
+        {"glass_frost", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2026, 12, 15, 7, 30); i.weather = {-4.0f, true, 0, weather::Sky::Clear, 1, -6, 0}; }},
+        {"glass_windy", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2026, 10, 12, 10, 0); i.weather = {12.0f, true, 3, weather::Sky::Cloudy, 14, 8, 20, 45}; }},
+        {"glass_snowman", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2026, 12, 19, 11, 0); i.weather = {-2.0f, true, 73, weather::Sky::Snow, 0, -5, 70}; }},
+        // special days
+        {"occ_birthday", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2027, 2, 2, 10, 0); i.weather = {1.0f, true, 3, weather::Sky::Cloudy, 3, -2, 20}; }},
+        {"occ_anniversary", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 10, 23, 19, 30); i.weather = {9.0f, false, 0, weather::Sky::Clear, 13, 5, 0}; }},
+        {"occ_christmas", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2026, 12, 25, 9, 0); i.weather = {-1.0f, true, 73, weather::Sky::Snow, 1, -3, 60}; }},
+        {"occ_new_years_eve", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2026, 12, 31, 16, 0); i.weather = {1.0f, true, 3, weather::Sky::Cloudy, 3, -2, 10}; }},
+        {"occ_new_year", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2027, 1, 1, 11, 0); i.weather = {2.0f, true, 3, weather::Sky::Cloudy, 4, -1, 10}; }},
+        {"occ_easter", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2027, 3, 28, 10, 0); i.weather = {14.0f, true, 2, weather::Sky::PartlyCloudy, 16, 5, 10}; }},
+        {"occ_nikolaus", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2026, 12, 6, 9, 0); i.weather = {0.0f, true, 3, weather::Sky::Cloudy, 2, -3, 20}; }},
+        {"occ_advent", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2026, 12, 13, 19, 0); i.weather = {-1.0f, false, 0, weather::Sky::Clear, 2, -5, 0}; }},
+        {"occ_st_martin", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2026, 11, 11, 18, 45); i.weather = {5.0f, false, 0, weather::Sky::Clear, 9, 2, 0}; }},
+        {"occ_halloween", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2026, 10, 31, 19, 30); i.weather = {8.0f, false, 2, weather::Sky::PartlyCloudy, 12, 4, 10}; }},
+        {"occ_clock_change", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 10, 25, 9, 0); }},
+        {"occ_oktoberfest", screen::Page::Day, 40, [](screen::Inputs& i) { at(i, 2026, 9, 25, 12, 30); i.weather = {18.0f, true, 0, weather::Sky::Clear, 21, 9, 0}; }},
+        {"occ_squirrel_day", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2027, 1, 21, 10, 0); i.weather = {-3.0f, true, 0, weather::Sky::Clear, 0, -8, 0}; }},
+        {"occ_valentine", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2027, 2, 14, 9, 0); i.weather = {2.0f, true, 3, weather::Sky::Cloudy, 5, -1, 10}; }},
+        {"occ_april_fool", screen::Page::Day, 40, [](screen::Inputs& i) { at(i, 2027, 4, 1, 10, 0); i.weather = {12.0f, true, 2, weather::Sky::PartlyCloudy, 15, 4, 20}; }},
+        {"occ_friday_party", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 10, 16, 18, 10); i.weather = {11.0f, true, 2, weather::Sky::PartlyCloudy, 14, 6, 10}; }},
+        {"occ_monday", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2026, 10, 12, 7, 45); }},
         {"fx_air_glider", screen::Page::Air, 40, [](screen::Inputs& i) { i.quality = {88, sensor::Level::Good}; i.weather = {14.0f, true, 3, weather::Sky::Cloudy, 16, 9, 20, 42}; }},
         {"fx_air_rain", screen::Page::Air, 40, [](screen::Inputs& i) { i.quality = {62, sensor::Level::Fair}; i.weather = {11.0f, true, 63, weather::Sky::Rain, 12, 7, 85, 12}; }},
         {"fx_air_sunny", screen::Page::Air, 40, [](screen::Inputs& i) { i.quality = {88, sensor::Level::Good}; i.weather = {19.0f, true, 0, weather::Sky::Clear, 22, 10, 0, 8}; }},

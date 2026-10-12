@@ -1,18 +1,14 @@
-// screen: the day page. The squirrel at its desk at home, doing what fits the time of day, with the real weather
-// in the window and the real time on the wall clock. Pure C++.
+// screen: the squirrel's day, the logic. Picks the scene from the clock, the calendar, the indoor climate and the
+// weather. Deterministic: no randomness anywhere. Pure C++.
 #include "screen/core/day.hpp"
 
 #include <algorithm>
-#include <cmath>
 
-#include "screen/core/draw.hpp"
 #include "screen/core/pages.hpp"
-#include "screen/core/sky.hpp"
-#include "screen/core/squirrel.hpp"
 
 namespace screen {
 
-// ---- the schedule ----------------------------------------------------------------------------------------------
+// ---- the daily routine -----------------------------------------------------------------------------------------
 
 namespace {
 
@@ -25,17 +21,22 @@ bool within(int m, int from, int to) noexcept {
     return from <= to ? (m >= from && m < to) : (m >= from || m < to);
 }
 
+int hhmm_plus(int hhmm, int add_min) noexcept {
+    const int m = ((minutes(hhmm) + add_min) % 1440 + 1440) % 1440;
+    return (m / 60) * 100 + m % 60;
+}
+
 }  // namespace
 
-Activity activity_for(bool time_valid, int weekday, int hour, int minute, const Schedule& s) noexcept {
+Activity activity_for(bool time_valid, int weekday, int hour, int minute, const Schedule& s, bool day_off) noexcept {
     if (!time_valid) return Activity::Sleep;
     const int m = hour * 60 + minute;
-    const bool weekend = weekday == 0 || weekday == 6;
-    const int wake = minutes(s.wake) + (weekend ? kWeekendLateMin : 0), lunch = minutes(s.lunch);
+    const bool free = day_off || weekday == 0 || weekday == 6;
+    const int wake = minutes(s.wake) + (free ? kWeekendLateMin : 0), lunch = minutes(s.lunch);
     const int end = minutes(s.end), bed = minutes(s.bed);
     if (!within(m, wake, bed)) return Activity::Sleep;
     if (within(m, lunch, lunch + kLunchMin)) return Activity::Lunch;
-    if (weekend) return within(m, wake, wake + kWeekendCoffeeMin) ? Activity::Coffee : Activity::Read;
+    if (free) return within(m, wake, wake + kWeekendCoffeeMin) ? Activity::Coffee : Activity::Read;
     if (within(m, wake, minutes(s.work))) return Activity::Coffee;
     if (within(m, minutes(s.work), end)) return Activity::Work;
     if (within(m, end, end + kCloseMin)) return Activity::CloseLaptop;
@@ -66,339 +67,203 @@ const char* activity_name(Activity a) noexcept {
     return "";
 }
 
-// ---- drawing ---------------------------------------------------------------------------------------------------
+// ---- the calendar ----------------------------------------------------------------------------------------------
 
+namespace cal {
 namespace {
 
-using draw::hex;
-using draw::Pt;
-
-constexpr float kPi = 3.14159265f;
-float ph(std::uint32_t t, std::uint32_t period) noexcept { return static_cast<float>(t % period) / static_cast<float>(period); }
-float wave(std::uint32_t t, std::uint32_t period) noexcept { return std::sin(2 * kPi * ph(t, period)); }
-float smooth(float k) noexcept { k = std::clamp(k, 0.0f, 1.0f); return k * k * (3 - 2 * k); }
-// 0 -> 1 -> 0 over [a, b), with eased edges `e` long; 0 outside
-float pulse(float k, float a, float b, float e) noexcept { return std::min(smooth((k - a) / e), smooth((b - k) / e)); }
-
-// Same colours as the squirrel (squirrel.cpp).
-constexpr std::uint32_t kFur = 0xE0873A, kFurDark = 0xB0602A, kCheek = 0xFF8C9A, kWhite = 0xFFFFFF;
-
-// Where the squirrel sits and how big: design coordinates (body centre at 125,150) map to the screen like this.
-constexpr float kCx = 136, kCy = 138, kScale = 0.92f;
-constexpr float kDeskTop = 172;                                   // screen y of the desk surface
-constexpr float kWinX0 = 160, kWinY0 = 38, kWinX1 = 206, kWinY1 = 94;  // the window (screen)
-
-struct Pen {
-    const Canvas& cv;
-    float ox, oy, s;
-    float X(float x) const { return ox + (x - 125.0f) * s; }
-    float Y(float y) const { return oy + (y - 150.0f) * s; }
-    void circle(float x, float y, float r, std::uint32_t c, int a = 256) const { draw::circle(cv, X(x), Y(y), r * s, hex(c), a); }
-    void ellipse(float x, float y, float rx, float ry, std::uint32_t c, float ang = 0, int a = 256) const {
-        draw::ellipse(cv, X(x), Y(y), rx * s, ry * s, hex(c), ang, a);
-    }
-    void line(float x0, float y0, float x1, float y1, float r, std::uint32_t c, int a = 256) const {
-        draw::capsule(cv, X(x0), Y(y0), X(x1), Y(y1), r * s, hex(c), a);
-    }
-    void arc(float x, float y, float R, float a0, float a1, float w, std::uint32_t c) const {
-        draw::arc(cv, X(x), Y(y), R * s, a0, a1, w * s, hex(c));
-    }
-    void box(float x0, float y0, float x1, float y1, std::uint32_t c, int a = 256) const {
-        const Pt p[4] = {{X(x0), Y(y0)}, {X(x1), Y(y0)}, {X(x1), Y(y1)}, {X(x0), Y(y1)}};
-        draw::polygon(cv, p, 4, hex(c), a);
-    }
-    void poly(const Pt* d, int n, std::uint32_t c, int a = 256) const {
-        Pt q[12];
-        n = std::min(n, 12);
-        for (int i = 0; i < n; ++i) q[i] = {X(d[i].x), Y(d[i].y)};
-        draw::polygon(cv, q, n, hex(c), a);
-    }
-};
-
-// An arm from the shoulder to the paw, in design coordinates.
-void arm(const Pen& p, float sx, float sy, float px, float py) {
-    p.line(sx, sy, px, py, 5.5f, kFurDark);
-    p.line(sx, sy, px, py, 4.4f, kFur);
-    p.circle(px, py, 4.6f, kFur);
-}
-
-struct Room { std::uint32_t top, bottom; int dark; };  // wall gradient, 0..256 how dark the room is
-
-Room room_for(Activity a) noexcept {
-    switch (a) {
-        case Activity::Sleep: return {0x1C2242, 0x2B3060, 200};
-        case Activity::Coffee: return {0xFFE9CF, 0xF7D2AA, 0};
-        case Activity::Work: return {0xE6EEF2, 0xD0DDE5, 0};
-        case Activity::Lunch: return {0xF6F0DA, 0xE8DCB6, 0};
-        case Activity::CloseLaptop: return {0xF6CFA8, 0xE0A57E, 30};
-        case Activity::Read: return {0x4A4266, 0x6A5878, 130};
-    }
-    return {0xE6EEF2, 0xD0DDE5, 0};
-}
-
-// The wall, with a hole for the window (the sky was drawn before).
-void wall(const Canvas& cv, const Room& r) {
-    for (int y = 0; y < gfx::kScreen; ++y) {
-        const gfx::Chord ch = gfx::kChord[static_cast<std::size_t>(y)];
-        const auto c = hex(draw::lerp_rgb(r.top, r.bottom, y * 256 / (gfx::kScreen - 1)));
-        gfx::Rgb565be* row = cv.px.data() + static_cast<std::size_t>(y) * gfx::kScreen;
-        if (y >= static_cast<int>(kWinY0) && y < static_cast<int>(kWinY1)) {
-            const int x0 = ch.x0, x1 = ch.x1;
-            std::fill(row + x0, row + std::clamp(static_cast<int>(kWinX0), x0, x1), c);
-            std::fill(row + std::clamp(static_cast<int>(kWinX1), x0, x1), row + x1, c);
-        } else {
-            std::fill(row + ch.x0, row + ch.x1, c);
-        }
-    }
-}
-
-void window_frame(const Canvas& cv, int dark) {
-    const auto frame = hex(draw::lerp_rgb(0xF7F3EC, 0x2A2C48, dark)), shade = hex(draw::lerp_rgb(0xC9BFB2, 0x1A1C30, dark));
-    const float mx = (kWinX0 + kWinX1) / 2, my = (kWinY0 + kWinY1) / 2;
-    draw::capsule(cv, kWinX0, kWinY0, kWinX1, kWinY0, 2.5f, frame);
-    draw::capsule(cv, kWinX0, kWinY1, kWinX1, kWinY1, 2.5f, frame);
-    draw::capsule(cv, kWinX0, kWinY0, kWinX0, kWinY1, 2.5f, frame);
-    draw::capsule(cv, kWinX1, kWinY0, kWinX1, kWinY1, 2.5f, frame);
-    draw::capsule(cv, mx, kWinY0, mx, kWinY1, 1.5f, frame);
-    draw::capsule(cv, kWinX0, my, kWinX1, my, 1.5f, frame);
-    draw::capsule(cv, kWinX0 - 5, kWinY1 + 4, kWinX1 + 5, kWinY1 + 4, 2.5f, shade);  // sill
-}
-
-// The wall clock shows the real time.
-void wall_clock(const Canvas& cv, const Inputs& in, int dark) {
-    constexpr float x = 208, y = 128, r = 14;
-    draw::circle(cv, x, y, r + 2.5f, hex(draw::lerp_rgb(0x8A5A36, 0x2A2238, dark)));
-    draw::circle(cv, x, y, r, hex(draw::lerp_rgb(0xFFF9EE, 0x5C5A78, dark)));
-    const auto ink = hex(draw::lerp_rgb(0x3A2A20, 0x1A1828, dark));
-    for (int i = 0; i < 12; i += 3) {
-        const float a = static_cast<float>(i) * kPi / 6;
-        draw::circle(cv, x + std::sin(a) * (r - 3.5f), y - std::cos(a) * (r - 3.5f), 1.2f, ink);
-    }
-    if (!in.time_valid) return;
-    const float hm = static_cast<float>(in.hour % 12) + static_cast<float>(in.minute) / 60;
-    const float ah = hm * kPi / 6, am = static_cast<float>(in.minute) * kPi / 30;
-    draw::capsule(cv, x, y, x + std::sin(ah) * (r - 7), y - std::cos(ah) * (r - 7), 1.5f, ink);
-    draw::capsule(cv, x, y, x + std::sin(am) * (r - 4), y - std::cos(am) * (r - 4), 1.0f, ink);
-    draw::circle(cv, x, y, 1.6f, hex(0xD9534F));
-}
-
-void desk(const Canvas& cv, int dark) {
-    const std::uint32_t top = draw::lerp_rgb(0xD39A62, 0x3A2C3A, dark), front = draw::lerp_rgb(0xA8714A, 0x2C2230, dark);
-    draw::vgradient(cv, front, draw::lerp_rgb(front, 0x000000, 70), static_cast<int>(kDeskTop) + 6);
-    draw::vgradient(cv, top, top, static_cast<int>(kDeskTop), static_cast<int>(kDeskTop) + 6);
-    draw::capsule(cv, 0, kDeskTop + 6, 240, kDeskTop + 6, 1.0f, hex(draw::lerp_rgb(front, 0x000000, 90)));
-}
-
-// A mug of coffee centred at (x, y) in design units; steam when hot.
-void mug(const Pen& p, float x, float y, bool steam, std::uint32_t t) {
-    p.arc(x + 10, y, 5.5f, -kPi / 2, kPi / 2, 1.8f, 0xB8403C);  // handle
-    p.box(x - 10, y - 10, x + 10, y + 11, 0xD9534F);
-    p.ellipse(x, y + 11, 10, 2.5f, 0xD9534F);
-    p.ellipse(x, y - 10, 10, 2.8f, 0xB8403C);
-    p.ellipse(x, y - 10, 8.5f, 2.0f, 0x5A3420);  // coffee
-    p.circle(x - 2, y + 1, 2.2f, kWhite, 220);   // a little heart
-    p.circle(x + 2, y + 1, 2.2f, kWhite, 220);
-    const Pt heart[3] = {{x - 4.1f, y + 1.8f}, {x + 4.1f, y + 1.8f}, {x, y + 6}};
-    p.poly(heart, 3, kWhite, 220);
-    if (!steam) return;
-    for (int i = 0; i < 3; ++i) {
-        const float k = ph(t + static_cast<std::uint32_t>(i) * 700u, 2100);
-        const float sx = x + static_cast<float>(i - 1) * 5 + wave(t + static_cast<std::uint32_t>(i) * 300u, 1400) * 2.5f;
-        p.circle(sx, y - 15 - k * 22, 2.4f + k * 1.5f, kWhite, static_cast<int>(170 * (1 - k)));
-    }
-}
-
-void laptop_lid(const Pen& p, float open) {  // open 1 = upright, 0 = shut
-    constexpr float hinge = 186, H = 56;
-    const float top = hinge - H * open;
-    p.box(96, hinge - 2, 154, hinge + 3, 0xB9BFC8);  // base
-    if (open < 0.04f) { p.box(96, hinge - 5, 154, hinge - 1, 0x8E96A3); return; }
-    p.box(99, top, 151, hinge, 0x8E96A3);
-    p.box(101.5f, top + 2.5f * open, 148.5f, hinge - 2.5f, 0xA3ABB7);
-    if (open > 0.5f) {  // an acorn logo on the lid
-        const float ly = (top + hinge) / 2;
-        p.ellipse(125, ly + 2.5f, 5, 6, 0xE8ECF2);
-        p.ellipse(125, ly - 2.5f, 6.2f, 3.2f, 0xE8ECF2);
-        p.line(125, ly - 5, 126.5f, ly - 8, 1.0f, 0xE8ECF2);
-    }
-}
-
-void bowl(const Pen& p, float x, float y) {
-    Pt b[9];
-    for (int i = 0; i <= 8; ++i) {  // lower half of an ellipse
-        const float a = kPi * static_cast<float>(i) / 8;
-        b[i] = {x + 17 * std::cos(a), y + 11 * std::sin(a)};
-    }
-    p.poly(b, 9, 0x5E9BD6);
-    p.ellipse(x, y, 17, 3.5f, 0x3F78B0);
-    p.ellipse(x, y, 15, 2.6f, 0xF2A65A);  // pumpkin soup
-    p.line(x - 9, y + 5, x + 9, y + 5, 1.0f, kWhite, 150);
-}
-
-void lamp(const Canvas& cv, std::uint32_t t) {  // on the left of the desk, in front of the tail
-    const float flick = 1 + wave(t, 5300) * 0.03f;
-    draw::circle(cv, 70, 128, 66 * flick, hex(0xFFE3A0), 45);
-    draw::circle(cv, 70, 128, 38 * flick, hex(0xFFE9B0), 45);
-}
-
-void lamp_stand(const Canvas& cv) {
-    draw::ellipse(cv, 40, kDeskTop + 1, 13, 3.5f, hex(0x2E3440));
-    draw::capsule(cv, 40, kDeskTop, 46, 126, 1.8f, hex(0x2E3440));
-    draw::capsule(cv, 46, 126, 58, 108, 1.8f, hex(0x2E3440));
-    const Pt shade[4] = {{62, 98}, {78, 108}, {70, 124}, {50, 112}};
-    draw::polygon(cv, shade, 4, hex(0x3F8F7A));
-    draw::circle(cv, 68, 119, 3.5f, hex(0xFFF4C8));
-}
-
-void nightcap(const Pen& p) {
-    const Pt cap[8] = {{94, 92}, {98, 72}, {116, 58}, {140, 58}, {162, 70}, {178, 96}, {166, 88}, {156, 92}};
-    p.poly(cap, 8, 0x4D5BB5);
-    p.line(118, 64, 150, 64, 1.6f, 0x7E8AD8, 200);
-    p.line(102, 78, 156, 78, 1.6f, 0x7E8AD8, 200);
-    p.line(95, 91, 155, 91, 4.2f, 0xEDEFFB);
-    p.circle(178, 98, 6, 0xEDEFFB);
-}
-
-void blanket(const Canvas& cv, std::uint32_t t) {  // tucked in up to the chest
-    const float breathe = wave(t, 3500) * 1.5f;  // rises and falls with the sleeping squirrel
-    draw::ellipse(cv, 120, 262 + breathe, 176, 124, hex(0xC9CEEA));
-    draw::ellipse(cv, 120, 262 + breathe, 174, 122, hex(0xEDEFFB));  // the folded-over sheet
-    draw::ellipse(cv, 120, 272 + breathe, 174, 122, hex(0x3E4A8C));
-    draw::ellipse(cv, 120, 274 + breathe, 172, 120, hex(0x5868B8));
-    for (int i = 0; i < 4; ++i)  // quilt stitching
-        draw::capsule(cv, 48 + i * 48.0f, 160 + breathe, 48 + i * 48.0f, 240, 0.8f, hex(0x3E4A8C), 160);
-    draw::capsule(cv, 0, 196 + breathe, 240, 196 + breathe, 0.8f, hex(0x3E4A8C), 160);
+// Days since 1970-01-01 (proleptic Gregorian), after Howard Hinnant's days_from_civil.
+int days(int y, int m, int d) noexcept {
+    y -= m <= 2;
+    const int era = (y >= 0 ? y : y - 399) / 400;
+    const int yoe = y - era * 400;
+    const int doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
+    const int doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    return era * 146097 + doe - 719468;
 }
 
 }  // namespace
 
-void render_day(const Canvas& cv, const Inputs& in) noexcept {
-    const std::uint32_t t = in.t_ms;
-    const Activity act = activity_for(in.time_valid, in.weekday, in.hour, in.minute, in.schedule);
-    const Room room = room_for(act);
-    const bool night_room = act == Activity::Sleep || act == Activity::Read;
+int weekday(int y, int m, int d) noexcept { return ((days(y, m, d) % 7) + 7 + 4) % 7; }  // 1970-01-01 was a Thursday
+int day_of_year(int y, int m, int d) noexcept { return days(y, m, d) - days(y, 1, 1) + 1; }
 
-    // the real sky in the window
-    const weather::Sky sk = in.weather_ok ? in.weather.sky : weather::Sky::Clear;
-    const bool day = in.weather_ok ? in.weather.is_day : !night_room;
-    sky::draw(cv, sk, day, t, (kWinX0 + kWinX1) / 2, (kWinY0 + kWinY1) / 2 - 2, 0.42f, sky::colors(sk, day, t));
-    wall(cv, room);
-    window_frame(cv, room.dark);
-    wall_clock(cv, in, room.dark);
-    if (act == Activity::Read) lamp(cv, t);
+int easter_day_of_year(int y) noexcept {  // anonymous Gregorian algorithm
+    const int a = y % 19, b = y / 100, c = y % 100, d = b / 4, e = b % 4, f = (b + 8) / 25, g = (b - f + 1) / 3;
+    const int h = (19 * a + b - d - g + 15) % 30, i = c / 4, k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const int mm = (a + 11 * h + 22 * l) / 451;
+    const int month = (h + l - 7 * mm + 114) / 31, day = (h + l - 7 * mm + 114) % 31 + 1;
+    return day_of_year(y, month, day);
+}
 
-    // the face follows the air, but calmer than on the air page (no hopping at the desk)
-    Mood mood = in.sensor_ok ? mood_for(in.quality.level) : Mood::Sleepy;
-    if (mood == Mood::VeryGood) mood = Mood::Good;
-    const float cycle = ph(t, 6000);
-    if (act == Activity::Sleep) mood = Mood::Sleepy;
-    const bool stretch = act == Activity::CloseLaptop && cycle > 0.45f && mood != Mood::Bad;
-    if (stretch) mood = Mood::VeryGood;
+int last_sunday(int y, int m) noexcept {
+    static constexpr int kLen[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    const bool leap = (y % 4 == 0 && y % 100 != 0) || y % 400 == 0;
+    const int last = kLen[(m + 11) % 12] + (m == 2 && leap);
+    return last - weekday(y, m, last);
+}
 
-    Outfit o;
-    o.paws_free = true;
-    if (act == Activity::Sleep) {  // pillow behind, in bed
-        draw::ellipse(cv, kCx, kCy - 30, 50, 28, hex(0xAEB4D8));
-        draw::ellipse(cv, kCx, kCy - 32, 47, 25, hex(0xC9CEEA));
+bool public_holiday(int y, int m, int d) noexcept {
+    const int md = m * 100 + d;
+    for (const int fixed : {101, 106, 501, 815, 1003, 1101, 1225, 1226})
+        if (md == fixed) return true;
+    const int doy = day_of_year(y, m, d), e = easter_day_of_year(y);
+    for (const int off : {-2, 1, 39, 50, 60})  // Good Friday, Easter Monday, Ascension, Whit Monday, Corpus Christi
+        if (doy == e + off) return true;
+    return false;
+}
+
+bool oktoberfest(int y, int m, int d) noexcept {
+    // ends on the first Sunday of October, or on 3 October if that is later; starts 15 days before that Sunday
+    const int first_sunday = 1 + (7 - weekday(y, 10, 1)) % 7;
+    const int start = day_of_year(y, 10, first_sunday) - 15, end = day_of_year(y, 10, std::max(first_sunday, 3));
+    const int doy = day_of_year(y, m, d);
+    return doy >= start && doy <= end;
+}
+
+int advent_candles(int y, int m, int d) noexcept {
+    const int fourth = 24 - weekday(y, 12, 24);  // the last Sunday before Christmas (or 24 December itself)
+    const int first = day_of_year(y, 12, fourth) - 21, doy = day_of_year(y, m, d);
+    if (doy < first || doy > day_of_year(y, 12, 23)) return 0;
+    return std::min(4, 1 + (doy - first) / 7);
+}
+
+}  // namespace cal
+
+Occasion occasion_for(int y, int m, int d, const Schedule& s) noexcept {
+    const int md = m * 100 + d;
+    if (s.birthday && md == s.birthday) return Occasion::Birthday;
+    if (s.anniversary && md == s.anniversary) return Occasion::Anniversary;
+    if (md >= 1224 && md <= 1226) return Occasion::Christmas;
+    if (md == 1231) return Occasion::NewYearsEve;
+    if (md == 101) return Occasion::NewYear;
+    const int doy = cal::day_of_year(y, m, d), e = cal::easter_day_of_year(y);
+    if (doy == e || doy == e + 1) return Occasion::Easter;
+    if (md == 1206) return Occasion::Nikolaus;
+    if (md == 1111) return Occasion::StMartin;
+    if (md == 1031) return Occasion::Halloween;
+    if ((m == 3 || m == 10) && d == cal::last_sunday(y, m)) return Occasion::ClockChange;
+    if (cal::oktoberfest(y, m, d)) return Occasion::Oktoberfest;
+    if (md == 121) return Occasion::SquirrelDay;
+    if (md == 214) return Occasion::Valentine;
+    if (md == 401) return Occasion::AprilFool;
+    return Occasion::None;
+}
+
+const char* occasion_name(Occasion o) noexcept {
+    switch (o) {
+        case Occasion::None: return "none";
+        case Occasion::Birthday: return "birthday";
+        case Occasion::Anniversary: return "anniversary";
+        case Occasion::Christmas: return "christmas";
+        case Occasion::NewYearsEve: return "new_years_eve";
+        case Occasion::NewYear: return "new_year";
+        case Occasion::Easter: return "easter";
+        case Occasion::Nikolaus: return "nikolaus";
+        case Occasion::StMartin: return "st_martin";
+        case Occasion::Halloween: return "halloween";
+        case Occasion::ClockChange: return "clock_change";
+        case Occasion::Oktoberfest: return "oktoberfest";
+        case Occasion::SquirrelDay: return "squirrel_day";
+        case Occasion::Valentine: return "valentine";
+        case Occasion::AprilFool: return "april_fool";
     }
-    draw_squirrel(cv, kCx, kCy, kScale, mood, t, o);
-    const Bob b = squirrel_bob(mood, t);
-    const Pen p{cv, kCx + b.dx * kScale, kCy + b.dy * kScale, kScale};  // moves with the squirrel
-    const Pen still{cv, kCx, kCy, kScale};                               // the desk does not
+    return "";
+}
 
-    switch (act) {
-        case Activity::Coffee: {  // holds the mug, a sip every few seconds
-            const float sip = pulse(cycle, 0.62f, 0.95f, 0.08f);
-            const float my = 140 - sip * 20;
-            mug(p, 125, my, true, t);
-            arm(p, 106, 128, 113, my + 4);
-            arm(p, 144, 128, 137, my + 4);
-            desk(cv, room.dark);
-            break;
-        }
-        case Activity::Work: {  // laptop open, screen light on the face, a sip from the cold coffee now and then
-            const float glow = 40 + wave(t, 2300) * 10 + ((t / 180) % 7 == 0 ? 14 : 0);
-            p.ellipse(125, 106, 30, 26, 0xA8DCFF, 0, static_cast<int>(glow));
-            arm(p, 106, 128, 108, 168);
-            arm(p, 144, 128, 142, 168);
-            desk(cv, room.dark);
-            mug(still, 45, 176, false, t);
-            laptop_lid(still, 1.0f);
-            break;
-        }
-        case Activity::CloseLaptop: {  // the lid swings shut, then a big stretch
-            const float open = 1 - smooth(cycle / 0.35f);
-            if (stretch) {
-                const float up = pulse(cycle, 0.45f, 1.0f, 0.12f);
-                arm(p, 106, 128, 96 - up * 4, 128 - up * 58);
-                arm(p, 144, 128, 154 + up * 4, 128 - up * 58);
-            } else {
-                arm(p, 106, 128, 108, 168);
-                arm(p, 144, 128, 142, 168);
-            }
-            desk(cv, room.dark);
-            laptop_lid(still, open);
-            break;
-        }
-        case Activity::Lunch: {  // spoonful after spoonful, cheeks full while chewing
-            const float lift = pulse(ph(t, 3200), 0.15f, 0.55f, 0.12f);
-            const float chew = pulse(ph(t, 3200), 0.5f, 1.0f, 0.06f);
-            if (chew > 0.05f) {
-                const float puff = 2 + chew * (2 + wave(t, 300) * 1.0f);
-                for (const float x : {101.0f, 149.0f}) {
-                    p.circle(x, 113, 4 + puff, kFur);
-                    p.circle(x, 113, 3 + puff, kCheek, 120);
-                }
-            }
-            desk(cv, room.dark);
-            bowl(still, 125, 175);
-            const float sx = 132 - lift * 7, sy = 173 - lift * 57;  // spoon bowl
-            p.line(sx, sy, sx + 18, sy + 12, 1.6f, 0x7A8494);
-            p.ellipse(sx, sy, 5, 3, 0x7A8494);
-            p.ellipse(sx, sy - 0.5f, 3.6f, 1.8f, 0xF2A65A, 0, static_cast<int>(256 * lift));  // a spoonful
-            arm(p, 144, 128, sx + 18, sy + 12);
-            arm(p, 106, 128, 102, 170);
-            break;
-        }
-        case Activity::Read: {  // an open book, a page turns every 8 s
-            constexpr float y0 = 122, y1 = 150;
-            const Pt left[4] = {{125, y0 + 6}, {100, y0}, {100, y1 - 6}, {125, y1}};
-            const Pt right[4] = {{125, y0 + 6}, {150, y0}, {150, y1 - 6}, {125, y1}};
-            p.line(101, y0 - 1.5f, 124, y0 + 4.5f, 1.4f, 0xFFF8E8);  // page edges over the cover
-            p.line(126, y0 + 4.5f, 149, y0 - 1.5f, 1.4f, 0xFFF8E8);
-            p.poly(left, 4, 0x3B6EA5);
-            p.poly(right, 4, 0x34639A);
-            p.line(125, y0 + 6, 125, y1, 1.0f, 0x24456E);
-            p.box(108, y0 + 9, 117, y0 + 12, 0xF2C14E);  // a title on the cover
-            const float k = ph(t, 8000);
-            if (k > 0.82f) {  // the turning page
-                const float a = kPi * smooth((k - 0.82f) / 0.18f);
-                const Pt pg[3] = {{125, y0 + 5}, {125 + std::cos(a) * 23, y0 + 1 - std::sin(a) * 20}, {125, y0 - 1}};
-                p.poly(pg, 3, 0xFFF8E8);
-            }
-            arm(p, 106, 128, 101, 141);
-            arm(p, 144, 128, 149, 141);
-            desk(cv, room.dark);
-            lamp_stand(cv);
-            break;
-        }
-        case Activity::Sleep: {
-            nightcap(p);
-            blanket(cv, t);
-            for (int i = 0; i < 3; ++i) {  // Zzz
-                const float k = ph(t + static_cast<std::uint32_t>(i) * 1000u, 3000);
-                if (k > 0.85f) continue;
-                draw_text(cv, static_cast<int>(184 + k * 12), static_cast<int>(112 - k * 30), 1 + (k > 0.3f) + (k > 0.6f),
-                          hex(0xE8E8FF), "Z");
-            }
-            break;
-        }
+// ---- the climate and the weather -------------------------------------------------------------------------------
+
+const char* situation_name(Situation s) noexcept {
+    switch (s) {
+        case Situation::None: return "none";
+        case Situation::Party: return "party";
+        case Situation::Smell: return "smell";
+        case Situation::Storm: return "storm";
+        case Situation::AirOut: return "air_out";
+        case Situation::CoolDown: return "cool_down";
+        case Situation::Yawn: return "yawn";
+        case Situation::HotRoom: return "hot_room";
+        case Situation::ColdRoom: return "cold_room";
+        case Situation::Humid: return "humid";
+        case Situation::DryAir: return "dry_air";
+        case Situation::Umbrella: return "umbrella";
+        case Situation::Cocoa: return "cocoa";
+        case Situation::Watering: return "watering";
     }
+    return "";
+}
 
-    const char* lbl = activity_label(act);
-    const bool big = text_width(lbl, 3) <= 150;
-    draw::capsule(cv, 64, 205, 176, 205, 14, hex(0x1A2233), 60);
-    draw::label(cv, big ? 194 : 198, big ? 3 : 2, hex(kWhite), lbl);
+void AirTrend::add(std::uint32_t now_ms, int score, bool valid) noexcept {
+    if (!valid) { n_ = 0; head_ = 0; valid_ = false; started_ = false; return; }
+    now_ = score;
+    valid_ = true;
+    if (started_ && now_ms - last_ < kStepMs) return;
+    started_ = true;
+    last_ = now_ms;
+    score_[head_] = score;
+    head_ = (head_ + 1) % kSamples;
+    n_ = std::min(n_ + 1, kSamples);
+}
+
+bool AirTrend::sudden_drop() const noexcept {
+    if (!valid_ || n_ < 5) return false;  // at least five minutes to compare with
+    int best = 0;
+    for (int i = 0; i < n_; ++i) best = std::max(best, score_[i]);
+    return best - now_ >= kDrop;
+}
+
+// ---- everything together ---------------------------------------------------------------------------------------
+
+namespace {
+
+bool wet(weather::Sky s) noexcept {
+    return s == weather::Sky::Drizzle || s == weather::Sky::Rain || s == weather::Sky::Thunder || s == weather::Sky::Snow;
+}
+
+Situation situation_for(const Inputs& in, const Scene& sc) noexcept {
+    const Activity a = sc.activity;
+    const int m = in.hour * 60 + in.minute;
+    const auto& w = in.weather;
+    if (in.time_valid && ((in.month == 12 && in.day == 31 && m >= 22 * 60) || (in.month == 1 && in.day == 1 && m < 30)))
+        return Situation::Party;
+    if (in.weather_ok && w.sky == weather::Sky::Thunder && (a == Activity::Sleep || a == Activity::Read)) return Situation::Storm;
+    if (a == Activity::Sleep) return Situation::None;
+    const bool sensor = in.sensor_ok;
+    const float inside = in.reading.temp_c, rh = in.reading.rh;
+    const bool stale = sensor && (in.quality.level == sensor::Level::Stale || in.quality.level == sensor::Level::Poor);
+    const bool nice_out = in.weather_ok && w.temp_c >= 10 && w.temp_c <= 24 && !wet(w.sky) && w.wind_kmh < 30;
+    if (sensor && in.air_drop) return Situation::Smell;
+    if (stale && nice_out) return Situation::AirOut;
+    if (sensor && inside >= kHotRoomC && in.weather_ok && w.temp_c <= inside - 3 && !wet(w.sky) && in.hour >= 18)
+        return Situation::CoolDown;
+    if (stale && a == Activity::Work) return Situation::Yawn;
+    if (sensor && inside >= kHotRoomC) return Situation::HotRoom;
+    if (sensor && inside < kColdRoomC) return Situation::ColdRoom;
+    if (sensor && rh > kHumidPct) return Situation::Humid;
+    if (sensor && rh > 0 && rh < kDryPct) return Situation::DryAir;
+    if (a == Activity::Coffee && !sc.day_off && in.weather_ok && w.precip_pct >= 60) return Situation::Umbrella;
+    if (a == Activity::Read && in.weather_ok && wet(w.sky) && in.hour >= 17) return Situation::Cocoa;
+    if (a == Activity::Read && sc.day_off && in.hour < 18 && in.weather_ok && w.is_day && w.temp_c >= 15 &&
+        (w.sky == weather::Sky::Clear || w.sky == weather::Sky::PartlyCloudy))
+        return Situation::Watering;
+    return Situation::None;
+}
+
+}  // namespace
+
+Scene scene_for(const Inputs& in) noexcept {
+    Scene sc;
+    if (!in.time_valid) return sc;
+    sc.occasion = occasion_for(in.year, in.month, in.day, in.schedule);
+    sc.advent = cal::advent_candles(in.year, in.month, in.day);
+    sc.day_off = in.weekday == 0 || in.weekday == 6 || cal::public_holiday(in.year, in.month, in.day);
+    Schedule s = in.schedule;
+    if (sc.occasion == Occasion::NewYear) s.wake = hhmm_plus(s.wake, 90);  // sleeps in even longer after the party
+    sc.activity = activity_for(true, in.weekday, in.hour, in.minute, s, sc.day_off);
+    sc.situation = situation_for(in, sc);
+    if (sc.situation == Situation::Party) sc.activity = Activity::Read;  // stays up
+    sc.friday_party = in.weekday == 5 && !sc.day_off && (sc.activity == Activity::CloseLaptop || sc.activity == Activity::Read);
+    sc.monday = in.weekday == 1 && !sc.day_off && sc.activity == Activity::Coffee;
+    return sc;
 }
 
 }  // namespace screen
