@@ -276,6 +276,11 @@ void wind_streaks(const Pen& p, std::uint32_t t) {
 
 }  // namespace
 
+Bob squirrel_bob(Mood m, std::uint32_t t) noexcept {
+    const Anim a = animate(m, t, false);
+    return {a.dx, a.dy};
+}
+
 Outfit outfit_for(bool weather_ok, const weather::Forecast& w) noexcept {
     Outfit o;
     if (!weather_ok) return o;
@@ -312,6 +317,7 @@ const char* mood_label(Mood m) noexcept {
 }
 
 void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, std::uint32_t t, Outfit o) noexcept {
+    if (o.paws_free) o.ice_cream = o.umbrella = o.windy = false;  // indoors, paws busy
     const Anim a = animate(m, t, o.windy);
     // the ice cream replaces the acorn; a fanning (bad air) or sleeping squirrel keeps its pose
     const bool cone = o.ice_cream && !o.umbrella && (m == Mood::VeryGood || m == Mood::Good || m == Mood::Okay);
@@ -331,7 +337,9 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
     p.ellipse(148, 182, 13, 6, kFurDark);
 
     // arms and paws
-    if (cone) {
+    if (o.paws_free) {
+        // the caller draws the arms with whatever they hold
+    } else if (cone) {
         p.ellipse(114, 139, 6, 10, kFur, 0.6f);
         p.ellipse(136, 139, 6, 10, kFur, -0.6f);
     } else switch (m) {
