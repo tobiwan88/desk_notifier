@@ -4,15 +4,17 @@
 #include <cstdint>
 #include <optional>
 
+#include "screen/core/day.hpp"
 #include "screen/core/font.hpp"
 #include "sensor/core/airq.hpp"
 #include "weather/core/forecast.hpp"
 
 namespace screen {
 
-enum class Page : std::uint8_t { Clock, Air, Weather };
+enum class Page : std::uint8_t { Clock, Air, Day };
 inline constexpr int kPageCount = 3;
-[[nodiscard]] const char* page_name(Page p) noexcept;              // "clock", "air", "weather"
+[[nodiscard]] const char* page_name(Page p) noexcept;              // "clock", "air", "day"
+// Also takes "weather", the old name of the third page, so existing scripts keep working.
 [[nodiscard]] std::optional<Page> page_from_name(const char* s) noexcept;
 
 // Everything a page may need. Filled by the render task once per frame.
@@ -21,24 +23,26 @@ struct Inputs {
     bool time_valid = false;
     int hour = 0, minute = 0, second = 0;
     int weekday = 0, day = 1, month = 1;  // weekday 0 = Sunday, month 1..12
+    int year = 2026;
     bool sensor_ok = false;
     sensor::Reading reading{};
     sensor::Quality quality{};
     bool alert = false;      // poor air and not snoozed
+    bool air_drop = false;   // the air score fell suddenly (AirTrend)
     bool weather_ok = false;
     weather::Forecast weather{};
-    char place[20] = "MUNICH";  // shown on the weather page (upper case)
+    Schedule schedule{};     // the squirrel's day plan
 };
 
 void render_clock(const Canvas& cv, const Inputs& in) noexcept;
-void render_weather(const Canvas& cv, const Inputs& in) noexcept;
+void render_day(const Canvas& cv, const Inputs& in) noexcept;
 void render_page(const Canvas& cv, Page p, const Inputs& in) noexcept;
 
 // Which page to show and how bright (fade out, switch, fade in).
 class Rotator {
 public:
     struct Config {
-        std::uint32_t dwell_ms[kPageCount] = {12000, 15000, 12000};  // clock, air, weather
+        std::uint32_t dwell_ms[kPageCount] = {12000, 15000, 12000};  // clock, air, day
         std::uint32_t fade_ms = 350;                                  // each half of a transition
     };
     struct Frame { Page page; int brightness; };  // brightness 0..256

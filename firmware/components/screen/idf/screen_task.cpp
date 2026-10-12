@@ -1,6 +1,7 @@
 #include "screen/idf/screen_task.hpp"
 
 #include <atomic>
+#include <cctype>
 #include <ctime>
 
 #include "clock/idf/clock.hpp"
@@ -19,8 +20,6 @@
 #include "sensor/idf/bme688.hpp"
 #include "weather/idf/client.hpp"
 
-#include <cstring>
-
 namespace screen {
 namespace {
 
@@ -36,7 +35,7 @@ Rotator::Config rotation_config() {
     Rotator::Config c;
     c.dwell_ms[static_cast<int>(Page::Clock)] = CONFIG_DESK_PAGE_CLOCK_S * 1000u;
     c.dwell_ms[static_cast<int>(Page::Air)] = CONFIG_DESK_PAGE_AIR_S * 1000u;
-    c.dwell_ms[static_cast<int>(Page::Weather)] = CONFIG_DESK_PAGE_WEATHER_S * 1000u;
+    c.dwell_ms[static_cast<int>(Page::Day)] = CONFIG_DESK_PAGE_DAY_S * 1000u;
     return c;
 }
 portMUX_TYPE g_mux = portMUX_INITIALIZER_UNLOCKED;
@@ -73,7 +72,18 @@ void task(void*) {
     }
 
     Rotator rot(rotation_config());
-    const std::string place = weather::place();
+    Schedule schedule;
+    schedule.wake = CONFIG_DESK_DAY_WAKE; schedule.work = CONFIG_DESK_DAY_WORK; schedule.lunch = CONFIG_DESK_DAY_LUNCH;
+    schedule.end = CONFIG_DESK_DAY_END; schedule.bed = CONFIG_DESK_DAY_BED;
+    schedule.birthday = CONFIG_DESK_DAY_BIRTHDAY; schedule.anniversary = CONFIG_DESK_DAY_ANNIVERSARY;
+    {
+        const char* name = CONFIG_DESK_DAY_BIRTHDAY_NAME;
+        std::size_t i = 0;
+        for (; name[i] && i + 1 < sizeof schedule.birthday_name; ++i)
+            schedule.birthday_name[i] = static_cast<char>(std::toupper(static_cast<unsigned char>(name[i])));
+        schedule.birthday_name[i] = 0;
+    }
+    AirTrend trend;
     std::uint32_t snooze_until = 0, next_frame = 0, sum_us = 0, max_us = 0, n = 0;
     int stalls = 0;
     for (;;) {
@@ -101,21 +111,23 @@ void task(void*) {
             if (clock_sync::local(tm)) {
                 in.time_valid = true;
                 in.hour = tm.tm_hour; in.minute = tm.tm_min; in.second = tm.tm_sec;
-                in.weekday = tm.tm_wday; in.day = tm.tm_mday; in.month = tm.tm_mon + 1;
+                in.weekday = tm.tm_wday; in.day = tm.tm_mday; in.month = tm.tm_mon + 1; in.year = tm.tm_year + 1900;
             }
             in.sensor_ok = snap.ok;
             in.reading = snap.reading;
             in.quality = snap.quality;
+            trend.add(now, snap.quality.score, snap.ok && snap.quality.level != sensor::Level::WarmingUp);
+            in.air_drop = trend.sudden_drop();
             in.alert = alert;
             const auto wx = weather::latest();
             in.weather_ok = wx.ok;
             in.weather = wx.forecast;
-            std::strncpy(in.place, place.c_str(), sizeof in.place - 1);
+            in.schedule = schedule;
 
             unsigned avail = 0;
             if (CONFIG_DESK_PAGE_CLOCK_S > 0) avail |= 1u << static_cast<int>(Page::Clock);
             if (CONFIG_DESK_PAGE_AIR_S > 0) avail |= 1u << static_cast<int>(Page::Air);
-            if (CONFIG_DESK_PAGE_WEATHER_S > 0 && wx.ok) avail |= 1u << static_cast<int>(Page::Weather);
+            if (CONFIG_DESK_PAGE_DAY_S > 0 && in.time_valid) avail |= 1u << static_cast<int>(Page::Day);
             // bad air: the squirrel stays on screen until the alert is acknowledged
             const auto frame = rot.tick(now, avail, alert ? std::optional<Page>(Page::Air) : std::nullopt);
             g_page = static_cast<int>(frame.page);

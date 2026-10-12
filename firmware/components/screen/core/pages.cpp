@@ -13,7 +13,7 @@ const char* page_name(Page p) noexcept {
     switch (p) {
         case Page::Clock: return "clock";
         case Page::Air: return "air";
-        case Page::Weather: return "weather";
+        case Page::Day: return "day";
     }
     return "";
 }
@@ -21,6 +21,7 @@ const char* page_name(Page p) noexcept {
 std::optional<Page> page_from_name(const char* s) noexcept {
     for (int i = 0; i < kPageCount; ++i)
         if (std::strcmp(s, page_name(static_cast<Page>(i))) == 0) return static_cast<Page>(i);
+    if (std::strcmp(s, "weather") == 0) return Page::Day;
     return std::nullopt;
 }
 
@@ -37,18 +38,25 @@ void render_clock(const Canvas& cv, const Inputs& in) noexcept {
     char buf[32];
     if (in.time_valid) std::snprintf(buf, sizeof buf, (in.second & 1) ? "%02d:%02d" : "%02d %02d", in.hour, in.minute);
     else std::snprintf(buf, sizeof buf, "--:--");
-    draw::label(cv, 72, 7, white, buf);
+    draw::label(cv, 62, 7, white, buf);
     if (in.time_valid) {
         std::snprintf(buf, sizeof buf, "%s %d %s", kDays[in.weekday % 7], in.day, kMonths[(in.month + 11) % 12]);
-        draw::label(cv, 130, 2, soft, buf);
+        draw::label(cv, 118, 2, soft, buf);
     }
-    // small summary line: inside and outside temperature
+    // summary lines: inside and outside temperature, then today's forecast (the weather page used to show it)
     char inside[12] = "--", outside[12] = "--";
     if (in.sensor_ok) std::snprintf(inside, sizeof inside, "%.0f^", static_cast<double>(in.reading.temp_c));
     if (in.weather_ok) std::snprintf(outside, sizeof outside, "%.0f^", static_cast<double>(in.weather.temp_c));
     std::snprintf(buf, sizeof buf, "IN %s OUT %s", inside, outside);
-    draw::label(cv, 152, 2, soft, buf);
-    // a tiny squirrel head peeking from the bottom edge
+    draw::label(cv, 140, 2, soft, buf);
+    if (in.weather_ok) {
+        const auto& w = in.weather;
+        if (w.precip_pct >= 20)
+            std::snprintf(buf, sizeof buf, "%.0f-%.0f^ RAIN %d%%", static_cast<double>(w.min_c), static_cast<double>(w.max_c), w.precip_pct);
+        else
+            std::snprintf(buf, sizeof buf, "LO %.0f^ HI %.0f^", static_cast<double>(w.min_c), static_cast<double>(w.max_c));
+        draw::label(cv, 162, 2, draw::hex(0xDDF0FF), buf);
+    }
     // the squirrel sits at the bottom, bigger than a peek
     Outfit o = outfit_for(in.weather_ok, in.weather);
     o.umbrella = o.windy = false;  // too tall for the peeking squirrel
@@ -58,7 +66,7 @@ void render_clock(const Canvas& cv, const Inputs& in) noexcept {
 void render_page(const Canvas& cv, Page p, const Inputs& in) noexcept {
     switch (p) {
         case Page::Clock: render_clock(cv, in); return;
-        case Page::Weather: render_weather(cv, in); return;
+        case Page::Day: render_day(cv, in); return;
         case Page::Air: {
             AirData a;
             a.sensor_ok = in.sensor_ok; a.reading = in.reading; a.quality = in.quality; a.alert = in.alert; a.t_ms = in.t_ms;

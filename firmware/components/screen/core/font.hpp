@@ -67,6 +67,9 @@ constexpr std::array<std::uint8_t, 7> glyph(char c) noexcept {
         case '-': return {0, 0, 0, 0b11111, 0, 0, 0};
         case '/': return {0b00001, 0b00010, 0b00010, 0b00100, 0b01000, 0b01000, 0b10000};
         case '!': return {0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0, 0b00100};
+        case '\'': return {0b00100, 0b00100, 0b01000, 0, 0, 0, 0};
+        case '?': return {0b01110, 0b10001, 0b00001, 0b00110, 0b00100, 0, 0b00100};
+        case '&': return {0b01100, 0b10010, 0b10100, 0b01000, 0b10101, 0b10010, 0b01101};
         case '^': return {0b01100, 0b10010, 0b10010, 0b01100, 0, 0, 0};
         default: return {0, 0, 0, 0, 0, 0, 0};
     }
