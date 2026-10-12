@@ -1,6 +1,6 @@
 # Desk notifier
 
-A small desk display on an ESP32-C61. A round 240x240 GC9A01 screen turns through three animated pages: a clock, a cute squirrel that shows the indoor air quality from a BME688 sensor, and today's weather for Munich. When the air gets bad the squirrel stays on screen and asks you to open a window until you press a button.
+A small desk display on an ESP32-C61. A round 240x240 GC9A01 screen turns through three animated pages: a clock with today's forecast for Munich, a cute squirrel that shows the indoor air quality from a BME688 sensor, and the squirrel's day at home, which follows the clock (coffee in the morning, laptop, lunch, reading, sleep). When the air gets bad the squirrel stays on screen and asks you to open a window until you press a button.
 
 ![The pages](docs/media/pages_tour.gif)
 
@@ -8,9 +8,9 @@ It started as the esp_eyes project (animated eyes on two displays) and was cut d
 
 ## What works today
 - Rotating pages with fades, 10 frames per second. See [docs/pages.md](docs/pages.md).
-  - Clock: time (set over the internet), date, indoor and outdoor temperature.
+  - Clock: time (set over the internet), date, indoor and outdoor temperature, today's low, high and chance of rain.
   - Air: a squirrel mascot whose mood shows the air level (very good, good, okay, bad), with temperature, humidity and score.
-  - Weather: today's forecast from Open-Meteo as a small animated sky (sun, clouds, rain, snow, fog, thunder) and the outdoor temperature.
+  - Day: the squirrel at its desk at home, doing what fits the time and weekday. The room's climate changes it (stuffy air: it yawns or opens the window; too warm, too cold, too dry, too humid; a sudden smell), so does the weather (umbrella, cocoa, thunder), and special days decorate the room (birthday, anniversary, Christmas, Advent, Halloween, Oktoberfest, ...). The real weather shows in the window, the real time on the wall clock. Nothing is random.
 - Bad-air alert: the air page stays on, snoozed for 15 minutes by the button or by `POST /api/ack`. Without an alert the button shows the next page.
 - Web page at `http://<device>.local/` and a small HTTP API.
 - Wi-Fi, over-the-air updates, and a serial console.
@@ -70,13 +70,13 @@ curl http://desk-xxxxxx.local/api/sensor     # temperature, humidity, pressure, 
 curl http://desk-xxxxxx.local/api/status     # uptime, memory, Wi-Fi, sensor state
 curl -X POST http://desk-xxxxxx.local/api/ack   # snooze the alert
 curl http://desk-xxxxxx.local/api/weather    # the last forecast
-curl -X POST http://desk-xxxxxx.local/api/page -d '{"page":"weather"}'   # clock, air, weather or next
+curl -X POST http://desk-xxxxxx.local/api/page -d '{"page":"day"}'   # clock, air, day or next ("weather" still works)
 curl -X POST http://desk-xxxxxx.local/api/weather -d '{"lat":48.137,"lon":11.575,"place":"Munich"}'   # change the place
 curl -X POST --data-binary @firmware.bin http://desk-xxxxxx.local/api/ota
 ```
 
 ## Console commands
-`wifi`, `status`, `sensor`, `ack`, `page clock|air|weather|next`, `weather [refresh | at <lat> <lon> [name]]`, `lcd pins`, `lcd init [hz]`, `hostname`, `auth open|token`, `token`, `reboot`, `factory-reset`.
+`wifi`, `status`, `sensor`, `ack`, `page clock|air|day|next`, `weather [refresh | at <lat> <lon> [name]]`, `lcd pins`, `lcd init [hz]`, `hostname`, `auth open|token`, `token`, `reboot`, `factory-reset`.
 
 ## About the air-quality score
 It is a simple estimate, not Bosch BSEC. 25 points come from humidity (best at 40 %) and 75 from the gas resistance compared with the highest value seen recently. It needs about 3 minutes to warm up and a stretch of clean air to be meaningful. The sensor also reads a little warm because it sits next to the board.

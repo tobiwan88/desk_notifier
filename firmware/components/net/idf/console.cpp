@@ -110,10 +110,10 @@ int cmd_sensor(int, char**) {
     return 0;
 }
 int cmd_ack(int, char**) { screen::ack(); return 0; }
-int cmd_page(int argc, char** argv) {  // page clock|air|weather|next
+int cmd_page(int argc, char** argv) {  // page clock|air|day|next
     if (argc == 2 && !std::strcmp(argv[1], "next")) { screen::next_page(); return 0; }
     if (argc == 2) if (const auto p = screen::page_from_name(argv[1])) { screen::show_page(*p); return 0; }
-    std::printf("now: %s\nusage: page clock|air|weather|next\n", screen::page_name(screen::page()));
+    std::printf("now: %s\nusage: page clock|air|day|next\n", screen::page_name(screen::page()));
     return 1;
 }
 int cmd_weather(int argc, char** argv) {  // weather | weather refresh | weather at <lat> <lon> [name]
@@ -155,7 +155,7 @@ std::expected<void, engine::Err> start_console() noexcept {
         {.command = "status", .help = "show status", .hint = nullptr, .func = cmd_status, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "fsbench", .help = "fsbench <clip>", .hint = nullptr, .func = cmd_fsbench, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "lcd", .help = "lcd pins | init [spi_hz]", .hint = nullptr, .func = cmd_lcd, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
-        {.command = "page", .help = "page clock|air|weather|next", .hint = nullptr, .func = cmd_page, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
+        {.command = "page", .help = "page clock|air|day|next", .hint = nullptr, .func = cmd_page, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "weather", .help = "weather | weather refresh | weather at <lat> <lon> [name]", .hint = nullptr, .func = cmd_weather, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "sensor", .help = "show BME688 reading", .hint = nullptr, .func = cmd_sensor, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "ack", .help = "acknowledge (snooze) the alert", .hint = nullptr, .func = cmd_ack, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},

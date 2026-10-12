@@ -6,9 +6,9 @@ The display turns through three pages and fades between them. It draws 10 frames
 
 | Page | Shows | Time on screen |
 |---|---|---|
-| Clock | Time, date, indoor and outdoor temperature, a small squirrel peeking in | 12 s |
+| Clock | Time, date, indoor and outdoor temperature, today's low and high (with the chance of rain from 20 %), a small squirrel peeking in | 12 s |
 | Air | The squirrel mascot in front of the outdoor weather, indoor temperature and humidity, the air level and score | 15 s |
-| Weather | Today's forecast for Munich as a small animated sky, the outdoor temperature, high and low, chance of rain | 12 s |
+| Day | The squirrel at its desk at home, doing what fits the time of day. The real weather in the window, the real time on the wall clock | 12 s |
 
 ![The rotation](media/pages_tour.gif)
 
@@ -24,7 +24,7 @@ The squirrel shows the indoor air from the BME688:
 | BAD (below 35) | Worried face, sweat drop, fans the air with its paw, grey haze. The text switches between BAD and OPEN WINDOW |
 | Sensor warming up | Sleeps under the stars, Zzz |
 
-Behind the squirrel the sky shows the weather outside, the same as on the weather page: sun, moon and stars at night, clouds, rain, snow (the hill turns white), fog, thunderstorms with lightning. Under rain and storms the hill gets darker.
+Behind the squirrel the sky shows the weather outside: sun, moon and stars at night, clouds, rain, snow (the hill turns white), fog, thunderstorms with lightning. Under rain and storms the hill gets darker.
 
 The squirrel dresses for the outdoor temperature:
 
@@ -37,11 +37,76 @@ Before the first forecast arrives the air page uses its own colours for each air
 
 When the air is BAD the air page stays on screen and its sky pulses red until you press the button or call `POST /api/ack` (15 minutes snooze).
 
+## The squirrel's day
+
+The day page shows what the squirrel is doing at home. It follows the clock, never chance: the same time on the same weekday always gives the same scene, and only the small animation inside a scene moves.
+
+| Weekdays | Squirrel | Text |
+|---|---|---|
+| 06:30–08:59 | Holds a steaming mug, takes a sip every few seconds | COFFEE TIME |
+| 09:00–11:59, 13:00–17:59 | Laptop open, screen light on its face, cold coffee on the desk | BUSY |
+| 12:00–12:59 | Pumpkin soup, spoon to mouth, cheeks full while chewing | LUNCH |
+| 18:00–18:29 | Closes the laptop, then a big happy stretch | WORK DONE |
+| 18:30–22:59 | Reads a book under the desk lamp, a page turns now and then | READING |
+| 23:00–06:29 | In bed with a nightcap, the blanket rises and falls, Zzz | GOOD NIGHT |
+
+On Saturday, Sunday and Bavarian public holidays it sleeps 90 minutes longer, has coffee for two hours, lunch as usual, and reads the rest of the day.
+
+### The room's climate and the weather
+
+The measured air and the forecast change what the squirrel does. The first match wins:
+
+| When | Squirrel | Text |
+|---|---|---|
+| 31 Dec from 22:00 until 00:30 | Party hat, sparkler, fireworks in the window | COUNTDOWN, HAPPY NEW YEAR |
+| The air score dropped 15 points within half an hour | Holds its nose, green stink lines | STINKY AIR! |
+| Thunder in the evening or at night | Blanket pulled up to the nose, flinches at each flash | THUNDER! |
+| Air OKAY or BAD, outside 10–24 °C, dry, calm | Opens the window, the curtain blows in | AIR OUT |
+| Room 26 °C or more, outside 3° cooler, evening | Opens the window | COOL OFF |
+| Air OKAY or BAD during work (and too wet to air out) | Yawns over the laptop | STUFFY AIR |
+| Room 26 °C or more | Fans itself with a leaf, red thermometer | TOO WARM |
+| Room below 18 °C | Knitted shawl, a cup of tea, blue thermometer | CHILLY |
+| Humidity over 65 % | Steamed-up window, a mushroom on the sill | TOO HUMID |
+| Humidity under 35 % | Sips water, mists the plant | DRY AIR |
+| Rain likely (60 %+) on a work morning | An umbrella leans against the desk | TAKE UMBRELLA |
+| Rain or snow in the evening | Cocoa next to the book | COSY EVENING |
+| Sunny, 15 °C or more, on a day off | Waters the plant | WATERING |
+
+The window shows the weather on the glass too: raindrops, frost in the corners on freezing mornings, a fogged pane with a wiped peephole, leaves blowing past at 30 km/h or more, a snowman on snowy days.
+
+### Special days
+
+| Day | Decoration | Text |
+|---|---|---|
+| Birthday (menuconfig, off by default) | Cake with a candle, party hat, garland, confetti | HAPPY BIRTHDAY, then the name |
+| Wedding anniversary (menuconfig, off by default) | A rose, hearts, heart garland | ANNIVERSARY, LOVE YOU! |
+| 24–26 Dec | Christmas tree, Santa hat | MERRY XMAS |
+| 31 Dec | Garland | NEW YEAR'S EVE |
+| 1 Jan | Confetti, sleeps in even longer | HAPPY NEW YEAR |
+| Easter Sunday and Monday | Basket of eggs | HAPPY EASTER |
+| Advent | A wreath with one to four candles; on Sundays the text says which Advent | 2. ADVENT |
+| 6 Dec | Boot with an orange and nuts, Santa hat | NIKOLAUS |
+| 11 Nov, evening | A paper lantern in the window | ST. MARTIN |
+| 31 Oct | Carved pumpkin, lit in the evening | HALLOWEEN |
+| Last Sunday of March and October | The wall clock spins forward or back | CLOCKS FORWARD, CLOCKS GO BACK |
+| Oktoberfest (from the Saturday 15 days before the first Sunday of October) | Pretzel, Lederhosen braces | O'ZAPFT IS! |
+| 21 Jan, Squirrel Appreciation Day | Crown, acorn cake, garland | SQUIRREL DAY |
+| 14 Feb | Pink mug, a rose, hearts | VALENTINE |
+| 1 Apr | The wall clock runs backwards | APRIL FOOL! |
+| Friday after work | Party hat | WEEKEND! |
+| Monday morning | The big mug | MONDAY... |
+
+When there is more than one text, they take turns every 4 seconds.
+
+The window shows the weather outside (sun, moon, clouds, rain, snow, fog, thunder), the wall clock the real time, and the room gets darker in the evening. The face still follows the indoor air. The page is left out until the time is known.
+
+Change the times, the birthday (with the name) and the anniversary in `idf.py menuconfig` → Desk notifier → Squirrel's day (times as HHMM, so 630 is 06:30; dates as MMDD, so 315 is 15 March, 0 turns it off). Bedtime may be after midnight (e.g. 30).
+
 ## Weather
 
-The board asks [Open-Meteo](https://open-meteo.com/) every 20 minutes. No account or key is needed. The picture comes from today's forecast (WMO code): sun (or moon at night), partly cloudy, cloudy, fog, drizzle, rain, snow, thunder. The page is left out of the rotation until the first forecast arrives, and again if the last good one is older than 3 hours.
+The board asks [Open-Meteo](https://open-meteo.com/) every 20 minutes. No account or key is needed. The air page shows it as the sky behind the squirrel and as the squirrel's outfit, the day page in the window, the clock page as numbers. There used to be a separate weather page; it showed the same sky and temperature again and was replaced by the day page. If the last good forecast is older than 3 hours, the pages fall back to their own colours.
 
-Change the place over the API (the name shows after a reboot):
+Change the place over the API:
 
 ```sh
 curl -X POST http://desk-xxxxxx.local/api/weather -d '{"lat":52.52,"lon":13.405,"place":"Berlin"}'
@@ -54,11 +119,11 @@ or with the console command `weather at 52.52 13.405 Berlin`, or in `idf.py menu
 | How | What |
 |---|---|
 | Button | During a BAD-air alert: snooze it. Otherwise: next page |
-| `POST /api/page` `{"page":"weather"}` | Fade to a page (`clock`, `air`, `weather`, or `next`) |
+| `POST /api/page` `{"page":"day"}` | Fade to a page (`clock`, `air`, `day`, or `next`; `weather` still works and means `day`) |
 | `POST /api/page` `{"refresh_weather":true}` | Fetch the forecast now |
 | `POST /api/weather` `{"lat":..,"lon":..,"place":".."}` | Change the forecast location |
 | `GET /api/weather` | The last forecast as JSON |
-| Console `page air`, `page next` | Same as the API |
+| Console `page day`, `page next` | Same as the API |
 | Console `weather`, `weather refresh` | Show or fetch the forecast |
 
 Page times and the frame rate are in `idf.py menuconfig` → Desk notifier → Pages. Set a page time to 0 to skip that page.
@@ -71,6 +136,12 @@ uv run python tools/preview_pages.py     # GIFs and sheet.png in build/preview
 ```
 
 The preview uses the same drawing code as the board.
+
+The props of the day page (pumpkin, wreath, leaf fan, rain on the glass, ...) have their own sheet, one row per prop at scene size and enlarged:
+
+```sh
+cmake --build build/host --target prop_sheet && uv run python tools/prop_sheet.py   # build/props/sheet.png
+```
 
 To check every combination, add `matrix`: one sheet per weather (`build/preview/matrix_*.png`), rows are the air levels, columns are day and night at -2, 15 and 29 °C:
 

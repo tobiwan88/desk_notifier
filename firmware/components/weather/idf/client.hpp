@@ -23,6 +23,6 @@ Status latest() noexcept;
 void refresh() noexcept;
 // Shows this forecast instead of the real one for `seconds` (0 = back to the real one). For trying the squirrel outfits.
 void set_demo(const Forecast& f, std::uint32_t seconds) noexcept;       // fetch again now
-std::string place() noexcept;  // the name shown on the page, e.g. "MUNICH"
+std::string place() noexcept;  // the place name, e.g. "MUNICH" (in /api/weather)
 
 }  // namespace weather
