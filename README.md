@@ -10,7 +10,7 @@ It started as the esp_eyes project (animated eyes on two displays) and was cut d
 - Rotating pages with fades, 10 frames per second. See [docs/pages.md](docs/pages.md).
   - Clock: time (set over the internet), date, indoor and outdoor temperature, today's low, high and chance of rain.
   - Air: a squirrel mascot whose mood shows the air level (very good, good, okay, bad), with temperature, humidity and score.
-  - Day: the squirrel at its desk at home, doing what fits the time and weekday. The real weather shows in the window, the real time on the wall clock. Nothing is random.
+  - Day: the squirrel at its desk at home, doing what fits the time and weekday. The room's climate changes it (stuffy air: it yawns or opens the window; too warm, too cold, too dry, too humid; a sudden smell), so does the weather (umbrella, cocoa, thunder), and special days decorate the room (birthday, anniversary, Christmas, Advent, Halloween, Oktoberfest, ...). The real weather shows in the window, the real time on the wall clock. Nothing is random.
 - Bad-air alert: the air page stays on, snoozed for 15 minutes by the button or by `POST /api/ack`. Without an alert the button shows the next page.
 - Web page at `http://<device>.local/` and a small HTTP API.
 - Wi-Fi, over-the-air updates, and a serial console.

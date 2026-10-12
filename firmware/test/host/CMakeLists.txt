@@ -14,3 +14,7 @@ target_compile_definitions(host_tests PRIVATE GOLDEN_DIR="${CMAKE_CURRENT_SOURCE
 # Renders the pages to raw frames for tools/preview_pages.py (not a test).
 add_executable(page_preview preview.cpp ${CORE_SRCS})
 target_include_directories(page_preview PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../components)
+
+# Renders each day-page prop for tools/prop_sheet.py (not a test).
+add_executable(prop_sheet prop_sheet.cpp ${CORE_SRCS})
+target_include_directories(prop_sheet PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../components)
