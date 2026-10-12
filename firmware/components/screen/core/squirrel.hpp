@@ -25,6 +25,7 @@ struct Outfit {
     bool sunglasses = false;
     bool umbrella = false;
     bool windy = false;
+    bool paws_free = false;  // no arms, acorn, ice cream or umbrella: the caller draws what the paws hold
 };
 inline constexpr float kColdC = 8.0f, kHotC = 25.0f, kWindyKmh = 30.0f;
 [[nodiscard]] Outfit outfit_for(bool weather_ok, const weather::Forecast& w) noexcept;
@@ -41,6 +42,11 @@ struct AirData {
 
 // Draws the squirrel. (cx, cy) is the centre of its body, `scale` 1.0 is about 120 px tall.
 void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, std::uint32_t t_ms, Outfit o = {}) noexcept;
+
+// Where draw_squirrel moves the body this frame (the bob of the mood animation), in design units (multiply by
+// scale), so that props drawn by the caller move with it.
+struct Bob { float dx, dy; };
+[[nodiscard]] Bob squirrel_bob(Mood m, std::uint32_t t_ms) noexcept;
 
 void render_air(const Canvas& cv, const AirData& d) noexcept;
 

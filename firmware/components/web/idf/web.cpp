@@ -168,7 +168,7 @@ esp_err_t post_weather_demo(httpd_req_t* r) {
     return ESP_OK;
 }
 
-// {"page":"clock"|"air"|"weather"} or {"page":"next"}; {"refresh_weather":true} fetches the forecast again.
+// {"page":"clock"|"air"|"day"} or {"page":"next"} ("weather" still works and means "day"); {"refresh_weather":true} fetches the forecast again.
 esp_err_t post_page(httpd_req_t* r) {
     if (!authorized(r)) return ESP_OK;
     char body[96]{};
@@ -185,7 +185,8 @@ esp_err_t post_page(httpd_req_t* r) {
             const std::string quoted = std::string("\"") + screen::page_name(p) + "\"";
             if (b.find(quoted) != std::string_view::npos) { screen::show_page(p); found = true; break; }
         }
-        if (!found && b.find("refresh_weather") == std::string_view::npos) { send_error(r, engine::Err::BadJson, "page must be clock, air, weather or next"); return ESP_OK; }
+        if (!found && b.find("\"weather\"") != std::string_view::npos) { screen::show_page(screen::Page::Day); found = true; }
+        if (!found && b.find("refresh_weather") == std::string_view::npos) { send_error(r, engine::Err::BadJson, "page must be clock, air, day or next"); return ESP_OK; }
     }
     send_json(r, "202 Accepted", R"({"ok":true})");
     return ESP_OK;

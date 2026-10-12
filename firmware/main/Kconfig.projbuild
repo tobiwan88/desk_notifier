@@ -65,9 +65,31 @@ menu "Desk notifier"
         config DESK_PAGE_AIR_S
             int "Seconds on the air (squirrel) page (0 = skip the page)"
             default 15
-        config DESK_PAGE_WEATHER_S
-            int "Seconds on the weather page (0 = skip the page)"
+        config DESK_PAGE_DAY_S
+            int "Seconds on the day (squirrel at home) page (0 = skip the page)"
             default 12
+    endmenu
+    menu "Squirrel's day (times as HHMM, 630 = 06:30; weekends start 90 min later, no work)"
+        config DESK_DAY_WAKE
+            int "Wake up, coffee"
+            range 0 2359
+            default 630
+        config DESK_DAY_WORK
+            int "Start work (laptop open)"
+            range 0 2359
+            default 900
+        config DESK_DAY_LUNCH
+            int "Lunch (one hour)"
+            range 0 2359
+            default 1200
+        config DESK_DAY_END
+            int "End of work (laptop closes, then reading)"
+            range 0 2359
+            default 1800
+        config DESK_DAY_BED
+            int "Bedtime (sleeps until wake up)"
+            range 0 2359
+            default 2300
     endmenu
     menu "Weather (Open-Meteo, no API key)"
         config DESK_WEATHER_URL

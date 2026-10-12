@@ -92,6 +92,7 @@ TEST_CASE("page names round-trip") {
         CHECK(screen::page_from_name(screen::page_name(p)) == p);
     }
     CHECK_FALSE(screen::page_from_name("nope").has_value());
+    CHECK(screen::page_from_name("weather") == Page::Day);  // old name of the third page
 }
 
 TEST_CASE("rotator cycles with fades and skips missing pages") {
@@ -99,7 +100,7 @@ TEST_CASE("rotator cycles with fades and skips missing pages") {
     c.dwell_ms[0] = 1000; c.dwell_ms[1] = 1000; c.dwell_ms[2] = 1000;
     c.fade_ms = 100;
     Rotator r(c);
-    const unsigned all = 0b111, no_weather = 0b011;
+    const unsigned all = 0b111, no_day = 0b011;
     CHECK(r.tick(0, all, {}).page == Page::Clock);
     CHECK(r.tick(999, all, {}).brightness == 256);
     auto f = r.tick(1000, all, {});        // fade out starts
@@ -111,8 +112,8 @@ TEST_CASE("rotator cycles with fades and skips missing pages") {
     CHECK(f.page == Page::Air);
     CHECK(f.brightness == 128);
     CHECK(r.tick(1200, all, {}).brightness == 256);
-    r.tick(2200, no_weather, {});           // weather unavailable: back to clock
-    CHECK(r.tick(2400, no_weather, {}).page == Page::Clock);
+    r.tick(2200, no_day, {});               // day page unavailable (no time yet): back to clock
+    CHECK(r.tick(2400, no_day, {}).page == Page::Clock);
 }
 
 TEST_CASE("rotator pin and requests") {
@@ -124,9 +125,9 @@ TEST_CASE("rotator pin and requests") {
     r.tick(5, 0b111, Page::Air);           // alert pins the air page
     CHECK(r.tick(30, 0b111, Page::Air).page == Page::Air);
     CHECK(r.tick(5000, 0b111, Page::Air).page == Page::Air);  // stays while pinned
-    r.show(Page::Weather, 5000);
+    r.show(Page::Day, 5000);
     CHECK(r.tick(5100, 0b111, {}).page == Page::Air);         // fade out first
-    CHECK(r.tick(5125, 0b111, {}).page == Page::Weather);
+    CHECK(r.tick(5125, 0b111, {}).page == Page::Day);
     r.tick(5130, 0b111, {});
     r.next(5130);
     r.tick(5131, 0b111, {});
@@ -169,9 +170,9 @@ TEST_CASE("every page renders something for every state") {
     for (int s = 0; s <= static_cast<int>(Sky::Thunder); ++s) {
         in.weather.sky = static_cast<Sky>(s);
         in.t_ms = 2000;
-        screen::render_page({a}, Page::Weather, in);
+        screen::render_page({a}, Page::Day, in);
         in.t_ms = 2500;
-        screen::render_page({b}, Page::Weather, in);
+        screen::render_page({b}, Page::Day, in);
         CHECK(a != b);
     }
     screen::render_page({a}, Page::Clock, in);
