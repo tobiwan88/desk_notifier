@@ -17,8 +17,16 @@ inline constexpr int kSpiHz = CONFIG_DESK_LCD_SPI_HZ;
 inline constexpr std::size_t kStripLines = CONFIG_DESK_STRIP_LINES;
 inline constexpr std::size_t kStripCount = CONFIG_DESK_STRIP_COUNT;
 
-// strapping, UART0, USB, PSRAM CS.
+#if CONFIG_IDF_TARGET_ESP32S3
+// strapping (0, 3, 45, 46), USB (19, 20), in-package flash/PSRAM (26..37, octal on R8), UART0.
+consteval bool reserved(int p) {
+    return p == 0 || p == 3 || p == 45 || p == 46 || p == 19 || p == 20 || (p >= 26 && p <= 37) || p == 43 ||
+           p == 44;
+}
+#else
+// C61: strapping, UART0, USB, PSRAM CS.
 consteval bool reserved(int p) { return p >= 8 && p <= 14; }
+#endif
 consteval bool all_distinct(const std::array<int, 6>& a) {
     for (std::size_t i = 0; i < a.size(); ++i)
         for (std::size_t j = i + 1; j < a.size(); ++j)
