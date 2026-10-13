@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <string_view>
 
 #include "screen/core/draw.hpp"
 #include "screen/core/fun.hpp"
@@ -338,7 +339,7 @@ void caption(const Canvas& cv, const Scene& sc, const Inputs& in, const char* sa
     }
     const char* first = situation_label(sc.situation, in);
     lines[n++] = first ? first : activity_label(sc.activity);
-    char sleeps[20] = "", what[24] = "";
+    char sleeps[32] = "", what[32] = "";
     if (sc.countdown > 0) {
         std::snprintf(sleeps, sizeof sleeps, sc.countdown == 1 ? "1 SLEEP TO GO" : "%d SLEEPS TO GO", sc.countdown);
         if (sc.countdown_to == Occasion::Birthday) {
@@ -352,7 +353,7 @@ void caption(const Canvas& cv, const Scene& sc, const Inputs& in, const char* sa
         lines[n++] = what;
     }
     if (in.plant.grew) lines[n++] = "NEW LEAF!";
-    if (const char* o = occasion_label(sc.occasion, in); o && std::strcmp(o, lines[0]) != 0) lines[n++] = o;
+    if (const char* o = occasion_label(sc.occasion, in); o && std::string_view(o) != std::string_view(lines[0])) lines[n++] = o;
     if (sc.occasion == Occasion::Birthday && in.schedule.birthday_name[0] && n < 6) lines[n++] = in.schedule.birthday_name;
     if (sc.occasion == Occasion::Anniversary && n < 6) lines[n++] = "LOVE YOU!";
     if (sc.advent > 0 && in.weekday == 0 && n < 6) lines[n++] = kAdvent[sc.advent];
