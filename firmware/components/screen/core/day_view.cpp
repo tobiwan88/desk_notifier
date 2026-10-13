@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <string_view>
 
 #include "screen/core/draw.hpp"
 #include "screen/core/pages.hpp"
@@ -320,7 +321,7 @@ void caption(const Canvas& cv, const Scene& sc, const Inputs& in) {
     int n = 0;
     const char* first = situation_label(sc.situation, in);
     lines[n++] = first ? first : activity_label(sc.activity);
-    if (const char* o = occasion_label(sc.occasion, in); o && std::strcmp(o, lines[0]) != 0) lines[n++] = o;
+    if (const char* o = occasion_label(sc.occasion, in); o && std::string_view(o) != std::string_view(lines[0])) lines[n++] = o;
     if (sc.occasion == Occasion::Birthday && in.schedule.birthday_name[0]) lines[n++] = in.schedule.birthday_name;
     if (sc.occasion == Occasion::Anniversary) lines[n++] = "LOVE YOU!";
     if (sc.advent > 0 && in.weekday == 0 && n < 4) lines[n++] = kAdvent[sc.advent];
