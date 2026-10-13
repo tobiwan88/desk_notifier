@@ -3,7 +3,7 @@
 Writes PNGs plus index.json (image -> what to look at) to hardware/out/review/<board>/.
 Region crops come from REGIONS (board mm from the top-left corner); the Haiku checks
 (hardware/agents/) each get one image and one question.
-Usage: uv run python hardware/tools/review_pack.py hardware/notifier-v1/notifier-v1.kicad_pcb
+Usage: uv run --package desk-hardware python hardware/tools/review_pack.py hardware/notifier-v1/notifier-v1.kicad_pcb
 """
 
 import json

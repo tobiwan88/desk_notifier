@@ -4,7 +4,7 @@
 - pin map: schematic module pins vs firmware Kconfig defaults for DESK_BOARD_NOTIFIER_V1
 - reserved pins: no S3 strapping/USB/PSRAM pin used for anything but its job
 - BOM: every LCSC part exists, is in stock for QTY boards, Basic/Extended count and cost
-Usage: uv run python hardware/tools/checks.py [--bom] [--qty 5]
+Usage: uv run --package desk-hardware python hardware/tools/checks.py [--bom] [--qty 5]
 """
 
 import argparse

@@ -3,7 +3,7 @@
 Parts without an LCSC field (holes, test pads, solder jumper) are left out of BOM and CPL.
 Rotation corrections follow the JLCKicadTools cpl_rotations_db (via kicad-jlcpcb-tools); they
 date from older KiCad libraries, so always confirm orientation in JLC's placement preview.
-Usage: uv run python hardware/tools/fab_package.py hardware/notifier-v1/notifier-v1.kicad_pcb
+Usage: uv run --package desk-hardware python hardware/tools/fab_package.py hardware/notifier-v1/notifier-v1.kicad_pcb
 """
 
 import csv

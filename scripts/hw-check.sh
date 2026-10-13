@@ -4,4 +4,4 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 . scripts/kicad-env.sh
 if ! command -v kicad-cli >/dev/null; then echo "SKIP: kicad-cli not installed" >&2; exit 0; fi
-uv run python hardware/tools/checks.py "$@"
+uv run --package desk-hardware python hardware/tools/checks.py "$@"
