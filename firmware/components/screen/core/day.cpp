@@ -4,6 +4,7 @@
 
 #include <algorithm>
 
+#include "screen/core/fun.hpp"
 #include "screen/core/pages.hpp"
 
 namespace screen {
@@ -127,6 +128,26 @@ int advent_candles(int y, int m, int d) noexcept {
     return std::min(4, 1 + (doy - first) / 7);
 }
 
+int days_until(int y, int m, int d, int mmdd) noexcept {
+    const int today = days(y, m, d), mm = mmdd / 100, dd = mmdd % 100;
+    int next = days(y, mm, dd);
+    if (next < today) next = days(y + 1, mm, dd);
+    return next - today;
+}
+
+float moon_phase(int y, int m, int d, int hour) noexcept {
+    // minutes since the new moon of 6 January 2000, 18:14 UTC, modulo one mean lunation (29.530589 days)
+    constexpr std::int64_t kLunation = 42524;
+    const std::int64_t min = static_cast<std::int64_t>(days(y, m, d) - days(2000, 1, 6)) * 1440 + hour * 60 - (18 * 60 + 14);
+    const std::int64_t r = ((min % kLunation) + kLunation) % kLunation;
+    return static_cast<float>(r) / static_cast<float>(kLunation);
+}
+
+bool full_moon(int y, int m, int d, int hour) noexcept {
+    const float p = moon_phase(y, m, d, hour);
+    return p > 0.466f && p < 0.534f;
+}
+
 }  // namespace cal
 
 Occasion occasion_for(int y, int m, int d, const Schedule& s) noexcept {
@@ -215,10 +236,6 @@ bool AirTrend::sudden_drop() const noexcept {
 
 namespace {
 
-bool wet(weather::Sky s) noexcept {
-    return s == weather::Sky::Drizzle || s == weather::Sky::Rain || s == weather::Sky::Thunder || s == weather::Sky::Snow;
-}
-
 Situation situation_for(const Inputs& in, const Scene& sc) noexcept {
     const Activity a = sc.activity;
     const int m = in.hour * 60 + in.minute;
@@ -230,10 +247,10 @@ Situation situation_for(const Inputs& in, const Scene& sc) noexcept {
     const bool sensor = in.sensor_ok;
     const float inside = in.reading.temp_c, rh = in.reading.rh;
     const bool stale = sensor && (in.quality.level == sensor::Level::Stale || in.quality.level == sensor::Level::Poor);
-    const bool nice_out = in.weather_ok && w.temp_c >= 10 && w.temp_c <= 24 && !wet(w.sky) && w.wind_kmh < 30;
+    const bool nice_out = in.weather_ok && w.temp_c >= 10 && w.temp_c <= 24 && !weather::wet(w.sky) && w.wind_kmh < 30;
     if (sensor && in.air_drop) return Situation::Smell;
     if (stale && nice_out) return Situation::AirOut;
-    if (sensor && inside >= kHotRoomC && in.weather_ok && w.temp_c <= inside - 3 && !wet(w.sky) && in.hour >= 18)
+    if (sensor && inside >= kHotRoomC && in.weather_ok && w.temp_c <= inside - 3 && !weather::wet(w.sky) && in.hour >= 18)
         return Situation::CoolDown;
     if (stale && a == Activity::Work) return Situation::Yawn;
     if (sensor && inside >= kHotRoomC) return Situation::HotRoom;
@@ -241,7 +258,7 @@ Situation situation_for(const Inputs& in, const Scene& sc) noexcept {
     if (sensor && rh > kHumidPct) return Situation::Humid;
     if (sensor && rh > 0 && rh < kDryPct) return Situation::DryAir;
     if (a == Activity::Coffee && !sc.day_off && in.weather_ok && w.precip_pct >= 60) return Situation::Umbrella;
-    if (a == Activity::Read && in.weather_ok && wet(w.sky) && in.hour >= 17) return Situation::Cocoa;
+    if (a == Activity::Read && in.weather_ok && weather::wet(w.sky) && in.hour >= 17) return Situation::Cocoa;
     if (a == Activity::Read && sc.day_off && in.hour < 18 && in.weather_ok && w.is_day && w.temp_c >= 15 &&
         (w.sky == weather::Sky::Clear || w.sky == weather::Sky::PartlyCloudy))
         return Situation::Watering;
@@ -263,7 +280,41 @@ Scene scene_for(const Inputs& in) noexcept {
     if (sc.situation == Situation::Party) sc.activity = Activity::Read;  // stays up
     sc.friday_party = in.weekday == 5 && !sc.day_off && (sc.activity == Activity::CloseLaptop || sc.activity == Activity::Read);
     sc.monday = in.weekday == 1 && !sc.day_off && sc.activity == Activity::Coffee;
+    struct Next { int mmdd; Occasion o; };
+    const Next next[] = {{in.schedule.birthday, Occasion::Birthday}, {in.schedule.anniversary, Occasion::Anniversary}, {1224, Occasion::Christmas}};
+    for (const Next& n : next) {
+        if (n.mmdd <= 0) continue;
+        const int dd = cal::days_until(in.year, in.month, in.day, n.mmdd);
+        if (dd >= 1 && dd <= 7 && (sc.countdown == 0 || dd < sc.countdown)) { sc.countdown = dd; sc.countdown_to = n.o; }
+    }
+    const bool night = in.hour >= 19 || in.hour < 5;
+    sc.howl_night = night && sc.activity != Activity::Sleep &&
+                    (cal::full_moon(in.year, in.month, in.day, in.hour) || sc.occasion == Occasion::Halloween);
     return sc;
+}
+
+unsigned allowed_gags(const Scene& sc, const Inputs& in) noexcept {
+    using fun::bit;
+    using fun::Gag;
+    const Activity act = sc.activity;
+    const Situation sit = sc.situation;
+    const bool bed = (act == Activity::Sleep || sit == Situation::Storm) && sit != Situation::Party;
+    if (!in.time_valid || bed || sit == Situation::Party) return 0;
+    const int mins = in.hour * 60 + in.minute;
+    unsigned gags = bit(Gag::Plane) | bit(Gag::Acorn);
+    const bool busy_paws = sit == Situation::Smell || sit == Situation::HotRoom || sit == Situation::ColdRoom ||
+                           sit == Situation::DryAir || sit == Situation::Watering;
+    if (act == Activity::Work && !busy_paws) {
+        gags |= bit(Gag::Pen);
+        if (mins >= 13 * 60 + 30 && mins < 15 * 60 && sit != Situation::AirOut) gags |= bit(Gag::NodOff);
+        if (in.weekday == 5 && in.hour >= 14) gags |= bit(Gag::ClockWatch);
+    }
+    if (act == Activity::Lunch && !busy_paws) gags |= bit(Gag::Cheeks);
+    if (in.weekday == 1 && !sc.day_off && mins >= 8 * 60 + 30 && mins < 10 * 60 && (act == Activity::Coffee || act == Activity::Work))
+        gags |= bit(Gag::Sigh);
+    if ((sit == Situation::AirOut || sit == Situation::CoolDown) && (act == Activity::Work || act == Activity::Read))
+        gags |= bit(Gag::Stretch);
+    return gags;
 }
 
 bool reading_lamp(const Scene& sc, const Inputs& in) noexcept {

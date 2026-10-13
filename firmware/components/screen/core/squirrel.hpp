@@ -27,6 +27,7 @@ struct Outfit {
     bool umbrella = false;
     bool windy = false;
     bool paws_free = false;  // no arms, acorn, ice cream or umbrella: the caller draws what the paws hold
+    bool wolf = false;       // Halloween night: grey wolf ears
 };
 inline constexpr float kColdC = 8.0f, kHotC = 25.0f, kWindyKmh = 30.0f;
 [[nodiscard]] Outfit outfit_for(bool weather_ok, const weather::Forecast& w) noexcept;
@@ -41,6 +42,11 @@ struct AirData {
     std::uint32_t t_ms = 0;  // monotonic, drives the animation
     fun::Quirks quirks{};    // blinks, glances, waves ...
     fun::Visit visit{};      // a bird on the head, a butterfly, a shooting star
+    float moon_phase = -1;   // 0..1 for the real moon, -1 = a crescent
+    int rainbow = 0;         // 0..256: a rainbow behind the hill after rain
+    float golden = -1;       // the golden acorn's visit 0..1, or -1
+    int golden_count = 0;
+    bool wolf = false;       // Halloween night
 };
 
 // Draws the squirrel. (cx, cy) is the centre of its body, `scale` 1.0 is about 120 px tall.

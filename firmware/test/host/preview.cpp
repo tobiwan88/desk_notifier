@@ -52,6 +52,7 @@ int main(int argc, char** argv) {
     struct Scene {
         const char* name; screen::Page page; int frames; void (*setup)(screen::Inputs&);
         screen::fun::Visitor want = screen::fun::Visitor::None; float at_k = 0.2f; bool wave = false;
+        bool (*find)(std::uint32_t t, const screen::Inputs& in) = nullptr;  // start where this is true
     };
     using V = screen::fun::Visitor;
     static const Scene kScenes[] = {
@@ -88,6 +89,38 @@ int main(int argc, char** argv) {
         {"fun_day_star", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2026, 10, 14, 23, 30); i.weather = {7.0f, false, 0, weather::Sky::Clear, 12, 4, 0}; }, V::ShootingStar, 0.295f},
         {"fun_day_butterfly", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 10, 17, 11, 0); i.weather = {20.0f, true, 0, weather::Sky::Clear, 22, 10, 0}; }, V::Butterfly, 0.4f},
         {"fun_clock_hour", screen::Page::Clock, 120, [](screen::Inputs& i) { i.hour = 10; i.minute = 0; }},
+        // more surprises: the moon, the golden acorn, seasonal visitors, the plant, countdowns, gags, puns
+        {"more_moon_crescent", screen::Page::Air, 20, [](screen::Inputs& i) { at(i, 2026, 10, 14, 21, 0); i.weather = {9.0f, false, 0, weather::Sky::Clear, 13, 5, 0}; }},
+        {"more_moon_half", screen::Page::Air, 20, [](screen::Inputs& i) { at(i, 2026, 10, 18, 21, 0); i.weather = {9.0f, false, 0, weather::Sky::Clear, 13, 5, 0}; }},
+        {"more_moon_full_howl", screen::Page::Air, 50, [](screen::Inputs& i) { at(i, 2026, 10, 26, 22, 0); i.weather = {7.0f, false, 0, weather::Sky::Clear, 12, 3, 0}; }, V::None, 0, false,
+         [](std::uint32_t t, const screen::Inputs& in) { return screen::fun::howl(t, in.seed) > 0.02f; }},
+        {"more_halloween_howl", screen::Page::Day, 50, [](screen::Inputs& i) { at(i, 2026, 10, 31, 20, 30); i.weather = {8.0f, false, 2, weather::Sky::PartlyCloudy, 12, 4, 10}; }, V::None, 0, false,
+         [](std::uint32_t t, const screen::Inputs& in) { return screen::fun::howl(t, in.seed) > 0.02f; }},
+        {"more_golden", screen::Page::Air, 120, [](screen::Inputs& i) { i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; i.golden_count = 3; }, V::None, 0, false,
+         [](std::uint32_t t, const screen::Inputs& in) { return screen::fun::golden(t, in.seed) >= 0; }},
+        {"more_owl", screen::Page::Day, 50, [](screen::Inputs& i) { at(i, 2026, 10, 14, 21, 30); i.weather = {9.0f, false, 3, weather::Sky::Cloudy, 12, 6, 20}; }, V::Owl, 0.3f},
+        {"more_hedgehog", screen::Page::Air, 80, [](screen::Inputs& i) { at(i, 2026, 10, 14, 18, 0); i.weather = {11.0f, false, 2, weather::Sky::PartlyCloudy, 14, 6, 10}; }, V::Hedgehog, 0.3f},
+        {"more_snail_air", screen::Page::Air, 60, [](screen::Inputs& i) { at(i, 2026, 10, 14, 15, 0); i.since_rain_min = 25; i.weather = {12.0f, true, 63, weather::Sky::Rain, 14, 8, 70, 5, 3}; }, V::Snail, 0.4f},
+        {"more_snail_day", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 10, 14, 15, 0); i.since_rain_min = 25; i.weather = {12.0f, true, 63, weather::Sky::Rain, 14, 8, 70, 5, 3}; }, V::Snail, 0.4f},
+        {"more_bee", screen::Page::Air, 60, [](screen::Inputs& i) { at(i, 2027, 7, 10, 14, 0); i.weather = {24.0f, true, 0, weather::Sky::Clear, 27, 15, 0}; }, V::Bee, 0.3f},
+        {"more_leaves", screen::Page::Air, 60, [](screen::Inputs& i) { at(i, 2026, 10, 14, 11, 0); i.weather = {13.0f, true, 2, weather::Sky::PartlyCloudy, 15, 6, 10}; }, V::Leaves, 0.35f},
+        {"more_petals", screen::Page::Air, 60, [](screen::Inputs& i) { at(i, 2027, 4, 14, 11, 0); i.weather = {16.0f, true, 0, weather::Sky::Clear, 18, 6, 0}; }, V::Petals, 0.35f},
+        {"more_rainbow_air", screen::Page::Air, 30, [](screen::Inputs& i) { i.since_rain_min = 15; i.weather = {14.0f, true, 63, weather::Sky::Rain, 16, 8, 70, 5, 2}; }},
+        {"more_rainbow_day", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2026, 10, 14, 16, 0); i.since_rain_min = 15; i.weather = {14.0f, true, 63, weather::Sky::Rain, 16, 8, 70, 5, 2}; }},
+        {"more_countdown_birthday", screen::Page::Day, 120, [](screen::Inputs& i) { at(i, 2027, 1, 30, 10, 0); i.weather = {1.0f, true, 3, weather::Sky::Cloudy, 3, -2, 20}; }},
+        {"more_countdown_anniversary", screen::Page::Day, 120, [](screen::Inputs& i) { at(i, 2026, 10, 18, 11, 0); }},
+        {"more_plant_bloom", screen::Page::Day, 40, [](screen::Inputs& i) { at(i, 2026, 10, 13, 10, 0); i.plant.leaves = 9; i.plant.flower = true; i.plant.grew = true; }},
+        {"more_plant_droop", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2026, 10, 13, 10, 0); i.plant.leaves = 4; i.plant.droop = 3; }},
+        {"more_pun", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 10, 13, 10, 0); }, V::None, 0, false,
+         [](std::uint32_t t, const screen::Inputs& in) { return screen::fun::pun(t, in.seed, 2) != nullptr && screen::fun::gag(t, in.seed, screen::allowed_gags(screen::scene_for(in), in)).gag == screen::fun::Gag::None; }},
+        {"gag_plane", screen::Page::Day, 70, [](screen::Inputs& i) { at(i, 2026, 10, 13, 10, 0); }, V::None, 0, false, [](std::uint32_t t, const screen::Inputs& in) { const auto g = screen::fun::gag(t, in.seed, screen::allowed_gags(screen::scene_for(in), in)); return g.gag == screen::fun::Gag::Plane && g.k > 0.02f; }},
+        {"gag_acorn", screen::Page::Day, 70, [](screen::Inputs& i) { at(i, 2026, 10, 13, 16, 0); }, V::None, 0, false, [](std::uint32_t t, const screen::Inputs& in) { const auto g = screen::fun::gag(t, in.seed, screen::allowed_gags(screen::scene_for(in), in)); return g.gag == screen::fun::Gag::Acorn && g.k > 0.02f; }},
+        {"gag_pen", screen::Page::Day, 70, [](screen::Inputs& i) { at(i, 2026, 10, 13, 11, 0); }, V::None, 0, false, [](std::uint32_t t, const screen::Inputs& in) { const auto g = screen::fun::gag(t, in.seed, screen::allowed_gags(screen::scene_for(in), in)); return g.gag == screen::fun::Gag::Pen && g.k > 0.02f; }},
+        {"gag_cheeks", screen::Page::Day, 70, [](screen::Inputs& i) { at(i, 2026, 10, 13, 12, 20); }, V::None, 0, false, [](std::uint32_t t, const screen::Inputs& in) { const auto g = screen::fun::gag(t, in.seed, screen::allowed_gags(screen::scene_for(in), in)); return g.gag == screen::fun::Gag::Cheeks && g.k > 0.02f; }},
+        {"gag_nod_off", screen::Page::Day, 70, [](screen::Inputs& i) { at(i, 2026, 10, 13, 14, 0); }, V::None, 0, false, [](std::uint32_t t, const screen::Inputs& in) { const auto g = screen::fun::gag(t, in.seed, screen::allowed_gags(screen::scene_for(in), in)); return g.gag == screen::fun::Gag::NodOff && g.k > 0.02f; }},
+        {"gag_clock_watch", screen::Page::Day, 70, [](screen::Inputs& i) { at(i, 2026, 10, 16, 16, 0); }, V::None, 0, false, [](std::uint32_t t, const screen::Inputs& in) { const auto g = screen::fun::gag(t, in.seed, screen::allowed_gags(screen::scene_for(in), in)); return g.gag == screen::fun::Gag::ClockWatch && g.k > 0.02f; }},
+        {"gag_sigh", screen::Page::Day, 70, [](screen::Inputs& i) { at(i, 2026, 10, 12, 9, 15); }, V::None, 0, false, [](std::uint32_t t, const screen::Inputs& in) { const auto g = screen::fun::gag(t, in.seed, screen::allowed_gags(screen::scene_for(in), in)); return g.gag == screen::fun::Gag::Sigh && g.k > 0.02f; }},
+        {"gag_stretch", screen::Page::Day, 70, [](screen::Inputs& i) { at(i, 2026, 10, 13, 10, 0); i.quality = {40, sensor::Level::Stale}; i.weather = {18.0f, true, 2, weather::Sky::PartlyCloudy, 20, 9, 10}; }, V::None, 0, false, [](std::uint32_t t, const screen::Inputs& in) { const auto g = screen::fun::gag(t, in.seed, screen::allowed_gags(screen::scene_for(in), in)); return g.gag == screen::fun::Gag::Stretch && g.k > 0.02f; }},
         // situations: the indoor climate and the weather change what the squirrel does
         {"sit_party", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 12, 31, 23, 40); i.weather = {-1.0f, false, 0, weather::Sky::Clear, 2, -4, 0}; }},
         {"sit_smell", screen::Page::Day, 40, [](screen::Inputs& i) { at(i, 2026, 10, 12, 10, 0); i.air_drop = true; i.quality = {50, sensor::Level::Fair}; }},
@@ -183,8 +216,9 @@ int main(int argc, char** argv) {
         screen::Inputs in = base_inputs();
         s.setup(in);
         std::uint32_t t0 = 100000u;  // find the moment the clip wants to show
-        for (std::uint32_t t = t0; (s.want != V::None || s.wave) && t < t0 + 36000000u; t += 100) {
-            if (s.wave ? screen::fun::quirks(t, in.seed).wave > 0.02f
+        for (std::uint32_t t = t0; (s.want != V::None || s.wave || s.find) && t < t0 + 400000000u; t += 100) {
+            if (s.find ? s.find(t, in)
+                : s.wave ? screen::fun::quirks(t, in.seed).wave > 0.02f
                        : [&] { const auto v = screen::fun::visit(t, in.seed, screen::fun::allowed_visitors(s.page, in));
                                return v.who == s.want && v.k >= s.at_k; }()) {
                 t0 = t - (s.wave ? 300u : 0u);

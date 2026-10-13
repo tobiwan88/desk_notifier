@@ -32,10 +32,6 @@ float event(std::uint32_t t, std::uint32_t seed, std::uint32_t salt, std::uint32
     return static_cast<float>(t - start) / static_cast<float>(dur);
 }
 
-bool wet(weather::Sky s) noexcept {
-    return s == weather::Sky::Drizzle || s == weather::Sky::Rain || s == weather::Sky::Thunder || s == weather::Sky::Snow;
-}
-
 // A blue tit, feet at (x, y). face +1 looks right, -1 left. flap: wing angle while flying; peck 0..1 dips the head.
 void bird(const Canvas& cv, float x, float y, float s, float face, bool flying, float flap, float peck) {
     auto P = [&](float dx, float dy) { return Pt{x + dx * face * s, y + dy * s}; };
@@ -110,16 +106,85 @@ Visit visit(std::uint32_t t, std::uint32_t seed, unsigned allowed) noexcept {
     return {};
 }
 
+float golden(std::uint32_t t, std::uint32_t seed) noexcept { return event(t, seed, 10, 1200000, 1, kGoldenMs); }
+
+float howl(std::uint32_t t, std::uint32_t seed) noexcept {
+    const float k = event(t, seed, 11, 25000, 40, 3000);
+    return k < 0 ? 0.0f : pulse(k, 0, 1, 0.12f);
+}
+
+GagNow gag(std::uint32_t t, std::uint32_t seed, unsigned allowed) noexcept {
+    allowed &= ~bit(Gag::None);
+    if (!allowed) return {};
+    const unsigned window = allowed & kWindowGags;
+    std::uint32_t r = 0;
+    const float k = event(t, seed, 12, 45000, window ? 45 : 30, 7000, &r);
+    if (k < 0) return {};
+    const unsigned pool = window ? window : allowed;  // in its time window, the window's mood comes first
+    int n = 0;
+    for (int i = 0; i < kGagCount; ++i) n += (pool >> i) & 1;
+    int pick = static_cast<int>(r % static_cast<std::uint32_t>(n));
+    for (int i = 0; i < kGagCount; ++i)
+        if (((pool >> i) & 1) && pick-- == 0) return {static_cast<Gag>(i), k, mix(r)};
+    return {};
+}
+
+const char* pun(std::uint32_t t, std::uint32_t seed, int activity) noexcept {
+    std::uint32_t r = 0;
+    if (event(t, seed, 13, 150000, 30, 6000, &r) < 0) return nullptr;
+    // at most 15 characters, so they fit the caption at the smaller size
+    static constexpr const char* kPuns[][3] = {
+        {"DREAMING NUTS", "SNORE-NUT", "ZZZ-QUIRREL"},          // sleep
+        {"BREW-TIFUL", "BEAN THERE", "NUT LATTE"},              // coffee
+        {"NUTS ABOUT WORK", "NUT-WORKING", "SQUIRRELLING"},     // work
+        {"NUT-RITIOUS", "SOUP-ER!", "ACORN SOUP?"},             // lunch
+        {"TAIL END!", "NUT SO FAST", "LOG OFF, OAK ON"},        // close laptop
+        {"A NUT-VEL", "TAIL TIME", "PAWS TO READ"},             // read
+    };
+    static constexpr const char* kAny[] = {"ACORNY JOKE", "TREE-MENDOUS", "I'M NUTS!", "HAZEL-NICE"};
+    const int a = std::clamp(activity, 0, 5);
+    return (r >> 3) % 3 == 0 ? kAny[(r >> 5) % 4] : kPuns[a][(r >> 5) % 3];
+}
+
+void howl_text(const Canvas& cv, float mx, float my, float tx, float ty, float k, std::uint32_t t) noexcept {
+    if (k <= 0.05f) return;
+    const int a = static_cast<int>(256 * k);
+    for (int i = 0; i < 3; ++i) {  // sound arcs going up and to the right
+        const float r = 9 + static_cast<float>(i) * 5 + 2 * std::sin(static_cast<float>(t) / 120.0f + static_cast<float>(i));
+        draw::arc(cv, mx, my, r, -kPi * 0.45f, -kPi * 0.05f, 0.9f, hex(0xFFF6D0), a * (3 - i) / 3);
+    }
+    const int x = static_cast<int>(tx), y = static_cast<int>(ty - 4 * k);
+    draw_text(cv, x + 1, y + 1, 2, hex(0x1A1A2E), "AWOO");
+    draw_text(cv, x, y, 2, draw::mix(hex(0x1A1A2E), hex(0xFFF6D0), a), "AWOO");
+}
+
+int rainbow_alpha(const Inputs& in) noexcept {
+    const auto& w = in.weather;
+    const weather::Sky now = weather::now_sky(w);
+    if (!in.weather_ok || !w.is_day || in.since_rain_min < 0 || in.since_rain_min >= 90) return 0;
+    if (now != weather::Sky::Clear && now != weather::Sky::PartlyCloudy) return 0;
+    const float m = static_cast<float>(in.since_rain_min);
+    return static_cast<int>(210 * std::min({1.0f, (m + 1) / 3, (90 - m) / 20}));
+}
+
 unsigned allowed_visitors(Page p, const Inputs& in) noexcept {
     const auto& w = in.weather;
-    const bool dry_day = in.weather_ok && w.is_day && !wet(w.sky) && w.wind_kmh < 30;
+    const bool dry_day = in.weather_ok && w.is_day && !weather::wet(w.sky) && w.wind_kmh < 30;
     const bool clear_night = in.weather_ok && !w.is_day && (w.sky == weather::Sky::Clear || w.sky == weather::Sky::PartlyCloudy);
+    const bool after_rain = in.since_rain_min >= 0 && !weather::wet(weather::now_sky(w));
+    const int mo = in.month;
     unsigned m = 0;
+    if (after_rain && p != Page::Clock) m |= bit(Visitor::Snail);
     switch (p) {
         case Page::Air:
             if (dry_day && !outfit_for(in.weather_ok, w).umbrella) m |= bit(Visitor::Bird);
             if (dry_day && w.temp_c >= 12) m |= bit(Visitor::Butterfly);
             if (clear_night) m |= bit(Visitor::ShootingStar);
+            if (in.time_valid && mo >= 9 && mo <= 11 && (in.hour >= 17 || in.hour < 7) && in.weather_ok && !weather::wet(w.sky))
+                m |= bit(Visitor::Hedgehog);
+            if (dry_day && mo >= 6 && mo <= 8 && w.temp_c >= 18) m |= bit(Visitor::Bee);
+            if (dry_day && (mo == 10 || mo == 11)) m |= bit(Visitor::Leaves);
+            if (dry_day && mo == 4) m |= bit(Visitor::Petals);
             break;
         case Page::Day: {
             if (!in.time_valid) break;
@@ -131,6 +196,7 @@ unsigned allowed_visitors(Page p, const Inputs& in) noexcept {
             if (!bed) m |= bit(Visitor::Ladybug);
             if (reading_lamp(sc, in)) m |= bit(Visitor::Moth);
             if (clear_night && !party) m |= bit(Visitor::ShootingStar);
+            if (in.weather_ok && !w.is_day && w.sky != weather::Sky::Thunder && !party) m |= bit(Visitor::Owl);
             break;
         }
         case Page::Clock: break;

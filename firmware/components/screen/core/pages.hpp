@@ -6,6 +6,7 @@
 
 #include "screen/core/day.hpp"
 #include "screen/core/font.hpp"
+#include "screen/core/memory.hpp"
 #include "sensor/core/airq.hpp"
 #include "weather/core/forecast.hpp"
 
@@ -34,6 +35,9 @@ struct Inputs {
     weather::Forecast weather{};
     Schedule schedule{};     // the squirrel's day plan
     std::uint32_t seed = 0x2545F491u;  // for the little random surprises (screen/core/fun), set at boot
+    int since_rain_min = -1; // minutes since the rain stopped, -1 = not lately (RainWatch)
+    int golden_count = 0;    // golden acorns found so far
+    Plant plant{};           // the window-sill plant (how good the air was day after day)
 };
 
 void render_clock(const Canvas& cv, const Inputs& in) noexcept;
