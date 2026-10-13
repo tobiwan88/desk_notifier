@@ -12,6 +12,12 @@ Desk notifier on an ESP32-C61: one GC9A01 round display, a BME688 (I2C), SNTP cl
 - `sensor` (airq score, BME688 driver, vendored Bosch BME68x API in `third_party/`), `screen` (font, AA shape rasterizer `draw.hpp`, pages: clock / squirrel air page / squirrel's day page (`day.cpp`), `Rotator`, render task), `weather` (Open-Meteo parse in core, HTTP fetch task in idf), `clock` (SNTP/TZ), `display`, `gfx`, `net`, `web`, `settings`, `storage` + `clip` (pictures, not yet shown), `engine` (errors/types only).
 - Kconfig prefix `DESK_*`. NVS namespace is still `eyes` (keeps Wi-Fi credentials from the old firmware).
 
+## Hardware (hardware/, see hardware/PLAN.md)
+- notifier-v1 PCB (ESP32-S3-WROOM-1-N8R2, 4 layers, JLC-assembled) is generated, not hand-drawn: edit `hardware/gen/notifier_v1.py` (PARTS/NETS) and `hardware/gen/layout_v1.py` (placement), then `hardware/tools/pipeline_v1.sh [--bom]`. Gate: `scripts/hw-check.sh` (in `check.sh`). Order steps: `hardware/notifier-v1/ORDER.md`.
+- `source scripts/kicad-env.sh` for kicad-cli, `$KICAD_PYTHON` (pcbnew SWIG, Python 3.9) and the symbol/footprint dirs. Routing: KiCadRoutingTools in `hardware/.tools/` (gitignored; clone + `build_router.py`).
+- Firmware for the PCB: `DESK_BOARD_NOTIFIER_V1` (default on S3); `idf.py -B build-s3 -DIDF_TARGET=esp32s3 -DSDKCONFIG=build-s3/sdkconfig build`.
+- KiCad's IPC API runs in the KiCad project manager (KiCad.app), not in the standalone PCB Editor app.
+
 ## Board
 ESP32-C61 MAC d8:85:ac:60:0e:d0, host `desk-600ed0` (192.168.178.86). Flash over the UART bridge `/dev/cu.usbserial-1110`; the native USB-Serial/JTAG port (the console) did not enumerate on the Mac, so logs are not visible there. Check state over HTTP (`/api/status` shows `sensor.i2c` scan). BME688 answers at 0x77. Display is mirrored-X by default (`DESK_LCD_MIRROR_X`; unconfirmed on the panel). Kconfig bools set to `n` are undefined macros: use `#ifdef`, there is no `IS_ENABLED`.
 GitHub: https://github.com/tobiwan88/desk_notifier (remote `desk`; `origin` is still the local esp_eyes clone source).
