@@ -102,6 +102,41 @@ The window shows the weather outside (sun, moon, clouds, rain, snow, fog, thunde
 
 Change the times, the birthday (with the name) and the anniversary in `idf.py menuconfig` → Desk notifier → Squirrel's day (times as HHMM, so 630 is 06:30; dates as MMDD, so 202 is 2 February, 0 turns it off). Bedtime may be after midnight (e.g. 30).
 
+## Little surprises
+
+Which scene shows never changes by chance. Inside a scene, small things happen at random moments, different after every boot (the seed comes from the hardware random number generator):
+
+- The squirrel blinks (sometimes twice), glances to the side, twitches an ear, flicks its tail and does a little hop.
+- On the air page it now and then waves hello, and with very good air it throws its acorn up and catches it.
+- On the full hour the clock-page squirrel pops up a little and waves for ten seconds.
+- Roughly every other minute a visitor may come by for about twelve seconds:
+
+| Visitor | Where | When |
+|---|---|---|
+| Blue tit | Lands on the squirrel's head and sings (air page), hops along the window sill and pecks (day page) | Daylight, dry, not windy |
+| Butterfly | Flutters past | Daylight, dry, 12 °C or more outside (15 °C on the day page) |
+| Ladybug | Walks along the desk | The squirrel is awake |
+| Moth | Circles the reading lamp | Reading in the evening |
+| Shooting star | Streaks across the sky or the window | Clear night |
+| Owl | Sits in the window and blinks | Night, no thunder |
+| Hedgehog | Walks over the hill | September to November, evenings |
+| Snail | Crawls on the hill or the window sill | Within 3 hours after rain, once it is dry |
+| Bee | Buzzes from flower to flower | June to August, 18 °C or more |
+| Autumn leaves | Tumble down over the whole screen | October and November, dry days |
+| Blossom petals | Drift across | April, dry days |
+
+More surprises:
+
+- **The golden acorn.** About once in a day and a half a golden acorn drops onto the hill. The air page comes up by itself, the squirrel hops for joy, and the caption counts how many you have found (saved across reboots).
+- **The real moon.** The moon in the sky and the window shows its real phase. On full-moon nights, and on Halloween night, the squirrel howls now and then ("AWOO"); on Halloween it wears grey wolf ears.
+- **Rainbows.** When the sun comes out within 90 minutes after rain (in daylight), a rainbow fades in behind the hill and in the window. The pictures of the sky now show the weather right now; the outfit still follows the day's forecast (an umbrella for later).
+- **The window-sill plant.** It remembers your air: every day with mostly good air (60 % of the measured minutes VERY GOOD or GOOD) brings a new leaf, up to nine ("NEW LEAF!" in the caption that day). A day with a lot of stale air (30 %) makes it droop, and at the worst it drops a leaf. Thirty good days in a row and it flowers. It is saved in NVS.
+- **Countdowns.** From a week before the birthday, the anniversary and Christmas, a tear-off calendar hangs on the wall and the caption says "3 SLEEPS TO GO", "ALEX'S BIRTHDAY".
+- **Gags** on the day page, about every few minutes when they fit: a paper plane glides through the room, an acorn rolls off the desk, the squirrel twirls a pen, stuffs its cheeks at lunch ("NOM NOM NOM"). In their time windows, and then more often: it nods off after lunch and jolts awake ("I'M AWAKE!", 13:30 to 15:00), watches the clock on Friday afternoons ("ALMOST WEEKEND"), sighs on Monday mornings, stretches happily at the open window. The eyes follow the plane and the acorn.
+- **Puns.** Now and then, on an ordinary day, the caption shows a squirrel pun for a few seconds: "NUTS ABOUT WORK", "BEAN THERE", "A NUT-VEL", "I'M NUTS!".
+
+Preview them with `uv run python tools/preview_pages.py build/preview fun_air_bird fun_day_bird fun_clock_hour` (scenes starting with `fun_`, `more_` and `gag_`); each clip starts at a moment where its surprise happens.
+
 ## Weather
 
 The board asks [Open-Meteo](https://open-meteo.com/) every 20 minutes. No account or key is needed. The air page shows it as the sky behind the squirrel and as the squirrel's outfit, the day page in the window, the clock page as numbers. There used to be a separate weather page; it showed the same sky and temperature again and was replaced by the day page. If the last good forecast is older than 3 hours, the pages fall back to their own colours.

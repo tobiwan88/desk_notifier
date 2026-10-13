@@ -59,4 +59,30 @@ void snowman(const Canvas& cv, const Win& w, std::uint32_t t) noexcept;         
 // a few breeze lines drift into the room. `dark` 0..256 darkens the frame for night rooms.
 void window_open(const Canvas& cv, const Win& w, std::uint32_t t, int dark) noexcept;
 
+// ---- creatures (props_critters.cpp) ------------------------------------------------------------------------
+// (x, base_y) is where the feet touch the ground; `face` +1 looks/walks right, -1 left; `s` 1.0 is natural size.
+void owl(const Canvas& cv, float x, float base_y, float s, std::uint32_t t) noexcept;  // round brown owl on a branch stub, big eyes that blink, head tilts now and then; ~22 px tall at s = 1
+void hedgehog(const Canvas& cv, float x, float base_y, float s, float face, std::uint32_t t) noexcept;  // walking hedgehog, spiky back, little pointed snout, tiny legs moving; ~14 px tall, 24 wide
+void snail(const Canvas& cv, float x, float base_y, float s, float face, std::uint32_t t) noexcept;     // snail with a spiral shell, body stretching and contracting as it crawls, eye stalks; ~12 px tall
+void bee(const Canvas& cv, float x, float y, float s, std::uint32_t t) noexcept;      // a round striped bee centred at (x, y), wings buzzing (blurred, flicker); ~10 px
+void paper_plane(const Canvas& cv, float x, float y, float s, float angle) noexcept;  // white folded paper plane centred at (x, y), nose pointing along angle (rad, 0 = right); ~18 px long
+void golden_acorn(const Canvas& cv, float x, float y, float s, std::uint32_t t) noexcept;  // a shining golden acorn centred at (x, y), glow halo and twinkling sparkles around it; ~16 px tall
+
+// ---- scenery (props_scenery.cpp) ---------------------------------------------------------------------------
+// A rainbow arc with 6 soft bands, centre (cx, cy) usually below the visible area, outer radius R, band width w
+// each; `alpha` 0..256 for fading in and out. Only the upper half of the circle is drawn.
+void rainbow(const Canvas& cv, float cx, float cy, float R, float w, int alpha) noexcept;
+// Drifting things over the whole round screen for a visit, progress k 0..1 (enter at the start, gone at the end).
+void falling_leaves(const Canvas& cv, float k, std::uint32_t t, std::uint32_t seed) noexcept;  // 6-8 autumn leaves tumbling down and sideways
+void petals(const Canvas& cv, float k, std::uint32_t t, std::uint32_t seed) noexcept;          // 10-14 pale pink blossom petals drifting
+// A tear-off wall calendar centred at (x, y), about 28 x 32 px at s = 1: red top band with two rings, white page,
+// `days` (1..99) big in the middle, a little heart under it when `heart`.
+void wall_calendar(const Canvas& cv, float x, float y, float s, int days, bool heart) noexcept;
+// A pen spinning around its middle at (x, y), angle in radians; ~20 px long.
+void pen(const Canvas& cv, float x, float y, float s, float angle) noexcept;
+// A potted plant that shows how good the room's air has been: `leaves` 0..9 leaves (0 = a bare sprout),
+// `droop` 0..3 (0 = upright and fresh green, 3 = hanging and yellowish), `flower` adds a blossom on top.
+// Small, for the window sill: about 24 px tall at s = 1 with 9 leaves.
+void memory_plant(const Canvas& cv, float x, float base_y, float s, std::uint32_t t, int leaves, int droop, bool flower) noexcept;
+
 }  // namespace screen::props
