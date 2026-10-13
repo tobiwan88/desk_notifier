@@ -9,6 +9,7 @@ check against the real module. See `notifier-v1/ORDER.md`.
 
 ## One command
 ```
+hardware/tools/setup_tools.sh             # once: routers into hardware/.tools (KRT 0.23.0, Freerouting 2.5.0 JAR)
 hardware/tools/pipeline_v1.sh [--bom]   # schematic -> placement -> routing -> pours -> checks -> review pack -> fab package
 scripts/hw-check.sh [--bom --qty N]      # the gate alone (also part of scripts/check.sh)
 ```

@@ -1,7 +1,7 @@
 # Haiku: one part lookup
 
 Check ONE LCSC part for a JLCPCB-assembled board. Run:
-  uv run python hardware/tools/jlcparts.py {lcsc}
+  uv run --package desk-hardware python hardware/tools/jlcparts.py {lcsc}
 and, if needed, the datasheet URL it returns.
 
 Report JSON only:

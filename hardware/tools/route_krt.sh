@@ -5,6 +5,7 @@
 set -e
 here="$(cd "$(dirname "$0")/.." && pwd)"
 K="$here/.tools/KiCadRoutingTools"; P="$K/.venv/bin/python"; F="$here/rules/krt-fab.txt"
+[ -x "$P" ] || { echo "KiCadRoutingTools missing: run hardware/tools/setup_tools.sh" >&2; exit 1; }
 in="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"; out="$2"
 work="$here/out/krt"; mkdir -p "$work"; cd "$work"
 pro="${in%.kicad_pcb}.kicad_pro"

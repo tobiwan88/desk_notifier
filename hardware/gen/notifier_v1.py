@@ -1,7 +1,7 @@
 """notifier-v1 schematic: ESP32-S3-WROOM-1, USB-C power/data, TLV62569 buck, BME688, 7-pin GC9A01 header.
 
 PARTS and NETS are the source of truth; the checks (tools/checks.py) import them.
-Run: uv run python hardware/gen/notifier_v1.py [out_dir]
+Run: uv run --package desk-hardware python hardware/gen/notifier_v1.py [out_dir]
 """
 
 import sys
