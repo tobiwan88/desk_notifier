@@ -1,109 +1,85 @@
 # Hardware: AI-driven KiCad pipeline, board v1
 
-Goal: a small 2-layer board for the desk notifier, fully assembled at JLCPCB, designed by agents
+Goal: a small board for the desk notifier, fully assembled at JLCPCB, designed by agents
 (schematic, placement, routing, checks, fab files, order checklist) with human checkpoints.
 
-## Board v1 (notifier-v1)
-- **MCU**: ESP32-S3-WROOM-1-N8R2 (LCSC C2913204). Firmware needs >= 8 MB flash and PSRAM
-  (1.5 MB app in 2 MB OTA slots, littlefs storage). The C61 module has no LCSC listing, the
-  C5 PSRAM variants had no stock. Switch back to C61/C5 if one is stocked at JLC before ordering.
-  Firmware port: `idf.py set-target esp32s3`, new pin map behind a Kconfig board option.
-- **Power**: USB-C only (HRO TYPE-C-31-M-12, C165948), 5.1k on CC1/CC2, USBLC6-2SC6 ESD (C7519),
-  3.3 V LDO AP2112K-3.3 (C51118, 600 mA; check S3 Wi-Fi peak margin in phase 1).
-- **Sensor**: BME688 (C3664478), thermally isolated (slots + distance from module and LDO).
-  Stock fluctuates: live stock check right before ordering.
-- **Display**: 7-pin GC9A01 module (AliExpress: VCC GND SCL SDA DC CS RST, no BL), bought
-  separately, plugs into a right-angle 2.54 mm female header (1x8 with one empty position unless
-  a 1x7 is found at JLC). VCC from VBUS 5 V if the module has its own regulator.
-- **Pins**: display off strapping/JTAG pins; USB on the S3 native USB pins; boot + reset buttons,
-  user button. Pin map lives in Kconfig (`DESK_BOARD_NOTIFIER_V1`), breadboard defaults stay.
-- **Board**: small rectangle, module at the edge, nothing under the antenna.
+**Status (2026-10-13):** notifier-v1 is generated, routed, checked and has a fab package.
+Open before ordering: human review in KiCad, JLC placement preview (rotations), display pinout
+check against the real module. See `notifier-v1/ORDER.md`.
 
-## Toolchain
+## One command
+```
+hardware/tools/pipeline_v1.sh [--bom]   # schematic -> placement -> routing -> pours -> checks -> review pack -> fab package
+scripts/hw-check.sh [--bom --qty N]      # the gate alone (also part of scripts/check.sh)
+```
+
+## Board v1 (notifier-v1), 50 x 36 mm, 4 layers (In1 GND, In2 3V3)
+- **MCU**: ESP32-S3-WROOM-1-N8R2 (C2913204). The firmware needs >= 8 MB flash + PSRAM; C61 and C5
+  modules had zero stock at JLC (all variants). N8R8 (C2913201) is the fallback (octal PSRAM:
+  `CONFIG_SPIRAM_MODE_OCT=y`, GPIO35-37 are unused anyway). Antenna overhangs the top edge.
+  Firmware: `DESK_BOARD_NOTIFIER_V1` (Kconfig choice, default on S3) sets the pin map;
+  `sdkconfig.defaults.esp32s3`; build with `idf.py -B build-s3 -DIDF_TARGET=esp32s3 -DSDKCONFIG=build-s3/sdkconfig build`.
+- **Power**: USB-C (HRO TYPE-C-31-M-12), 5.1k CC, USBLC6-2SC6 ESD, 500 mA polyfuse, TLV62569 buck
+  (2 A, 3.33 V via 100k/22k) with a 2.2 uH Cenker CKCS4030. A linear regulator would burn ~0.6 W
+  and warm the sensor; the design review caught it.
+- **Sensor**: BME688 at 0x77 on a peninsula (1.2 mm notch facing the module and below, neck at the
+  left edge), no pours on the island or neck, far from the module and the buck.
+- **Display**: 7-pin GC9A01 module (VCC GND SCL SDA DC CS RST) on a right-angle 1x7 female socket
+  (C22436148) whose face sits 0.4 mm past the right edge; pin names on the bottom silkscreen.
+  JP1 selects LCD VCC: 3V3 (default, bridged) or 5V.
+- **Pins** (S3): LCD SCLK 12, MOSI 11, DC 9, CS 10, RST 14 (FSPI pins); I2C SDA 4, SCL 5;
+  button 6; BOOT 0; USB 19/20; UART0 43/44. Checked against Kconfig by `tools/checks.py`.
+- **Debug**: pads TX RX GND 3V3 EN IO0 (ESP auto-program order) + VBUS; RESET/BOOT/user buttons.
+
+## Toolchain (what is actually used)
 | Step | Tool |
 |---|---|
-| Schematic | Python generator writing `.kicad_sch` (KiCad 10 IPC has no schematic API) |
-| Placement | KiCad IPC API (`kicad-python`) live in the PCB editor; MCP server picked in a spike |
-| Routing | Freerouting 2.5 JAR (`hardware/tools/freerouting`, Java 25+), headless: `pcbnew.ExportSpecctraDSN` -> freerouting `-de/-do` -> `pcbnew.ImportSpecctraSES` (kicad-cli 10 has no DSN export); `hardware/tools/autoroute.py` |
-| Routing candidate | KiCadRoutingTools (drandyhaas, MIT, Rust A* core): edits `.kicad_pcb` directly, per-net `--nets`, diff pairs, `--json-out`; bake-off against Freerouting on the real board |
-| Routing fallback | DeepPCB (cloud, paid, GUI plugin) for a one-off comparison only |
-| Checks / outputs | `kicad-cli`: ERC/DRC JSON + `--exit-code-violations`, `--schematic-parity`, gerbers, drill, pos, BOM, PDF/SVG, render, STEP |
-| Parts | `easyeda2kicad`, `kicad-jlcpcb-tools` |
+| Schematic | `gen/notifier_v1.py` (PARTS + NETS = source of truth) on kicad-sch-api via `gen/schkit.py` (own pin math, label justification, net-intent check against KiCad's netlist) |
+| Placement | `gen/layout_v1.py` (pcbnew SWIG in KiCad's Python): outline, positions, planes, keepouts, rules, silk; writes `.kicad_pro` + `.kicad_dru` |
+| Routing | KiCadRoutingTools 0.23 (`tools/route_krt.sh`): planes on In1/In2, USB diff pair, rest on F/B only, `--ordering inside_out`, `--same-net-pad-clearance`, fab floors pinned (`rules/krt-fab.txt`, `--no-fix-drc-settings`) |
+| Routing alt | Freerouting 2.5 JAR (`tools/autoroute.py`, `tools/freerouting`): fine on simple boards, left 12 nets open here (planes, island) |
+| Finish | `tools/finish.py`: outer GND pours, refill, DRC-driven removal of dangling router leftovers (undone if it opens a connection) |
+| Checks | `tools/checks.py`: ERC + DRC + schematic parity (JSON), `waivers.yaml`, pin map vs Kconfig, reserved S3 pins, live JLC BOM (`tools/jlcparts.py`) |
+| Review | `tools/review_pack.py` (schematic tiles, layer plots, 3D renders) + `tools/render_review.py` (annotated: no pours, nets named and coloured, mm grid) |
+| Fab | `tools/fab_package.py`: gerbers + drill zip, JLC BOM (grouped by LCSC) and CPL with rotation corrections |
 
-Critical nets (USB pair, power, GND pour, antenna area) are placed/routed by rule; Freerouting
-routes the rest. Gerbers only from a board with zero DRC errors and zero unrouted nets.
+## Review loop and agent roles
+1. Change the generator, run the pipeline. 2. Gate: `checks.py` must be OK (errors are never waivable
+for clearance/short/hole/unconnected/courtyard). 3. Review pack. 4. Haiku agents, one image + one
+question each (`agents/visual_check.md`), on the annotated renders; an Opus subagent with fresh context
+reviews the whole design. 5. Opus decides fixes; repeat. 6. Human checkpoint.
 
-## Review loop
-1. Change the design (generator / IPC).
-2. Hard checks (`scripts/hw-check.sh`, called from `check.sh`):
-   ERC + DRC (JSON), JLC 2-layer `.kicad_dru`, pin map vs Kconfig (flags strapping/USB/PSRAM
-   pins), Espressif checklist as code (EN RC 10k + 1 uF, GPIO strapping pulls, decoupling distance,
-   antenna keepout, CC resistors), BME688 distance to hot parts, BOM (live stock, Basic/Extended,
-   package vs footprint).
-3. Review pack (`hardware/tools/review_pack.py`): schematic PDF + per-sheet PNG, per-part crops,
-   per-layer PCB images, 3D renders (top/bottom/iso), overlays (antenna keepout, BME688 radius,
-   ratsnest, USB/power nets), region crops, diff image against the last revision.
-4. Haiku agents in parallel on narrow tasks (below); Opus reviewer with fresh context on the whole pack.
-5. Opus triages and fixes; repeat (max N iterations, never more findings than the last pass).
-   Accepted violations go to `hardware/waivers.yaml` with a reason, never silent KiCad exclusions.
-6. Human checkpoint on the same PDF/images.
-
-## Agent roles
-| Role | Model | Task |
+| Role | Model | Template |
 |---|---|---|
-| Orchestrator / author | Opus | architecture, schematic, placement, critical routing, fix decisions, final review |
-| Part lookup | Haiku | one part: LCSC stock, price, Basic/Extended, datasheet URL |
-| Datasheet extraction | Haiku | one datasheet -> JSON: pins, abs max, reference circuit, land pattern, page refs |
-| Footprint check | Haiku | one part: footprint image vs land-pattern JSON, pin 1 |
-| ERC/DRC triage | Haiku | violation batch -> auto-fix / judgment / waiver candidate + reason |
-| Narrow visual checks | Haiku | one image + one question (antenna keepout clear? decoupling next to pin? silk overlaps?) |
-| Holistic review | Opus subagent | whole review pack + datasheet JSONs, fresh context |
-| Fab check | Haiku | gerber/drill images, BOM + CPL vs JLC rules, rotations |
+| Orchestrator / author / fix decisions | Opus | - |
+| Part lookup, datasheet extraction | Haiku | `agents/part_lookup.md`, `agents/datasheet_extract.md` |
+| Narrow visual checks | Haiku | `agents/visual_check.md` |
+| ERC/DRC triage | Haiku | `agents/drc_triage.md` |
+| Fab file check | Haiku | (BOM/CPL/gerber listing) |
+| Holistic design review | Opus subagent, fresh context | - |
+| Brainstorm when blocked | Sonnet | - |
 
-Haiku prompts live in `hardware/agents/` as templates with a fixed JSON output schema. Haiku never
-edits the design; findings are confirmed by a script or by Opus before a fix.
+## Lessons (2026-10-13)
+- kicad-sch-api 0.5.x rotates pins the wrong way at 90/270 degrees (an LED came out reversed with
+  ERC clean) and writes every label left-justified. `schkit` fixes both; keep the net-intent check.
+- Native freerouting-cli 2.5.0 crashes in its router thread and hangs; the JAR has analytics on by
+  default (wrapper disables them). kicad-cli 10 has no DSN export (pcbnew SWIG has).
+- KiCadRoutingTools routes everything here in seconds, but: it rewrites the project's fab rules
+  unless `--no-fix-drc-settings` + `--fab-overrides`; it uses inner layers for signals unless
+  `--layers F.Cu B.Cu` (cut the GND plane); its default ordering put vias into EN pads despite
+  `--same-net-pad-clearance` (our `.kicad_dru` rule caught it); it leaves dangling stubs.
+- Haiku can't read KiCad's own plots (pour and pads same colour, tiny refs): all "unclear". On the
+  annotated renders it measures distances and traces nets. The question must encode the exact
+  rule (a too-strict antenna question produced a false "fail").
+- The fresh-context Opus review found the real design issues (LDO heat into the sensor, weak
+  island isolation, vias in pads, plane cuts); Haiku checks are for narrow confirmation.
+- No board without a `.kicad_pro`: DRC silently falls back to KiCad defaults.
+- KiCad's IPC API did not start from the standalone PCB Editor app (no socket); live editing is not
+  part of the pipeline yet.
 
-## Phases
-0. **Setup**: Java 25 + Freerouting, KiCad IPC API on, `kicad-python`; toy board through the full
-   chain (generate schematic, ERC, place, route, DRC, review pack, fab outputs); MCP + kicad-happy
-   spike; real ERC/DRC JSON samples; JLC 2-layer `.kicad_dru`; Haiku prompt templates.
-1. **Parts and pins**: confirm module, S3 USB pins, header, LDO; BOM check; Kconfig board option,
-   S3 firmware build.
-2. **Schematic** + loop. Checkpoint: human review in KiCad.
-3. **Layout**: placement, critical nets, Freerouting, loop. Checkpoint: renders.
-4. **Fab package**: gerbers, drill, JLC BOM/CPL; JLC online DFM.
-5. **Order checklist**: human orders. Bring-up via `/api/status`.
-
-## Layout
-```
-hardware/
-  PLAN.md
-  notifier-v1/   KiCad project (sch generated, pcb edited)
-  lib/           project symbols/footprints/3D (LCSC-sourced, pinned)
-  gen/           schematic generator
-  tools/         checks, review pack, routing, fab package
-  agents/        Haiku prompt templates
-  rules/         JLC .kicad_dru
-  waivers.yaml
-  out/           generated outputs (gitignored)
-```
-
-## Phase 0 findings (2026-10-13)
-- Toy chain works end to end: `spike/gen_toy.py` (schematic + net check) -> netlist ->
-  `tools/pcb_from_netlist.py` -> `tools/autoroute.py` -> DRC with `--schematic-parity`.
-- kicad-sch-api 0.5.x rotates pins the wrong way at 90/270 degrees (an LED came out reversed,
-  ERC clean). `gen/schkit.py` computes pin positions itself and `check_nets()` compares the
-  intended nets with KiCad's netlist after every generation. Keep that gate.
-- freerouting-cli 2.5.0 (native) crashes in the router thread and hangs; use the JAR.
-  The JAR has analytics on by default (BigQuery); the wrapper disables them.
-- Freerouting needs the real JLC rules: with 0.2/0.2 mm defaults it necks VBUS down to 0.15 mm
-  between SOT-23-5 pins. Next: JLC 2-layer `.kicad_dru` and netclasses (power width).
-- Grid placement routes but is poor (decoupling far from pins): placement is the hard part.
-- `kicad-cli` prints Homebrew fontconfig warnings on stderr; filter them in tooling.
-- The review images (schematic PDF, 3D render PNG) are readable directly by the model;
-  the full page is too small, the review pack must crop regions.
-
-## Environment notes
-- kicad-cli: `/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli` (KiCad 10.0.7); `scripts/kicad-env.sh` puts it on PATH.
-- `pcbnew` SWIG only in KiCad's bundled Python 3.9 (`.../Frameworks/Python.framework/Versions/Current/bin/python3`).
-- IPC API: `kicad_common.json` -> `api.enable_server: true`; needs the PCB editor running.
+## Not done / next
+- Human review of schematic and layout in KiCad; JLC placement preview; order (`notifier-v1/ORDER.md`).
+- MCP server / kicad-happy spike and live IPC placement (blocked on the API socket, see above).
+- 3D model for the HRO USB-C is missing in renders; STEP export for an enclosure.
+- Placement is hand-written coordinates; try `py_placer` from KiCadRoutingTools on the next board.
+- Buck input cap is ~3 mm from VIN; tighten on the next revision.

@@ -21,43 +21,53 @@ mm = pcbnew.FromMM
 PLACE = {
     # module: antenna (local y < -6.75) overhangs the top edge
     "U1": (25.0, 6.75, 0, "F"),
-    "C5": (13.1, 2.2, 0, "F"), "C6": (13.1, 4.0, 0, "F"),          # 3V3 pin 2 at (16.25, 2.76)
-    "R4": (13.1, 5.4, 0, "F"), "C4": (13.1, 6.7, 0, "F"),          # EN pin 3 at (16.25, 4.03)
-    "R6": (13.1, 8.6, 0, "F"),                                     # IO6 pin 6 at (16.25, 7.84)
-    "R7": (13.1, 12.6, 0, "F"), "R8": (13.1, 13.9, 0, "F"),        # I2C pull-ups
-    # BME688 island (top-left), cut free by the L slot below
-    "U4": (4.5, 5.0, 0, "F"), "C7": (8.2, 3.6, 90, "F"), "C8": (8.2, 6.4, 90, "F"),
+    "C5": (13.8, 2.4, 90, "F"), "C6": (13.7, 4.6, 0, "F"),         # 3V3 pin 2 at (16.25, 2.76)
+    "R4": (13.7, 5.9, 0, "F"), "C4": (13.7, 7.2, 0, "F"),          # EN pin 3 at (16.25, 4.03)
+    "R6": (13.7, 8.6, 0, "F"),                                     # IO6 pin 6 at (16.25, 7.84)
+    "R7": (13.7, 12.6, 0, "F"), "R8": (13.7, 13.9, 0, "F"),        # I2C pull-ups
+    # BME688 peninsula (top-left): notch on the module side and below, neck at the left edge
+    "U4": (4.5, 4.6, 0, "F"), "C7": (3.3, 7.9, 0, "F"), "C8": (5.3, 7.9, 0, "F"),
     # buttons on the left under the island
-    "SW1": (4.8, 17.5, 0, "F"), "SW2": (4.8, 25.0, 0, "F"),
-    # USB-C at the bottom edge, ESD and CC resistors next to it
+    "SW1": (4.8, 17.8, 0, "F"), "SW2": (4.8, 25.6, 0, "F"),
+    # USB-C at the bottom edge, ESD and CC resistors next to it, then the polyfuse
     "J1": (15.0, H - 3.4, 0, "F"),
     "R1": (8.6, H - 5.6, 90, "F"), "R2": (21.4, H - 5.6, 90, "F"),
-    "U2": (15.0, 24.5, 0, "F"),
-    # regulator bottom centre, far from the sensor
-    "U3": (29.5, 30.0, 0, "F"), "C1": (23.4, 30.5, 90, "F"), "C2": (35.6, 30.0, 90, "F"), "C3": (37.4, 30.0, 90, "F"),
+    "U2": (15.0, 24.5, 0, "F"), "F1": (23.4, 33.8, 0, "F"),
+    # buck converter bottom centre, far from the sensor
+    "U3": (30.0, 30.5, 180, "F"), "C1": (26.6, 28.2, 90, "F"), "L1": (34.8, 30.5, 0, "F"),
+    "R9": (27.0, 31.6, 0, "F"), "R10": (27.0, 32.9, 0, "F"),
+    "C2": (34.0, 26.8, 0, "F"), "C3": (37.0, 27.0, 90, "F"),
     "R3": (28.0, 24.3, 0, "F"), "D1": (31.0, 24.3, 0, "F"),
     # BOOT pull-up near IO0 (pin 27 at (33.75, 18.0))
     "R5": (36.3, 19.0, 90, "F"),
-    # display socket on the right edge, opening facing out (body to +x)
-    "J2": (W - 10.6, 26.0, 180, "F"), "JP1": (36.0, 23.2, 90, "F"),
-    "SW3": (44.5, 31.5, 0, "F"),
-    # debug UART pads and mounting holes
-    "TP1": (37.0, 2.2, 0, "F"), "TP2": (39.6, 2.2, 0, "F"), "TP3": (42.2, 2.2, 0, "F"),
-    "H1": (46.8, 3.2, 0, "F"), "H2": (3.0, H - 3.0, 0, "F"),
+    # display socket on the right edge, its face 0.4 mm past the edge (body to +x)
+    "J2": (W - 10.2, 26.0, 180, "F"), "JP1": (36.0, 23.2, 90, "F"),
+    "SW3": (41.3, 32.3, 0, "F"),
+    # debug pads (ESP auto-program order) and mounting holes
+    "TP1": (36.3, 2.8, 0, "F"), "TP2": (38.6, 2.8, 0, "F"), "TP3": (40.9, 2.8, 0, "F"),
+    "TP4": (43.2, 2.8, 0, "F"), "TP5": (45.5, 2.8, 0, "F"), "TP6": (47.8, 2.8, 0, "F"),
+    "TP7": (24.5, 27.0, 0, "F"),
+    "H1": (47.8, H - 2.2, 0, "F"), "H2": (3.0, H - 3.0, 0, "F"),
 }
 
-# L-shaped slot around the BME688 island: vertical along x=10.5..11.3 and horizontal along y=10.5..11.3
-SLOT = [(10.5, 3.5), (11.3, 3.5), (11.3, 11.3), (1.5, 11.3), (1.5, 10.5), (10.5, 10.5)]
-ISLAND = [(0, 0), (10.5, 0), (10.5, 10.5), (0, 10.5)]
+# BME688 peninsula: notch (slot width 1.2 mm) along the module side and below, open to the top edge;
+# the island hangs on a 2.6 mm neck at the left board edge, away from the module and the buck
+S = 1.2
+OUTLINE = [(0, 0), (10.4, 0), (10.4, 10.4), (2.6, 10.4), (2.6, 10.4 + S), (10.4 + S, 10.4 + S), (10.4 + S, 0),
+           (W, 0), (W, H), (0, H)]
+ISLAND = [(0, 0), (10.4, 0), (10.4, 10.4), (0, 10.4)]
+NECK = [(0, 10.4), (4.5, 10.4), (4.5, 13.2), (0, 13.2)]          # no pours here: keep plane heat off the neck
+ANTENNA_STRIP = [(10.4 + S, 0), (W, 0), (W, 1.8), (10.4 + S, 1.8)]  # no pours/vias beside the antenna
 
-SILK = [  # (text, x, y, size)
-    ("RST", 4.8, 14.0, 1.0), ("BOOT", 4.8, 21.5, 1.0), ("BTN", 44.5, 35.0, 0.8),
-    ("TX RX GND", 39.6, 4.4, 0.8), ("1", 37.3, 26.0, 0.8), ("LCD", 44.5, 7.5, 1.0),
-    ("5V", 33.6, 21.4, 0.8), ("3V3", 33.4, 25.0, 0.8), ("BME688", 5.0, 9.3, 0.8),
-    ("desk notifier v1", 25.0, 21.8, 1.0),
-]
+SILK = [  # (text, x, y, size, layer)
+    ("RST", 4.8, 13.8, 1.0, "F"), ("BOOT", 4.8, 21.9, 1.0, "F"), ("BTN", 36.4, 35.0, 0.8, "F"),
+    ("TX", 36.3, 4.4, 0.8, "F"), ("RX", 38.6, 4.4, 0.8, "F"), ("GND", 40.9, 4.4, 0.8, "F"),
+    ("3V3", 43.2, 4.4, 0.8, "F"), ("EN", 45.5, 4.4, 0.8, "F"), ("IO0", 47.8, 4.4, 0.8, "F"),
+    ("5V", 33.6, 21.4, 0.8, "F"), ("3V3", 33.4, 25.0, 0.8, "F"), ("BME688", 5.0, 9.4, 0.8, "F"),
+    ("desk notifier v1", 25.0, 21.8, 1.0, "F"), ("LCD", 44.5, 7.5, 1.0, "F"), ("1", 39.8, 28.6, 0.8, "F"),
+] + [(name, 37.4, 26.0 - 2.54 * i, 0.8, "B") for i, name in enumerate(("VCC", "GND", "SCL", "SDA", "DC", "CS", "RST"))]
 
-NETCLASS_PATTERNS = {"Power": ["/VBUS", "/+3V3", "/GND"], "USB": ["/USB_DP", "/USB_DN"]}
+NETCLASS_PATTERNS = {"Power": ["/VBUS_IN", "/VBUS", "/+3V3", "/GND", "/SW"], "USB": ["/USB_DP", "/USB_DN"]}
 
 
 def v(x, y):
@@ -148,8 +158,7 @@ def main():
     board = pcbnew.BOARD()
     board.SetCopperLayerCount(4)
     rules(board)
-    edge_poly(board, [(0, 0), (W, 0), (W, H), (0, H)])
-    edge_poly(board, SLOT)
+    edge_poly(board, OUTLINE)
 
     nets = {}
     for name in sorted(set(pads.values())):
@@ -192,15 +201,19 @@ def main():
     zone(board, pcbnew.In2_Cu, "/+3V3", full)
     # outer GND pours are added after routing (tools/finish.py), so the router sees free layers
     # no pours on the sensor island: keep the module's and regulator's heat out (tracks still allowed)
-    keepout(board, [pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.B_Cu], ISLAND)
+    copper = [pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.B_Cu]
+    keepout(board, copper, ISLAND)
+    keepout(board, copper, NECK)
+    keepout(board, copper, ANTENNA_STRIP, vias=True)
 
     filler = pcbnew.ZONE_FILLER(board)
     filler.Fill(board.Zones())
-    for text, x, y, size in SILK:
+    for text, x, y, size, side in SILK:
         t = pcbnew.PCB_TEXT(board)
         t.SetText(text)
         t.SetPosition(v(x, y))
-        t.SetLayer(pcbnew.F_SilkS)
+        t.SetLayer(pcbnew.F_SilkS if side == "F" else pcbnew.B_SilkS)
+        t.SetMirrored(side == "B")
         t.SetTextSize(pcbnew.VECTOR2I(mm(size), mm(size)))
         t.SetTextThickness(mm(0.15))
         board.Add(t)
@@ -210,6 +223,8 @@ def main():
     from pathlib import Path
     here = Path(__file__).resolve().parent.parent
     write(Path(pcb_file).with_suffix(".kicad_pro"), here / "rules" / "jlc-4layer.json", NETCLASS_PATTERNS)
+    import shutil
+    shutil.copy(here / "rules" / "notifier.kicad_dru", Path(pcb_file).with_suffix(".kicad_dru"))
     print(f"{pcb_file}: {len(comps)} footprints, {len(nets)} nets, 4 layers, {W}x{H} mm")
 
 

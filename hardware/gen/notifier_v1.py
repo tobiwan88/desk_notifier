@@ -1,4 +1,4 @@
-"""notifier-v1 schematic: ESP32-S3-WROOM-1, USB-C power/data, AMS1117, BME688, 7-pin GC9A01 header.
+"""notifier-v1 schematic: ESP32-S3-WROOM-1, USB-C power/data, TLV62569 buck, BME688, 7-pin GC9A01 header.
 
 PARTS and NETS are the source of truth; the checks (tools/checks.py) import them.
 Run: uv run python hardware/gen/notifier_v1.py [out_dir]
@@ -21,13 +21,17 @@ PARTS = {
     "R1": ("Device:R", "5.1k", R0402, "C25905", (80, 105), 0),
     "R2": ("Device:R", "5.1k", R0402, "C25905", (90, 105), 0),
     "U2": ("Power_Protection:USBLC6-2SC6", "USBLC6-2SC6", "Package_TO_SOT_SMD:SOT-23-6", "C7519", (95, 45), 0),
-    # 3.3 V regulator
-    "U3": ("Regulator_Linear:AMS1117-3.3", "AMS1117-3.3", "Package_TO_SOT_SMD:SOT-223-3_TabPin2", "C6186", (160, 45), 0),
+    # VBUS polyfuse, 3.3 V buck (a linear regulator would burn ~0.6 W and warm the BME688)
+    "F1": ("Device:Polyfuse", "500mA", "Fuse:Fuse_1206_3216Metric", "C70077", (120, 30), 90),
+    "U3": ("Regulator_Switching:TLV62569DBV", "TLV62569", "Package_TO_SOT_SMD:SOT-23-5", "C141836", (160, 45), 0),
+    "L1": ("Device:L", "2.2u", "Inductor_SMD:L_Cenker_CKCS4030", "C354584", (185, 40), 90),
+    "R9": ("Device:R", "100k", R0402, "C25741", (200, 55), 0),   # Vout = 0.6 V * (1 + R9/R10) = 3.33 V
+    "R10": ("Device:R", "22k", R0402, "C25768", (200, 70), 0),
     "C1": ("Device:C", "10u", C0603, "C19702", (140, 60), 0),
-    "C2": ("Device:C", "22u", C0805, "C45783", (180, 60), 0),
-    "C3": ("Device:C", "100n", C0402, "C1525", (190, 60), 0),
-    "R3": ("Device:R", "1k", R0402, "C11702", (210, 45), 0),
-    "D1": ("Device:LED", "red", "LED_SMD:LED_0603_1608Metric", "C2286", (210, 65), 90),
+    "C2": ("Device:C", "22u", C0805, "C45783", (215, 60), 0),
+    "C3": ("Device:C", "100n", C0402, "C1525", (225, 60), 0),
+    "R3": ("Device:R", "4.7k", R0402, "C25900", (240, 45), 0),
+    "D1": ("Device:LED", "red", "LED_SMD:LED_0603_1608Metric", "C2286", (240, 65), 90),
     # ESP32-S3 module, reset, boot, user button
     "U1": ("RF_Module:ESP32-S3-WROOM-1", "ESP32-S3-WROOM-1-N8R2", "RF_Module:ESP32-S3-WROOM-1", "C2913204", (300, 150), 0),
     "C5": ("Device:C", "22u", C0805, "C45783", (250, 90), 0),
@@ -49,13 +53,18 @@ PARTS = {
     "J2": ("Connector_Generic:Conn_01x07", "GC9A01", "Connector_PinSocket_2.54mm:PinSocket_1x07_P2.54mm_Horizontal", "C22436148", (170, 230), 0),
     "JP1": ("Jumper:SolderJumper_3_Bridged12", "LCD_VCC", "Jumper:SolderJumper-3_P1.3mm_Bridged12_RoundedPad1.0x1.5mm", None, (140, 215), 0),
     # debug UART pads, mounting holes
-    "TP1": ("Connector:TestPoint", "TXD0", "TestPoint:TestPoint_Pad_D1.5mm", None, (370, 120), 0),
-    "TP2": ("Connector:TestPoint", "RXD0", "TestPoint:TestPoint_Pad_D1.5mm", None, (380, 120), 0),
-    "TP3": ("Connector:TestPoint", "GND", "TestPoint:TestPoint_Pad_D1.5mm", None, (390, 120), 0),
+    "TP1": ("Connector:TestPoint", "TXD0", "TestPoint:TestPoint_Pad_D1.0mm", None, (370, 120), 0),
+    "TP2": ("Connector:TestPoint", "RXD0", "TestPoint:TestPoint_Pad_D1.0mm", None, (380, 120), 0),
+    "TP3": ("Connector:TestPoint", "GND", "TestPoint:TestPoint_Pad_D1.0mm", None, (390, 120), 0),
+    "TP4": ("Connector:TestPoint", "3V3", "TestPoint:TestPoint_Pad_D1.0mm", None, (400, 120), 0),
+    "TP5": ("Connector:TestPoint", "EN", "TestPoint:TestPoint_Pad_D1.0mm", None, (370, 140), 0),
+    "TP6": ("Connector:TestPoint", "IO0", "TestPoint:TestPoint_Pad_D1.0mm", None, (380, 140), 0),
+    "TP7": ("Connector:TestPoint", "VBUS", "TestPoint:TestPoint_Pad_D1.0mm", None, (390, 140), 0),
     "H1": ("Mechanical:MountingHole", "M2", "MountingHole:MountingHole_2.2mm_M2", None, (370, 250), 0),
     "H2": ("Mechanical:MountingHole", "M2", "MountingHole:MountingHole_2.2mm_M2", None, (385, 250), 0),
     "#FLG01": ("power:PWR_FLAG", "PWR_FLAG", None, None, (30, 30), 0),
     "#FLG02": ("power:PWR_FLAG", "PWR_FLAG", None, None, (45, 30), 0),
+    "#FLG03": ("power:PWR_FLAG", "PWR_FLAG", None, None, (60, 30), 0),
 }
 
 # module pin -> GPIO, for the pin map check against firmware Kconfig
@@ -63,12 +72,15 @@ U1_GPIO = {"4": 4, "5": 5, "6": 6, "17": 9, "18": 10, "19": 11, "20": 12, "22": 
 U1_UNUSED = ["7", "8", "9", "10", "11", "12", "15", "16", "21", "23", "24", "25", "26", "28", "29", "30", "31", "32", "33", "34", "35", "38", "39"]
 
 NETS = {
-    "VBUS": [("J1", "A4"), ("J1", "A9"), ("J1", "B4"), ("J1", "B9"), ("U2", "5"), ("U3", "3"), ("C1", "1"), ("JP1", "3"), ("#FLG01", "1")],
+    "VBUS_IN": [("J1", "A4"), ("J1", "A9"), ("J1", "B4"), ("J1", "B9"), ("U2", "5"), ("F1", "1")],
+    "VBUS": [("F1", "2"), ("U3", "4"), ("U3", "1"), ("C1", "1"), ("JP1", "3"), ("TP7", "1"), ("#FLG01", "1")],
+    "SW": [("U3", "3"), ("L1", "1")],
+    "FB": [("U3", "5"), ("R9", "2"), ("R10", "1")],
     "GND": [("J1", "A1"), ("J1", "A12"), ("J1", "B1"), ("J1", "B12"), ("J1", "SH"), ("R1", "2"), ("R2", "2"), ("U2", "2"),
-            ("U3", "1"), ("C1", "2"), ("C2", "2"), ("C3", "2"), ("D1", "1"), ("U1", "1"), ("U1", "40"), ("U1", "41"),
+            ("U3", "2"), ("R10", "2"), ("C1", "2"), ("C2", "2"), ("C3", "2"), ("D1", "1"), ("U1", "1"), ("U1", "40"), ("U1", "41"),
             ("C5", "2"), ("C6", "2"), ("C4", "2"), ("SW1", "2"), ("SW2", "2"), ("SW3", "2"), ("U4", "1"), ("U4", "7"),
             ("C7", "2"), ("C8", "2"), ("J2", "2"), ("TP3", "1"), ("#FLG02", "1")],
-    "+3V3": [("U3", "2"), ("C2", "1"), ("C3", "1"), ("R3", "1"), ("U1", "2"), ("C5", "1"), ("C6", "1"), ("R4", "1"),
+    "+3V3": [("L1", "2"), ("R9", "1"), ("TP4", "1"), ("#FLG03", "1"), ("C2", "1"), ("C3", "1"), ("R3", "1"), ("U1", "2"), ("C5", "1"), ("C6", "1"), ("R4", "1"),
              ("R5", "1"), ("R6", "1"), ("U4", "8"), ("U4", "6"), ("U4", "2"), ("U4", "5"), ("C7", "1"), ("C8", "1"),
              ("R7", "1"), ("R8", "1"), ("JP1", "1")],
     "CC1": [("J1", "A5"), ("R1", "1")],
@@ -76,8 +88,8 @@ NETS = {
     "USB_DP": [("J1", "A6"), ("J1", "B6"), ("U2", "1"), ("U2", "6"), ("U1", "14")],
     "USB_DN": [("J1", "A7"), ("J1", "B7"), ("U2", "3"), ("U2", "4"), ("U1", "13")],
     "LED_A": [("R3", "2"), ("D1", "2")],
-    "EN": [("U1", "3"), ("R4", "2"), ("C4", "1"), ("SW1", "1")],
-    "BOOT": [("U1", "27"), ("R5", "2"), ("SW2", "1")],
+    "EN": [("U1", "3"), ("R4", "2"), ("C4", "1"), ("SW1", "1"), ("TP5", "1")],
+    "BOOT": [("U1", "27"), ("R5", "2"), ("SW2", "1"), ("TP6", "1")],
     "BTN": [("U1", "6"), ("R6", "2"), ("SW3", "1")],
     "I2C_SDA": [("U1", "4"), ("U4", "3"), ("R7", "2")],
     "I2C_SCL": [("U1", "5"), ("U4", "4"), ("R8", "2")],
