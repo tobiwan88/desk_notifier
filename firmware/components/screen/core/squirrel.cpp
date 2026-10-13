@@ -1,9 +1,11 @@
 #include "screen/core/squirrel.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 
 #include "screen/core/draw.hpp"
+#include "screen/core/props.hpp"
 #include "screen/core/sky.hpp"
 
 namespace screen {
@@ -138,7 +140,17 @@ void tail(const Pen& p, float angle) {
     }
 }
 
-void ear(const Pen& p, float x, float y, float ang) {
+void ear(const Pen& p, float x, float y, float ang, bool wolf = false) {
+    if (wolf) {  // Halloween: tall grey wolf ears
+        const float c = std::cos(ang), s = std::sin(ang);
+        auto at = [&](float dx, float dy) { return Pt{p.X(x + dx * c - dy * s), p.Y(y + dx * s + dy * c)}; };
+        const Pt outer[3] = {at(-10, 6), at(10, 6), at(0, -26)}, inner[3] = {at(-5.5f, 3), at(5.5f, 3), at(0, -17)};
+        const Pt edge[3] = {at(-11.5f, 7), at(11.5f, 7), at(0, -28.5f)};
+        draw::polygon(p.cv, edge, 3, hex(0x4A4A56));
+        draw::polygon(p.cv, outer, 3, hex(0x8E8E9A));
+        draw::polygon(p.cv, inner, 3, hex(0xD9A0A8));
+        return;
+    }
     p.ellipse(x, y, 8.5f, 15, kFurDark, ang);
     p.ellipse(x, y, 7, 13.5f, kFur, ang);
     p.ellipse(x + std::sin(-ang) * -1.5f, y + 2, 4, 8.5f, kEarIn, ang);
@@ -147,13 +159,15 @@ void ear(const Pen& p, float x, float y, float ang) {
     p.line(tx, ty, tx + std::sin(ang) * 6, ty - std::cos(ang) * 6, 2.6f, kFurDark);
 }
 
-void eye(const Pen& p, float x, float y, Mood m, bool blink) {
+void eye(const Pen& p, float x, float y, Mood m, bool blink, float look = 0) {
     if (m == Mood::VeryGood) { p.arc(x, y + 3, 5, kPi + 0.35f, 2 * kPi - 0.35f, 1.7f, kEye); return; }  // ^ ^
     if (m == Mood::Sleepy) { p.arc(x, y - 3, 5, 0.35f, kPi - 0.35f, 1.5f, kEye); return; }              // closed
     if (blink) { p.line(x - 5, y + 1, x + 5, y + 1, 1.5f, kEye); return; }
+    x += look * 2.2f;  // a glance to the side
     p.ellipse(x, y, 5.5f, 7, kEye);
     p.circle(x + 2, y - 2.5f, 2.2f, kWhite);
     p.circle(x - 1.5f, y + 3, 1.0f, kWhite, 190);
+    x -= look * 2.2f;
     if (m == Mood::Okay) {  // half-closed lid
         p.quad(x - 7, y - 9, x + 7, y - 0.5f, kFur);
         p.line(x - 6, y - 0.5f, x + 6, y - 0.5f, 1.2f, kEye);
@@ -316,9 +330,16 @@ const char* mood_label(Mood m) noexcept {
     return "";
 }
 
-void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, std::uint32_t t, Outfit o) noexcept {
+void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, std::uint32_t t, Outfit o,
+                   const fun::Quirks& q) noexcept {
     if (o.paws_free) o.ice_cream = o.umbrella = o.windy = false;  // indoors, paws busy
-    const Anim a = animate(m, t, o.windy);
+    Anim a = animate(m, t, o.windy);
+    if (!o.windy) {  // the little random quirks
+        a.blink = a.blink || q.blink;
+        a.tail += q.tail * 0.22f;
+        if (m == Mood::VeryGood || m == Mood::Good || m == Mood::Okay) a.dy -= q.hop * 6;
+    }
+    const float twitch = o.windy ? 0.0f : q.ear * 0.35f;
     // the ice cream replaces the acorn; a fanning (bad air) or sleeping squirrel keeps its pose
     const bool cone = o.ice_cream && !o.umbrella && (m == Mood::VeryGood || m == Mood::Good || m == Mood::Okay);
     const Pen p{cv, cx + a.dx * scale, cy + a.dy * scale, scale};
@@ -344,13 +365,26 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
         p.ellipse(136, 139, 6, 10, kFur, -0.6f);
     } else switch (m) {
         case Mood::VeryGood:
-        case Mood::Good:
+        case Mood::Good: {
+            const float hello = o.umbrella ? 0.0f : q.wave;
+            const float toss = (hello < 0.05f && m == Mood::VeryGood) ? q.toss : 0.0f;  // up in the air and caught again
             p.ellipse(114, 139, 6, 10, kFur, 0.6f);
-            p.ellipse(136, 139, 6, 10, kFur, -0.6f);
-            acorn(p, 125, 141, m == Mood::VeryGood ? wave(t, 700) * 0.15f : 0.0f);
+            if (hello < 0.05f) p.ellipse(136, 139, 6, 10, kFur, -0.6f);
+            acorn(p, hello < 0.05f ? 125 : 121, 141 - 46 * std::sin(kPi * toss),
+                  toss > 0 ? toss * 4 * kPi : (m == Mood::VeryGood ? wave(t, 700) * 0.15f : 0.0f));
             p.circle(118, 143, 4.2f, kFur);
-            p.circle(132, 143, 4.2f, kFur);
+            if (hello < 0.05f) {
+                p.circle(132, 143, 4.2f, kFur);
+            } else {  // waves hello with the right paw
+                const float wx = 132 + (161 - 132) * hello + wave(t, 380) * 4 * hello, wy = 143 + (104 - 143) * hello;
+                p.line(139, 133, wx, wy, 5.5f, kFurDark);
+                p.line(139, 133, wx, wy, 4.4f, kFur);
+                p.circle(wx, wy, 6.2f, kFurDark);
+                p.circle(wx, wy, 5.2f, kFur);
+                p.circle(wx - 1.5f, wy - 1.5f, 1.4f, kFurLight, 200);
+            }
             break;
+        }
         case Mood::Okay:
             p.ellipse(103, 150, 5.5f, 11, kFur, 0.15f);
             p.ellipse(147, 150, 5.5f, 11, kFur, -0.15f);
@@ -372,8 +406,8 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
 
     // head
     if (!o.hat) {
-        ear(p, 104, 76, -0.35f - a.ear);
-        ear(p, 146, 76, 0.35f + a.ear);
+        ear(p, 104, 76, -0.35f - a.ear, o.wolf);
+        ear(p, 146, 76, 0.35f + a.ear + twitch, o.wolf);
     }
     p.ellipse(125, 103, 33, 29, kFurDark);
     p.ellipse(125, 103, 31, 27, kFur);
@@ -381,8 +415,8 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
     p.ellipse(125, 114, 16, 11, kBelly);
     if (o.hat) {
         hat_dome(p);
-        ear(p, 102, 72, -0.45f - a.ear);  // through the hat
-        ear(p, 148, 72, 0.45f + a.ear);
+        ear(p, 102, 72, -0.45f - a.ear, o.wolf);  // through the hat
+        ear(p, 148, 72, 0.45f + a.ear + twitch, o.wolf);
         hat_cuff(p, t);
         scarf(p);
     }
@@ -390,8 +424,8 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
         p.circle(103, 112, 6, kCheek, m == Mood::VeryGood || o.hat ? 200 : 130);
         p.circle(147, 112, 6, kCheek, m == Mood::VeryGood || o.hat ? 200 : 130);
     }
-    eye(p, 112, 99, m, a.blink);
-    eye(p, 138, 99, m, a.blink);
+    eye(p, 112, 99, m, a.blink, q.look);
+    eye(p, 138, 99, m, a.blink, q.look);
     if (o.sunglasses) sunglasses(p);
     if (m == Mood::Bad) {  // worried brows (under the hat cuff they sit lower)
         const float by = o.hat ? 4.0f : 0.0f;
@@ -422,6 +456,10 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
         case Mood::Sleepy:
             p.arc(125, 112, 3, 0.4f, kPi - 0.4f, 1.0f, kEye);
             break;
+    }
+    if (q.howl > 0.05f) {  // a round "oo" mouth
+        p.ellipse(125, 116, 4.5f, 2 + 5 * q.howl, kMouth);
+        p.ellipse(125, 118 + 2 * q.howl, 2.6f, 1.2f + 1.5f * q.howl, kTongue);
     }
     p.ellipse(125, 108, 4.5f, 3.2f, kNose);
     p.circle(123.8f, 107, 1.1f, kWhite, 150);
@@ -463,16 +501,19 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
     }
     const bool wx = d.weather_ok;
     const auto& w = d.weather;
-    const bool snowy = wx && w.sky == weather::Sky::Snow;
+    const weather::Sky sk = weather::now_sky(w);  // the picture shows the weather right now
+    const bool snowy = wx && sk == weather::Sky::Snow;
     if (wx) {
         // the sky shows the weather outside; the air quality tints it and colours the hill
-        sky::Palette pal = sky::colors(w.sky, w.is_day, t);
+        sky::Palette pal = sky::colors(sk, w.is_day, t);
         if (m == Mood::Bad) pal = {draw::lerp_rgb(pal.top, 0x8E8699, 110), draw::lerp_rgb(pal.bottom, 0xB8B0BC, 110)};
         if (d.alert) pal.top = draw::lerp_rgb(pal.top, 0xFF8A7A, static_cast<int>((wave(t, 1600) + 1) * 70));
-        sky::draw(cv, w.sky, w.is_day, t, 200, 98, 0.55f, pal, false);
+        sky::draw(cv, sk, w.is_day, t, 200, 98, 0.55f, pal, false, d.moon_phase);
+        if (d.visit.who == fun::Visitor::ShootingStar) fun::shooting_star(cv, 20, 16, 220, 100, d.visit);
+        if (d.rainbow > 0) props::rainbow(cv, 40, 250, 196, 7, d.rainbow);
         if (m == Mood::Sleepy) { hill = 0x7DBD66; hill_back = 0xA5CF91; }  // the night colours come from the sky now
         if (snowy) { hill = 0xC9D8E8; hill_back = 0xE4ECF4; }
-        const int gl = sky::gloom(w.sky);  // grey light under clouds and rain
+        const int gl = sky::gloom(sk);  // grey light under clouds and rain
         hill = draw::lerp_rgb(hill, 0x4A5A55, gl); hill_back = draw::lerp_rgb(hill_back, 0x4A5A55, gl);
         if (!w.is_day) { hill = draw::lerp_rgb(hill, 0x16302A, 130); hill_back = draw::lerp_rgb(hill_back, 0x16302A, 150); }
     } else {
@@ -508,7 +549,26 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
         }
     }
 
-    if (wx) sky::precipitation(cv, w.sky, t);  // in front of the hills, behind the squirrel
+    // visitors on the hill
+    const fun::Visit& v = d.visit;
+    auto hill_y = [](float x) { const float dx = std::clamp(x - 125, -140.0f, 140.0f); return 312 - std::sqrt(143 * 143 - dx * dx); };
+    if (v.who == fun::Visitor::Hedgehog || v.who == fun::Visitor::Snail) {
+        const bool hog = v.who == fun::Visitor::Hedgehog;
+        const float dir = (v.r & 1) ? 1.0f : -1.0f;
+        const float k = v.k - std::sin(2 * kPi * v.k * 3) / (2 * kPi * 3) * 0.8f;  // walks, stops, walks
+        const float x = hog ? (dir > 0 ? -16 + k * 272 : 256 - k * 272) : (dir > 0 ? 24 + k * 40 : 64 - k * 40);
+        if (hog) props::hedgehog(cv, x, hill_y(x) + 2, 1.4f, dir, t);
+        else props::snail(cv, x, hill_y(x) + 2, 1.7f, dir, t);
+    }
+    if (v.who == fun::Visitor::Bee) {  // from flower to flower
+        const float k = v.k, a = k * 2 * kPi * 2;
+        float x = 52 + std::cos(a) * 30 + std::sin(a * 2.3f) * 8, y = 170 + std::sin(a) * 18;
+        if (k < 0.1f) { const float e = k / 0.1f; x = 260 - (260 - x) * e; y = 120 + (y - 120) * e; }
+        if (k > 0.9f) { const float e = (k - 0.9f) / 0.1f; x += (260 - x) * e; y += (110 - y) * e; }
+        props::bee(cv, x, y, 1.7f, t);
+    }
+
+    if (wx) sky::precipitation(cv, sk, t);  // in front of the hills, behind the squirrel
 
     // the haze of bad air drifts past, partly behind and partly in front of the squirrel
     auto haze = [&](int from, int to, int alpha) {
@@ -523,8 +583,32 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
     if (m == Mood::Bad) haze(0, 3, 110);
 
     const Outfit outfit = outfit_for(d.weather_ok, d.weather);
-    if (outfit.umbrella) draw_squirrel(cv, 144, 156, 0.78f, m, t, outfit);  // smaller, canopy clear of the top text
-    else draw_squirrel(cv, 146, 136, 0.92f, m, t, outfit);
+    const bool bird = d.visit.who == fun::Visitor::Bird && !outfit.umbrella;
+    const bool gold = d.golden >= 0 && m != Mood::Bad;
+    fun::Quirks q = d.quirks;
+    if (bird) q.hop = 0;  // sits still while the bird is on its head
+    Mood face = m;
+    if (gold) {  // over the moon: hops for joy
+        face = Mood::VeryGood;
+        q.hop = std::fabs(std::sin(static_cast<float>(t) / 260.0f));
+        q.wave = q.toss = 0;
+        const float k = d.golden;
+        const float y = k < 0.12f ? -12 + 184 * (k / 0.12f) * (k / 0.12f) : 172 - std::fabs(std::sin(std::min(1.0f, (k - 0.12f) / 0.08f) * kPi)) * 14 * (1 - std::min(1.0f, (k - 0.12f) / 0.08f));
+        props::golden_acorn(cv, 86, y - 4, 2.0f, t);
+    }
+    Outfit look = outfit;
+    look.wolf = d.wolf;
+    if (outfit.umbrella) draw_squirrel(cv, 144, 156, 0.78f, face, t, look, q);  // smaller, canopy clear of the top text
+    else draw_squirrel(cv, 146, 136, 0.92f, face, t, look, q);
+    if (q.howl > 0.05f) fun::howl_text(cv, 150, 106, 178, 128, q.howl, t);
+    if (bird) {
+        const Bob b = squirrel_bob(m, t);
+        constexpr float s = 0.92f;
+        fun::bird_on_head(cv, 146 + (b.dx - 4) * s, 136 + (b.dy + (outfit.hat ? 56 : 76) - 150) * s, 1.2f, d.visit, t);
+    }
+    if (d.visit.who == fun::Visitor::Butterfly) fun::butterfly(cv, 14, 50, 150, 170, d.visit, t);
+    if (d.visit.who == fun::Visitor::Leaves) props::falling_leaves(cv, d.visit.k, t, d.visit.r);
+    if (d.visit.who == fun::Visitor::Petals) props::petals(cv, d.visit.k, t, d.visit.r);
 
     if (m == Mood::Bad) haze(3, 5, 70);
     if (m == Mood::VeryGood) {
@@ -557,6 +641,12 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
         draw::label(cv, 22, 2, white, buf);
     } else {
         draw::label(cv, 22, 2, white, "NO SENSOR");
+    }
+    if (gold) {
+        draw::label(cv, 186, 2, hex(0xFFE27A), "GOLDEN ACORN!");
+        std::snprintf(buf, sizeof buf, "FOUND: %d", d.golden_count);
+        draw::label(cv, 208, 2, white, buf);
+        return;
     }
     if (m == Mood::Bad && ph(t, 4000) > 0.5f) draw::label(cv, 186, 2, hex(0xFFE0DA), "OPEN WINDOW");
     else {

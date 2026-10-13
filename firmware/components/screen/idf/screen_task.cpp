@@ -2,7 +2,11 @@
 
 #include <atomic>
 #include <cctype>
+#include <cstdlib>
+#include <string>
 #include <ctime>
+
+#include <sys/time.h>
 
 #include "clock/idf/clock.hpp"
 #include "config.hpp"
@@ -10,6 +14,7 @@
 #include "driver/gpio.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_random.h"
 #include "esp_system.h"
 #include "esp_task_wdt.h"
 #include "esp_timer.h"
@@ -17,7 +22,10 @@
 #include "freertos/task.h"
 #include "screen/core/draw.hpp"
 #include "screen/core/pages.hpp"
+#include "screen/core/fun.hpp"
+#include "screen/core/memory.hpp"
 #include "sensor/idf/bme688.hpp"
+#include "settings/idf/settings.hpp"
 #include "weather/idf/client.hpp"
 
 namespace screen {
@@ -84,6 +92,13 @@ void task(void*) {
         schedule.birthday_name[i] = 0;
     }
     AirTrend trend;
+    const std::uint32_t seed = esp_random();  // a different string of little surprises after every boot
+    RainWatch rain;
+    Plant plant = plant_load(settings::get("plant").value_or("").c_str());
+    int golden_count = std::atoi(settings::get("golden").value_or("0").c_str());
+    bool golden_seen = false;
+    std::uint32_t plant_tick = 0;
+    int plant_saves = 0;
     std::uint32_t snooze_until = 0, next_frame = 0, sum_us = 0, max_us = 0, n = 0;
     int stalls = 0;
     for (;;) {
@@ -112,6 +127,9 @@ void task(void*) {
                 in.time_valid = true;
                 in.hour = tm.tm_hour; in.minute = tm.tm_min; in.second = tm.tm_sec;
                 in.weekday = tm.tm_wday; in.day = tm.tm_mday; in.month = tm.tm_mon + 1; in.year = tm.tm_year + 1900;
+                timeval tv{};
+                gettimeofday(&tv, nullptr);
+                in.millis = static_cast<int>(tv.tv_usec / 1000);
             }
             in.sensor_ok = snap.ok;
             in.reading = snap.reading;
@@ -122,14 +140,37 @@ void task(void*) {
             const auto wx = weather::latest();
             in.weather_ok = wx.ok;
             in.weather = wx.forecast;
+            rain.update(now, wx.ok, weather::wet(weather::now_sky(wx.forecast)));
+            in.since_rain_min = rain.since_min(now);
+            if (in.time_valid && now - plant_tick >= 60000u) {  // the window-sill plant counts the minutes of good air
+                plant_tick = now;
+                const bool closed = plant_minute(plant, in.year * 10000 + in.month * 100 + in.day, snap.ok, snap.quality.level);
+                if (closed || ++plant_saves >= 30) {  // save at the end of a day, and every half hour
+                    plant_saves = 0;
+                    char buf[64];
+                    plant_save(plant, buf, sizeof buf);
+                    settings::set("plant", buf);
+                }
+            }
+            in.plant = plant;
+            const bool golden = fun::golden(now, seed) >= 0;  // the golden acorn: counted once, shown on the air page
+            if (golden && !golden_seen) {
+                ++golden_count;
+                settings::set("golden", std::to_string(golden_count));
+                ESP_LOGI(kTag, "golden acorn #%d", golden_count);
+            }
+            golden_seen = golden;
+            in.golden_count = golden_count;
             in.schedule = schedule;
+            in.seed = seed;
 
             unsigned avail = 0;
             if (CONFIG_DESK_PAGE_CLOCK_S > 0) avail |= 1u << static_cast<int>(Page::Clock);
             if (CONFIG_DESK_PAGE_AIR_S > 0) avail |= 1u << static_cast<int>(Page::Air);
             if (CONFIG_DESK_PAGE_DAY_S > 0 && in.time_valid) avail |= 1u << static_cast<int>(Page::Day);
             // bad air: the squirrel stays on screen until the alert is acknowledged
-            const auto frame = rot.tick(now, avail, alert ? std::optional<Page>(Page::Air) : std::nullopt);
+            const bool pin_air = alert || (golden && CONFIG_DESK_PAGE_AIR_S > 0);
+            const auto frame = rot.tick(now, avail, pin_air ? std::optional<Page>(Page::Air) : std::nullopt);
             g_page = static_cast<int>(frame.page);
 
             const std::int64_t t0 = esp_timer_get_time();

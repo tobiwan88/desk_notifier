@@ -123,6 +123,25 @@ int main(int argc, char** argv) {
         {"glass_steam", glass([](const Canvas& c, const Win& w, std::uint32_t t) { P::glass_steam(c, w, t); })},
         {"leaves_flying", glass([](const Canvas& c, const Win& w, std::uint32_t t) { P::leaves_flying(c, w, t); })},
         {"snowman", glass([](const Canvas& c, const Win& w, std::uint32_t t) { P::snowman(c, w, t); })},
+        {"owl", glass([](const Canvas& c, const Win& w, std::uint32_t t) { const float k = (w.x1 - w.x0) / 46; P::owl(c, (w.x0 + w.x1) / 2, w.y1 - 2 * k, k, t); })},
+        {"hedgehog", stand([](const Canvas& c, float x, float y, float s, std::uint32_t t) { P::hedgehog(c, x - 30 * s + static_cast<float>(t % 3000) / 3000 * 60 * s, y, s, 1, t); })},
+        {"snail", stand([](const Canvas& c, float x, float y, float s, std::uint32_t t) { P::snail(c, x - 10 * s + static_cast<float>(t % 3000) / 3000 * 20 * s, y, s, -1, t); })},
+        {"bee", [](const Canvas& c, std::uint32_t t, bool big) { room(c); P::bee(c, 120 + std::sin(static_cast<float>(t) / 300.0f) * 20, 120, big ? 4 : 1, t); }},
+        {"paper_plane", [](const Canvas& c, std::uint32_t t, bool big) { room(c); P::paper_plane(c, 120, 120, big ? 4 : 1, -0.2f + std::sin(static_cast<float>(t) / 500.0f) * 0.2f); }},
+        {"golden_acorn", [](const Canvas& c, std::uint32_t t, bool big) { room(c); P::golden_acorn(c, 120, 130, big ? 4 : 1, t); }},
+        {"rainbow", [](const Canvas& c, std::uint32_t t, bool big) { draw::vgradient(c, 0x8FC6F0, 0xD8ECFA); P::rainbow(c, 60, big ? 300 : 260, big ? 240 : 200, big ? 9 : 6, static_cast<int>(128 + 128 * std::sin(static_cast<float>(t) / 800.0f))); }},
+        {"falling_leaves", [](const Canvas& c, std::uint32_t t, bool) { draw::vgradient(c, 0x8FC6F0, 0xD8ECFA); P::falling_leaves(c, static_cast<float>(t % 12000) / 12000, t, 7); }},
+        {"petals", [](const Canvas& c, std::uint32_t t, bool) { draw::vgradient(c, 0x8FC6F0, 0xD8ECFA); P::petals(c, static_cast<float>(t % 12000) / 12000, t, 7); }},
+        {"wall_calendar", [](const Canvas& c, std::uint32_t t, bool big) { room(c); P::wall_calendar(c, 120, 110, big ? 3.5f : 1, 3 + static_cast<int>(t / 1000 % 3), big); }},
+        {"pen", [](const Canvas& c, std::uint32_t t, bool big) { room(c); P::pen(c, 120, 120, big ? 4 : 1, static_cast<float>(t) / 120.0f); }},
+        {"memory_plant", [](const Canvas& c, std::uint32_t t, bool big) {
+             room(c);
+             const int step = static_cast<int>(t / 1000 % 3);  // three states across the clip
+             const float s = big ? 2.6f : 1, y = big ? 205.0f : 172.0f;
+             if (step == 0) P::memory_plant(c, 120, y, s, t, 1, 0, false);
+             if (step == 1) P::memory_plant(c, 120, y, s, t, 9, 0, true);
+             if (step == 2) P::memory_plant(c, 120, y, s, t, 6, 3, false);
+         }},
         {"window_open", [small, large](const Canvas& c, std::uint32_t t, bool big) {
              room(c);
              const Win w = big ? large : small;

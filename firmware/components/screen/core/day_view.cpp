@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include "screen/core/draw.hpp"
+#include "screen/core/fun.hpp"
 #include "screen/core/pages.hpp"
 #include "screen/core/props.hpp"
 #include "screen/core/sky.hpp"
@@ -245,6 +246,15 @@ void shawl(const Pen& p, std::uint32_t t) {
     p.line(110, 120, 140, 120, 4.5f, kWool);
 }
 
+// An acorn rolling along (angle = how far it has turned), centred at (x, y).
+void rolling_acorn(const Canvas& cv, float x, float y, float angle) {
+    const float c = std::cos(angle), s = std::sin(angle);
+    draw::ellipse(cv, x, y, 5.2f, 6.2f, hex(0x8A5A2C), angle);
+    draw::ellipse(cv, x, y, 4.4f, 5.4f, hex(0xB37B40), angle);
+    draw::ellipse(cv, x + s * 3.6f, y - c * 3.6f, 5.6f, 3.0f, hex(0x6E4220), angle);
+    draw::capsule(cv, x + s * 6, y - c * 6, x + s * 8.5f, y - c * 8.5f, 0.9f, hex(0x6E4220));
+}
+
 // A New Year's Eve sparkler held up in the paw at (x, y), design units.
 void sparkler(const Pen& p, float x, float y, std::uint32_t t) {
     p.line(x, y, x + 6, y - 30, 1.0f, 0x6A6A72);
@@ -315,18 +325,40 @@ const char* occasion_label(Occasion o, const Inputs& in) noexcept {
     return nullptr;
 }
 
-void caption(const Canvas& cv, const Scene& sc, const Inputs& in) {
+// `say`: a pun or a gag's words, shown instead of the usual first line while it lasts.
+void caption(const Canvas& cv, const Scene& sc, const Inputs& in, const char* say = nullptr) {
     static constexpr const char* kAdvent[] = {"", "1. ADVENT", "2. ADVENT", "3. ADVENT", "4. ADVENT"};
-    const char* lines[4] = {};
+    const char* lines[6] = {};
     int n = 0;
+    if (say) {
+        const bool big = text_width(say, 3) <= 150;
+        const float half = static_cast<float>(text_width(say, big ? 3 : 2)) / 2 - 6;
+        draw::capsule(cv, 120 - half, 197, 120 + half, 197, 14, hex(0x1A2233), 60);
+        draw::label(cv, big ? 187 : 190, big ? 3 : 2, hex(0xFFF2B8), say);
+        return;
+    }
     const char* first = situation_label(sc.situation, in);
     lines[n++] = first ? first : activity_label(sc.activity);
+    char sleeps[32] = "", what[32] = "";
+    if (sc.countdown > 0) {
+        std::snprintf(sleeps, sizeof sleeps, sc.countdown == 1 ? "1 SLEEP TO GO" : "%d SLEEPS TO GO", sc.countdown);
+        if (sc.countdown_to == Occasion::Birthday) {
+            const char* name = in.schedule.birthday_name;
+            if (name[0] && std::strlen(name) <= 4) std::snprintf(what, sizeof what, "%s'S BIRTHDAY", name);
+            else std::snprintf(what, sizeof what, "%s", name[0] ? name : "BIRTHDAY");
+        } else {
+            std::snprintf(what, sizeof what, "%s", sc.countdown_to == Occasion::Anniversary ? "OUR DAY" : "CHRISTMAS");
+        }
+        lines[n++] = sleeps;
+        lines[n++] = what;
+    }
+    if (in.plant.grew) lines[n++] = "NEW LEAF!";
     if (const char* o = occasion_label(sc.occasion, in); o && std::string_view(o) != std::string_view(lines[0])) lines[n++] = o;
-    if (sc.occasion == Occasion::Birthday && in.schedule.birthday_name[0]) lines[n++] = in.schedule.birthday_name;
-    if (sc.occasion == Occasion::Anniversary) lines[n++] = "LOVE YOU!";
-    if (sc.advent > 0 && in.weekday == 0 && n < 4) lines[n++] = kAdvent[sc.advent];
-    if (sc.friday_party && n < 4) lines[n++] = "WEEKEND!";
-    if (sc.monday && n < 4) lines[n++] = "MONDAY...";
+    if (sc.occasion == Occasion::Birthday && in.schedule.birthday_name[0] && n < 6) lines[n++] = in.schedule.birthday_name;
+    if (sc.occasion == Occasion::Anniversary && n < 6) lines[n++] = "LOVE YOU!";
+    if (sc.advent > 0 && in.weekday == 0 && n < 6) lines[n++] = kAdvent[sc.advent];
+    if (sc.friday_party && n < 6) lines[n++] = "WEEKEND!";
+    if (sc.monday && n < 6) lines[n++] = "MONDAY...";
     const char* lbl = lines[(in.t_ms / 4000u) % static_cast<unsigned>(n)];
     const bool big = text_width(lbl, 3) <= 150;
     const float half = static_cast<float>(text_width(lbl, big ? 3 : 2)) / 2 - 6;
@@ -371,13 +403,18 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
     Room room = room_for(bed ? Activity::Sleep : act, in.hour);
     if (party) room = {0x2A2350, 0x45306A, 150};
     const P::Win win{kWinX0, kWinY0, kWinX1, kWinY1};
+    const fun::Visit vis = fun::visit(t, in.seed, fun::allowed_visitors(Page::Day, in));
 
     // the real sky in the window, and what happens on the glass
     const auto& w = in.weather;
-    const weather::Sky sk = in.weather_ok ? w.sky : weather::Sky::Clear;
+    const weather::Sky sk = in.weather_ok ? weather::now_sky(w) : weather::Sky::Clear;  // what the window shows right now
     const bool day = party ? false : (in.weather_ok ? w.is_day : room.dark < 100);
-    sky::draw(cv, sk, day, t, (kWinX0 + kWinX1) / 2, (kWinY0 + kWinY1) / 2 - 2, 0.42f, sky::colors(sk, day, t));
+    const float moon = in.time_valid ? cal::moon_phase(in.year, in.month, in.day, in.hour) : -1.0f;
+    sky::draw(cv, sk, day, t, (kWinX0 + kWinX1) / 2, (kWinY0 + kWinY1) / 2 - 2, 0.42f, sky::colors(sk, day, t), true, moon);
+    if (const int a = fun::rainbow_alpha(in); a > 0) P::rainbow(cv, kWinX0 - 4, kWinY1 + 30, 70, 4.5f, a);  // the wall clips it
     wall(cv, room);
+    if (vis.who == fun::Visitor::Owl) P::owl(cv, (kWinX0 + kWinX1) / 2 + 7, kWinY1 - 1, 0.85f, t);
+    if (vis.who == fun::Visitor::ShootingStar) fun::shooting_star(cv, kWinX0, kWinY0, kWinX1, kWinY1, vis);
     if (party) P::fireworks(cv, win, t);
     if (in.weather_ok) {
         if (sk == weather::Sky::Snow && w.is_day) P::snowman(cv, win, t);
@@ -389,6 +426,12 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
     if (sit == Situation::Humid) P::glass_steam(cv, win, t);
     if (sit == Situation::AirOut || sit == Situation::CoolDown) P::window_open(cv, win, t, room.dark);
     else window_frame(cv, room.dark);
+    P::memory_plant(cv, kWinX0 + 10, kWinY1 + 2, 1.3f, t, in.plant.leaves, in.plant.droop, in.plant.flower);
+    if (vis.who == fun::Visitor::Snail) {
+        const float k = vis.k - std::sin(2 * kPi * vis.k * 3) / (2 * kPi * 3) * 0.8f;
+        P::snail(cv, kWinX1 - 2 - k * (kWinX1 - kWinX0 - 16), kWinY1 + 2, 0.8f, -1, t);
+    }
+    if (vis.who == fun::Visitor::Bird) fun::bird_on_sill(cv, kWinX0 + 4, kWinX1 - 2, kWinY1 + 2, vis, t);
     if (sit == Situation::Humid) P::mushroom(cv, kWinX1 - 6, kWinY1 + 2, 0.55f);
     if (occ == Occasion::StMartin && (in.hour >= 16 || in.hour < 6)) P::lantern(cv, (kWinX0 + kWinX1) / 2, kWinY0 + 4, 0.9f, t);
 
@@ -402,10 +445,11 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
     if (occ == Occasion::Birthday || occ == Occasion::SquirrelDay || occ == Occasion::NewYearsEve || party)
         P::bunting(cv, 22, t, false);
     if (occ == Occasion::Anniversary || occ == Occasion::Valentine) P::bunting(cv, 22, t, true);
+    if (sc.countdown > 0) P::wall_calendar(cv, 37, 76, 1.0f, sc.countdown, sc.countdown_to != Occasion::Christmas);
 
     // who owns the left of the desk: a prop of the situation, else the reading lamp, else yesterday's mug
     const bool plant_left = sit == Situation::DryAir || sit == Situation::Watering;
-    const bool lamp_on = act == Activity::Read && !bed && !plant_left && sit != Situation::Umbrella && (room.dark > 60 || party);
+    const bool lamp_on = reading_lamp(sc, in);
     if (lamp_on) lamp(cv, t);
 
     // the face follows the air, but calmer than on the air page (no hopping at the desk)
@@ -418,7 +462,15 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
     if (party || occ == Occasion::Birthday || occ == Occasion::SquirrelDay || occ == Occasion::Anniversary) {
         if (mood != Mood::Bad && mood != Mood::Sleepy) mood = Mood::Good;
     }
-    const bool stretch = act == Activity::CloseLaptop && cycle > 0.45f && mood != Mood::Bad && !bed;
+    // a gag now and then (the time-window ones only in their window)
+    const fun::GagNow gag = fun::gag(t, in.seed, allowed_gags(sc, in));
+    const bool nodding = gag.gag == fun::Gag::NodOff && gag.k < 0.75f;
+    const bool startled = gag.gag == fun::Gag::NodOff && gag.k >= 0.75f;
+    const float reach = gag.gag == fun::Gag::Stretch ? pulse(gag.k, 0.1f, 0.9f, 0.15f) : 0.0f;
+    if (nodding) mood = Mood::Sleepy;
+    if (startled) mood = Mood::Good;
+
+    const bool stretch = (act == Activity::CloseLaptop && cycle > 0.45f && mood != Mood::Bad && !bed) || reach > 0.05f;
     if (stretch || party) mood = Mood::VeryGood;
 
     // in a thunderstorm the squirrel flinches at each flash
@@ -427,13 +479,23 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
 
     Outfit o;
     o.paws_free = true;
+    o.wolf = occ == Occasion::Halloween && (in.hour >= 17 || in.hour < 5) && !bed;
     if (bed) {  // pillow behind, in bed
         draw::ellipse(cv, kCx, kCy - 30, 50, 28, hex(0xAEB4D8));
         draw::ellipse(cv, kCx, kCy - 32, 47, 25, hex(0xC9CEEA));
     }
-    draw_squirrel(cv, cx, kCy, kScale, mood, t, o);
+    fun::Quirks q = fun::quirks(t, in.seed);
+    q.hop = 0;  // it sits at the desk
+    if (sc.howl_night && act == Activity::Read && !bed && !party) q.howl = fun::howl(t, in.seed);
+    // the eyes follow whatever flies or rolls past, and on a Friday afternoon the clock
+    const float plane_x = -20 + 280 * gag.k, acorn_x = 60 + 200 * gag.k;
+    if (gag.gag == fun::Gag::Plane) q.look = std::clamp((plane_x - 136) / 50, -1.0f, 1.0f);
+    if (gag.gag == fun::Gag::Acorn) q.look = std::clamp((acorn_x - 136) / 50, -1.0f, 1.0f);
+    if (gag.gag == fun::Gag::ClockWatch) q.look = pulse(gag.k, 0, 1, 0.1f);
+    const float cy = kCy + (nodding ? 2.5f * smooth(gag.k / 0.3f) : 0.0f);  // the head sinks while it nods off
+    draw_squirrel(cv, cx, cy, kScale, mood, t, o, q);
     const Bob b = squirrel_bob(mood, t);
-    const Pen p{cv, cx + b.dx * kScale, kCy + b.dy * kScale, kScale};  // moves with the squirrel
+    const Pen p{cv, cx + b.dx * kScale, cy + b.dy * kScale, kScale};  // moves with the squirrel
     const Pen still{cv, kCx, kCy, kScale};                             // the desk does not
 
     // hats and clothes
@@ -444,6 +506,12 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
     else if (occ == Occasion::Christmas || occ == Occasion::Nikolaus) P::santa_hat(cv, brim_x, brim_y, brim_w);
     if (occ == Occasion::Oktoberfest && !bed) braces(p);
     if (sit == Situation::Yawn) yawn(p, t);
+    if (q.howl > 0.05f) fun::howl_text(cv, p.X(130), p.Y(116), 168, 100, q.howl, t);
+    if (startled) draw::label(cv, static_cast<int>(p.Y(52)), 3, hex(0xFFE27A), "!");
+    if (gag.gag == fun::Gag::Sigh) {  // a little puff of air drifts away
+        const float k = gag.k;
+        draw::ellipse(cv, p.X(112) - 30 * k, p.Y(118) - 8 * k, 5 + 6 * k, 3 + 4 * k, hex(0xE8EEF5), 0, static_cast<int>(200 * (1 - k)));
+    }
 
     if (bed) {
         if (sit == Situation::Storm) {  // under the blanket up to the nose, paws holding the edge
@@ -541,11 +609,21 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
             case Activity::Work: {  // laptop open, screen light on the face, yesterday's coffee on the desk
                 const float glow = 40 + wave(t, 2300) * 10 + ((t / 180) % 7 == 0 ? 14 : 0);
                 p.ellipse(125, 106, 30, 26, 0xA8DCFF, 0, static_cast<int>(glow));
-                arm(p, 106, 128, 108, 168);
-                arm(p, 144, 128, 142, 168);
+                if (reach > 0.05f) {  // a happy stretch at the open window
+                    arm(p, 106, 128, 96 - reach * 4, 128 - reach * 58);
+                    arm(p, 144, 128, 154 + reach * 4, 128 - reach * 58);
+                } else {
+                    arm(p, 106, 128, 108, 168);
+                    if (gag.gag != fun::Gag::Pen) arm(p, 144, 128, 142, 168);  // with the pen it comes in front of the laptop
+                }
                 desk(cv, room.dark);
                 mug(still, 45, 176, false, t);
                 laptop_lid(still, 1.0f);
+                if (gag.gag == fun::Gag::Pen && reach <= 0.05f) {  // twirls a pen
+                    const float spin = static_cast<float>(t) / 70.0f;
+                    P::pen(cv, p.X(152), p.Y(144), 1.1f, spin);
+                    arm(p, 144, 128, 150, 150);
+                }
                 break;
             }
             case Activity::CloseLaptop: {  // the lid swings shut, then a big stretch
@@ -564,9 +642,10 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
             }
             case Activity::Lunch: {  // spoonful after spoonful, cheeks full while chewing
                 const float lift = pulse(ph(t, 3200), 0.15f, 0.55f, 0.12f);
-                const float chew = pulse(ph(t, 3200), 0.5f, 1.0f, 0.06f);
+                const bool stuffed = gag.gag == fun::Gag::Cheeks;  // hamster cheeks!
+                const float chew = stuffed ? 1.0f : pulse(ph(t, 3200), 0.5f, 1.0f, 0.06f);
                 if (chew > 0.05f) {
-                    const float puff = 2 + chew * (2 + wave(t, 300) * 1.0f);
+                    const float puff = stuffed ? 6 + wave(t, 260) * 1.2f : 2 + chew * (2 + wave(t, 300) * 1.0f);
                     for (const float x : {101.0f, 149.0f}) {
                         p.circle(x, 113, 4 + puff, kFur);
                         p.circle(x, 113, 3 + puff, kCheek, 120);
@@ -599,8 +678,13 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
                     const Pt pg[3] = {{125, y0 + 5}, {125 + std::cos(a) * 23, y0 + 1 - std::sin(a) * 20}, {125, y0 - 1}};
                     p.poly(pg, 3, 0xFFF8E8);
                 }
-                arm(p, 106, 128, 101, 141);
-                arm(p, 144, 128, 149, 141);
+                if (reach > 0.05f) {
+                    arm(p, 106, 128, 96 - reach * 4, 128 - reach * 58);
+                    arm(p, 144, 128, 154 + reach * 4, 128 - reach * 58);
+                } else {
+                    arm(p, 106, 128, 101, 141);
+                    arm(p, 144, 128, 149, 141);
+                }
                 desk(cv, room.dark);
                 if (sit == Situation::Cocoa) P::cocoa_mug(cv, 98, kDeskTop - 9, 1.5f, t);
                 break;
@@ -617,7 +701,29 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
     desk_decor(cv, sc, in, t);
     if (occ == Occasion::NewYear || occ == Occasion::Birthday) P::confetti(cv, t);
     if (occ == Occasion::Valentine || occ == Occasion::Anniversary) P::hearts_rising(cv, p.X(160), p.Y(96), t);
-    caption(cv, sc, in);
+    switch (vis.who) {  // little visitors
+        case fun::Visitor::Ladybug: fun::ladybug(cv, 22, 218, kDeskTop + 3, vis, t); break;
+        case fun::Visitor::Moth: fun::moth(cv, 66, 116, vis, t); break;
+        case fun::Visitor::Butterfly: fun::butterfly(cv, 20, 40, 220, 160, vis, t); break;
+        default: break;
+    }
+    if (gag.gag == fun::Gag::Plane) {  // a paper plane glides through the room
+        const float k = gag.k, y = 64 + 56 * k + std::sin(k * 2 * kPi) * 10;
+        P::paper_plane(cv, plane_x, y, 1.3f, 0.35f + std::cos(k * 2 * kPi) * 0.25f);
+    }
+    if (gag.gag == fun::Gag::Acorn) {  // an acorn rolls off the desk
+        const float edge = 226, x = acorn_x;
+        const float y = x < edge ? kDeskTop - 4 : kDeskTop - 4 + (x - edge) * (x - edge) * 0.08f;
+        rolling_acorn(cv, x, y, (x - 60) / 4.5f);
+    }
+    const char* say = nullptr;
+    if (gag.gag == fun::Gag::ClockWatch) say = "ALMOST WEEKEND";
+    else if (gag.gag == fun::Gag::Sigh) say = "SIGH...";
+    else if (startled) say = "I'M AWAKE!";
+    else if (gag.gag == fun::Gag::Cheeks) say = "NOM NOM NOM";
+    else if (sit == Situation::None && occ == Occasion::None && sc.countdown == 0)
+        say = fun::pun(t, in.seed, static_cast<int>(act));
+    caption(cv, sc, in, say);
 }
 
 }  // namespace screen

@@ -43,6 +43,9 @@ namespace cal {
 [[nodiscard]] bool public_holiday(int y, int m, int d) noexcept;  // Bavaria (Munich): no work
 [[nodiscard]] bool oktoberfest(int y, int m, int d) noexcept;
 [[nodiscard]] int advent_candles(int y, int m, int d) noexcept; // 0, or 1..4 from the first Sunday of Advent to 23 Dec
+[[nodiscard]] int days_until(int y, int m, int d, int mmdd) noexcept;  // 0 on the day itself, up to 365
+[[nodiscard]] float moon_phase(int y, int m, int d, int hour) noexcept;  // 0 new, 0.25 first quarter, 0.5 full, 0.75 last quarter
+[[nodiscard]] bool full_moon(int y, int m, int d, int hour) noexcept;    // within about a day of full
 }  // namespace cal
 
 // Special days. One at a time, the most personal wins. Advent is extra (see Scene::advent).
@@ -103,7 +106,14 @@ struct Scene {
     bool day_off = false;     // weekend or public holiday
     bool friday_party = false;  // Friday after work
     bool monday = false;      // Monday morning coffee: the big mug
+    int countdown = 0;        // 1..7 days to the next of birthday, anniversary, Christmas (0 = none)
+    Occasion countdown_to = Occasion::None;
+    bool howl_night = false;  // full moon (or Halloween) at night: the squirrel may howl
 };
 [[nodiscard]] Scene scene_for(const Inputs& in) noexcept;
+// Which gags (bits of fun::Gag) fit the scene right now.
+[[nodiscard]] unsigned allowed_gags(const Scene& sc, const Inputs& in) noexcept;
+// Is the desk lamp on (reading in the evening)?
+[[nodiscard]] bool reading_lamp(const Scene& sc, const Inputs& in) noexcept;
 
 }  // namespace screen
