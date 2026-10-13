@@ -118,8 +118,24 @@ Which scene shows never changes by chance. Inside a scene, small things happen a
 | Ladybug | Walks along the desk | The squirrel is awake |
 | Moth | Circles the reading lamp | Reading in the evening |
 | Shooting star | Streaks across the sky or the window | Clear night |
+| Owl | Sits in the window and blinks | Night, no thunder |
+| Hedgehog | Walks over the hill | September to November, evenings |
+| Snail | Crawls on the hill or the window sill | Within 3 hours after rain, once it is dry |
+| Bee | Buzzes from flower to flower | June to August, 18 °C or more |
+| Autumn leaves | Tumble down over the whole screen | October and November, dry days |
+| Blossom petals | Drift across | April, dry days |
 
-Preview them with `uv run python tools/preview_pages.py build/preview fun_air_bird fun_day_bird fun_clock_hour` (all scenes starting with `fun_`); each clip starts at a moment where its surprise happens.
+More surprises:
+
+- **The golden acorn.** About once in a day and a half a golden acorn drops onto the hill. The air page comes up by itself, the squirrel hops for joy, and the caption counts how many you have found (saved across reboots).
+- **The real moon.** The moon in the sky and the window shows its real phase. On full-moon nights, and on Halloween night, the squirrel howls now and then ("AWOO"); on Halloween it wears grey wolf ears.
+- **Rainbows.** When the sun comes out within 90 minutes after rain (in daylight), a rainbow fades in behind the hill and in the window. The pictures of the sky now show the weather right now; the outfit still follows the day's forecast (an umbrella for later).
+- **The window-sill plant.** It remembers your air: every day with mostly good air (60 % of the measured minutes VERY GOOD or GOOD) brings a new leaf, up to nine ("NEW LEAF!" in the caption that day). A day with a lot of stale air (30 %) makes it droop, and at the worst it drops a leaf. Thirty good days in a row and it flowers. It is saved in NVS.
+- **Countdowns.** From a week before the birthday, the anniversary and Christmas, a tear-off calendar hangs on the wall and the caption says "3 SLEEPS TO GO", "ALEX'S BIRTHDAY".
+- **Gags** on the day page, about every few minutes when they fit: a paper plane glides through the room, an acorn rolls off the desk, the squirrel twirls a pen, stuffs its cheeks at lunch ("NOM NOM NOM"). In their time windows, and then more often: it nods off after lunch and jolts awake ("I'M AWAKE!", 13:30 to 15:00), watches the clock on Friday afternoons ("ALMOST WEEKEND"), sighs on Monday mornings, stretches happily at the open window. The eyes follow the plane and the acorn.
+- **Puns.** Now and then, on an ordinary day, the caption shows a squirrel pun for a few seconds: "NUTS ABOUT WORK", "BEAN THERE", "A NUT-VEL", "I'M NUTS!".
+
+Preview them with `uv run python tools/preview_pages.py build/preview fun_air_bird fun_day_bird fun_clock_hour` (scenes starting with `fun_`, `more_` and `gag_`); each clip starts at a moment where its surprise happens.
 
 ## Weather
 

@@ -58,10 +58,34 @@ void sun(const Canvas& cv, float cx, float cy, float r, std::uint32_t t) {
     draw::circle(cv, cx + r * 0.55f, cy + 3 * k, 3.2f * k, hex(0xFF9A6B), 150);
 }
 
-void moon(const Canvas& cv, float cx, float cy, float r, std::uint32_t sky_at_moon) {
-    draw::circle(cv, cx, cy, r * 1.4f, hex(0xFFF1B0), 30);
-    draw::circle(cv, cx, cy, r, hex(0xFFF1B0));
-    draw::circle(cv, cx + r * 0.45f, cy - r * 0.3f, r * 0.82f, hex(sky_at_moon));
+// phase < 0: the classic crescent; else 0 new .. 0.5 full .. 1 new, lit from the right while waxing.
+void moon(const Canvas& cv, float cx, float cy, float r, std::uint32_t sky_at_moon, float phase) {
+    if (phase < 0) {
+        draw::circle(cv, cx, cy, r * 1.4f, hex(0xFFF1B0), 30);
+        draw::circle(cv, cx, cy, r, hex(0xFFF1B0));
+        draw::circle(cv, cx + r * 0.45f, cy - r * 0.3f, r * 0.82f, hex(sky_at_moon));
+        return;
+    }
+    const float lit = (1 - std::cos(2 * kPi * phase)) / 2;  // 0 new .. 1 full
+    draw::circle(cv, cx, cy, r * 1.4f, hex(0xFFF1B0), static_cast<int>(10 + 30 * lit));
+    draw::circle(cv, cx, cy, r, hex(draw::lerp_rgb(sky_at_moon, 0xFFF1B0, 50)));  // the dark side, faintly
+    const float side = phase < 0.5f ? 1.0f : -1.0f, k = std::cos(2 * kPi * phase);  // terminator: x = side * k * limb
+    constexpr int kN = 7;  // 16 points: the most draw::polygon takes; each row is one span, so a crescent works
+    draw::Pt pts[2 * kN + 2];
+    int n = 0;
+    for (int i = 0; i <= kN; ++i) {  // the lit limb, top to bottom
+        const float a = -kPi / 2 + kPi * static_cast<float>(i) / kN;
+        pts[n++] = {cx + side * r * std::cos(a), cy + r * std::sin(a)};
+    }
+    for (int i = kN; i >= 0; --i) {  // back up along the terminator
+        const float a = -kPi / 2 + kPi * static_cast<float>(i) / kN;
+        pts[n++] = {cx + side * k * r * std::cos(a), cy + r * std::sin(a)};
+    }
+    if (lit > 0.02f) draw::polygon(cv, pts, n, hex(0xFFF1B0));
+    if (lit > 0.6f) {  // a few craters on a fuller moon
+        draw::circle(cv, cx - r * 0.25f, cy - r * 0.2f, r * 0.18f, hex(0xEADCA0), static_cast<int>(200 * lit));
+        draw::circle(cv, cx + r * 0.3f, cy + r * 0.3f, r * 0.12f, hex(0xEADCA0), static_cast<int>(200 * lit));
+    }
 }
 
 void stars(const Canvas& cv, std::uint32_t t) {
@@ -153,7 +177,8 @@ void precipitation(const Canvas& cv, Sky s, std::uint32_t t) noexcept {
     }
 }
 
-void draw(const Canvas& cv, Sky s, bool day, std::uint32_t t, float icx, float icy, float k, const Palette& pal, bool precip) noexcept {
+void draw(const Canvas& cv, Sky s, bool day, std::uint32_t t, float icx, float icy, float k, const Palette& pal, bool precip,
+          float moon_phase) noexcept {
     draw::vgradient(cv, pal.top, pal.bottom);
     const float drift = wave(t, 7000) * 5 * k;
     // sky colour behind the moon, for the crescent cut-out
@@ -161,11 +186,11 @@ void draw(const Canvas& cv, Sky s, bool day, std::uint32_t t, float icx, float i
     switch (s) {
         case Sky::Clear:
             if (day) sun(cv, icx, icy, 26 * k, t);
-            else { stars(cv, t); moon(cv, icx, icy, 24 * k, behind(icy)); }
+            else { stars(cv, t); moon(cv, icx, icy, 24 * k, behind(icy), moon_phase); }
             break;
         case Sky::PartlyCloudy:
             if (day) sun(cv, icx + 20 * k, icy - 12 * k, 21 * k, t);
-            else { stars(cv, t); moon(cv, icx + 20 * k, icy - 12 * k, 19 * k, behind(icy - 12 * k)); }
+            else { stars(cv, t); moon(cv, icx + 20 * k, icy - 12 * k, 19 * k, behind(icy - 12 * k), moon_phase); }
             cloud(cv, icx - 10 * k + drift, icy + 12 * k, 1.0f * k, 0xFFFFFF, 0xC9D6E3);
             break;
         case Sky::Cloudy:

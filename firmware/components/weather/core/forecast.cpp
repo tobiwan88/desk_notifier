@@ -77,6 +77,10 @@ const char* sky_name(Sky s, bool is_day) noexcept {
     return "";
 }
 
+Sky now_sky(const Forecast& f) noexcept { return f.now_code >= 0 ? sky_from_wmo(f.now_code) : f.sky; }
+
+bool wet(Sky s) noexcept { return s == Sky::Drizzle || s == Sky::Rain || s == Sky::Thunder || s == Sky::Snow; }
+
 std::optional<Forecast> parse_open_meteo(std::string_view json) noexcept {
     const std::string_view cur = object(json, "current"), day = object(json, "daily");
     if (cur.empty() || day.empty()) return std::nullopt;
@@ -84,6 +88,7 @@ std::optional<Forecast> parse_open_meteo(std::string_view json) noexcept {
     float v = 0;
     if (!number(cur, "temperature_2m", f.temp_c)) return std::nullopt;
     if (number(cur, "is_day", v)) f.is_day = v > 0.5f;
+    if (number(cur, "weather_code", v)) f.now_code = static_cast<int>(v);
     if (!number(day, "weather_code", v)) {
         if (!number(cur, "weather_code", v)) return std::nullopt;
     }

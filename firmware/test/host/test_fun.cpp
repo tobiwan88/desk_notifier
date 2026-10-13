@@ -63,15 +63,15 @@ const weather::Forecast kSunny{19, true, 0, weather::Sky::Clear, 22, 10, 0}, kRa
 TEST_CASE("who may visit") {
     using screen::Page;
     using screen::fun::allowed_visitors;
-    CHECK(allowed_visitors(Page::Air, base(11, kSunny)) == (bit(Visitor::Bird) | bit(Visitor::Butterfly)));
+    CHECK(allowed_visitors(Page::Air, base(11, kSunny)) == (bit(Visitor::Bird) | bit(Visitor::Butterfly) | bit(Visitor::Leaves)));  // October
     CHECK(allowed_visitors(Page::Air, base(11, kRain)) == 0u);
-    CHECK(allowed_visitors(Page::Air, base(23, kNight)) == bit(Visitor::ShootingStar));
+    CHECK(allowed_visitors(Page::Air, base(23, kNight)) == (bit(Visitor::ShootingStar) | bit(Visitor::Hedgehog)));
     auto windy = base(11, kSunny); windy.weather.wind_kmh = 40;
     CHECK(allowed_visitors(Page::Air, windy) == 0u);
     CHECK(allowed_visitors(Page::Clock, base(11, kSunny)) == 0u);
     CHECK(allowed_visitors(Page::Day, base(10, kRain)) == bit(Visitor::Ladybug));           // working, rain outside
-    CHECK(allowed_visitors(Page::Day, base(21, kCloudyNight)) == (bit(Visitor::Ladybug) | bit(Visitor::Moth)));  // reading lamp
-    CHECK(allowed_visitors(Page::Day, base(3, kNight)) == bit(Visitor::ShootingStar));      // asleep: only the window
+    CHECK(allowed_visitors(Page::Day, base(21, kCloudyNight)) == (bit(Visitor::Ladybug) | bit(Visitor::Moth) | bit(Visitor::Owl)));  // reading lamp
+    CHECK(allowed_visitors(Page::Day, base(3, kNight)) == (bit(Visitor::ShootingStar) | bit(Visitor::Owl)));  // asleep: only the window
     auto no_time = base(10, kSunny); no_time.time_valid = false;
     CHECK(allowed_visitors(Page::Day, no_time) == 0u);
 }

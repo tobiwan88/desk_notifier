@@ -17,10 +17,15 @@ struct Forecast {
     float max_c = 0, min_c = 0;
     int precip_pct = -1;     // today's max precipitation probability, -1 = unknown
     float wind_kmh = 0;      // current wind speed at 10 m; 0 if the API did not send it
+    int now_code = -1;       // the WMO code right now (current), -1 = unknown
 };
+
+// The weather right now (current code), or today's when the current one is unknown.
+[[nodiscard]] Sky now_sky(const Forecast& f) noexcept;
 
 // WMO 4677 weather interpretation code (as used by Open-Meteo) -> picture.
 [[nodiscard]] Sky sky_from_wmo(int code) noexcept;
+[[nodiscard]] bool wet(Sky s) noexcept;  // drizzle, rain, thunder, snow
 [[nodiscard]] const char* sky_name(Sky s, bool is_day) noexcept;
 
 // Parses the body of

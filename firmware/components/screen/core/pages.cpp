@@ -86,6 +86,17 @@ void render_page(const Canvas& cv, Page p, const Inputs& in) noexcept {
             a.weather_ok = in.weather_ok; a.weather = in.weather;
             a.quirks = fun::quirks(in.t_ms, in.seed);
             a.visit = fun::visit(in.t_ms, in.seed, fun::allowed_visitors(Page::Air, in));
+            a.rainbow = fun::rainbow_alpha(in);
+            a.golden = fun::golden(in.t_ms, in.seed);
+            a.golden_count = in.golden_count;
+            if (in.time_valid) {
+                a.moon_phase = cal::moon_phase(in.year, in.month, in.day, in.hour);
+                const bool night = in.weather_ok ? !in.weather.is_day : (in.hour >= 19 || in.hour < 5);
+                const bool halloween = occasion_for(in.year, in.month, in.day, in.schedule) == Occasion::Halloween;
+                a.wolf = halloween && night;
+                if (night && in.sensor_ok && (halloween || cal::full_moon(in.year, in.month, in.day, in.hour)))
+                    a.quirks.howl = fun::howl(in.t_ms, in.seed);
+            }
             render_air(cv, a);
             return;
         }
