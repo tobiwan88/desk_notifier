@@ -5,6 +5,7 @@
 #include <cstdint>
 
 #include "screen/core/font.hpp"
+#include "screen/core/fun.hpp"
 #include "sensor/core/airq.hpp"
 #include "weather/core/forecast.hpp"
 
@@ -38,10 +39,13 @@ struct AirData {
     bool weather_ok = false; // the sky behind the squirrel shows the outdoor weather
     weather::Forecast weather{};
     std::uint32_t t_ms = 0;  // monotonic, drives the animation
+    fun::Quirks quirks{};    // blinks, glances, waves ...
+    fun::Visit visit{};      // a bird on the head, a butterfly, a shooting star
 };
 
 // Draws the squirrel. (cx, cy) is the centre of its body, `scale` 1.0 is about 120 px tall.
-void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, std::uint32_t t_ms, Outfit o = {}) noexcept;
+void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, std::uint32_t t_ms, Outfit o = {},
+                   const fun::Quirks& q = {}) noexcept;
 
 // Where draw_squirrel moves the body this frame (the bob of the mood animation), in design units (multiply by
 // scale), so that props drawn by the caller move with it.

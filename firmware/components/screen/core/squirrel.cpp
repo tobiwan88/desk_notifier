@@ -147,13 +147,15 @@ void ear(const Pen& p, float x, float y, float ang) {
     p.line(tx, ty, tx + std::sin(ang) * 6, ty - std::cos(ang) * 6, 2.6f, kFurDark);
 }
 
-void eye(const Pen& p, float x, float y, Mood m, bool blink) {
+void eye(const Pen& p, float x, float y, Mood m, bool blink, float look = 0) {
     if (m == Mood::VeryGood) { p.arc(x, y + 3, 5, kPi + 0.35f, 2 * kPi - 0.35f, 1.7f, kEye); return; }  // ^ ^
     if (m == Mood::Sleepy) { p.arc(x, y - 3, 5, 0.35f, kPi - 0.35f, 1.5f, kEye); return; }              // closed
     if (blink) { p.line(x - 5, y + 1, x + 5, y + 1, 1.5f, kEye); return; }
+    x += look * 2.2f;  // a glance to the side
     p.ellipse(x, y, 5.5f, 7, kEye);
     p.circle(x + 2, y - 2.5f, 2.2f, kWhite);
     p.circle(x - 1.5f, y + 3, 1.0f, kWhite, 190);
+    x -= look * 2.2f;
     if (m == Mood::Okay) {  // half-closed lid
         p.quad(x - 7, y - 9, x + 7, y - 0.5f, kFur);
         p.line(x - 6, y - 0.5f, x + 6, y - 0.5f, 1.2f, kEye);
@@ -316,9 +318,16 @@ const char* mood_label(Mood m) noexcept {
     return "";
 }
 
-void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, std::uint32_t t, Outfit o) noexcept {
+void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, std::uint32_t t, Outfit o,
+                   const fun::Quirks& q) noexcept {
     if (o.paws_free) o.ice_cream = o.umbrella = o.windy = false;  // indoors, paws busy
-    const Anim a = animate(m, t, o.windy);
+    Anim a = animate(m, t, o.windy);
+    if (!o.windy) {  // the little random quirks
+        a.blink = a.blink || q.blink;
+        a.tail += q.tail * 0.22f;
+        if (m == Mood::VeryGood || m == Mood::Good || m == Mood::Okay) a.dy -= q.hop * 6;
+    }
+    const float twitch = o.windy ? 0.0f : q.ear * 0.35f;
     // the ice cream replaces the acorn; a fanning (bad air) or sleeping squirrel keeps its pose
     const bool cone = o.ice_cream && !o.umbrella && (m == Mood::VeryGood || m == Mood::Good || m == Mood::Okay);
     const Pen p{cv, cx + a.dx * scale, cy + a.dy * scale, scale};
@@ -344,13 +353,26 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
         p.ellipse(136, 139, 6, 10, kFur, -0.6f);
     } else switch (m) {
         case Mood::VeryGood:
-        case Mood::Good:
+        case Mood::Good: {
+            const float hello = o.umbrella ? 0.0f : q.wave;
+            const float toss = (hello < 0.05f && m == Mood::VeryGood) ? q.toss : 0.0f;  // up in the air and caught again
             p.ellipse(114, 139, 6, 10, kFur, 0.6f);
-            p.ellipse(136, 139, 6, 10, kFur, -0.6f);
-            acorn(p, 125, 141, m == Mood::VeryGood ? wave(t, 700) * 0.15f : 0.0f);
+            if (hello < 0.05f) p.ellipse(136, 139, 6, 10, kFur, -0.6f);
+            acorn(p, hello < 0.05f ? 125 : 121, 141 - 46 * std::sin(kPi * toss),
+                  toss > 0 ? toss * 4 * kPi : (m == Mood::VeryGood ? wave(t, 700) * 0.15f : 0.0f));
             p.circle(118, 143, 4.2f, kFur);
-            p.circle(132, 143, 4.2f, kFur);
+            if (hello < 0.05f) {
+                p.circle(132, 143, 4.2f, kFur);
+            } else {  // waves hello with the right paw
+                const float wx = 132 + (161 - 132) * hello + wave(t, 380) * 4 * hello, wy = 143 + (104 - 143) * hello;
+                p.line(139, 133, wx, wy, 5.5f, kFurDark);
+                p.line(139, 133, wx, wy, 4.4f, kFur);
+                p.circle(wx, wy, 6.2f, kFurDark);
+                p.circle(wx, wy, 5.2f, kFur);
+                p.circle(wx - 1.5f, wy - 1.5f, 1.4f, kFurLight, 200);
+            }
             break;
+        }
         case Mood::Okay:
             p.ellipse(103, 150, 5.5f, 11, kFur, 0.15f);
             p.ellipse(147, 150, 5.5f, 11, kFur, -0.15f);
@@ -373,7 +395,7 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
     // head
     if (!o.hat) {
         ear(p, 104, 76, -0.35f - a.ear);
-        ear(p, 146, 76, 0.35f + a.ear);
+        ear(p, 146, 76, 0.35f + a.ear + twitch);
     }
     p.ellipse(125, 103, 33, 29, kFurDark);
     p.ellipse(125, 103, 31, 27, kFur);
@@ -382,7 +404,7 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
     if (o.hat) {
         hat_dome(p);
         ear(p, 102, 72, -0.45f - a.ear);  // through the hat
-        ear(p, 148, 72, 0.45f + a.ear);
+        ear(p, 148, 72, 0.45f + a.ear + twitch);
         hat_cuff(p, t);
         scarf(p);
     }
@@ -390,8 +412,8 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
         p.circle(103, 112, 6, kCheek, m == Mood::VeryGood || o.hat ? 200 : 130);
         p.circle(147, 112, 6, kCheek, m == Mood::VeryGood || o.hat ? 200 : 130);
     }
-    eye(p, 112, 99, m, a.blink);
-    eye(p, 138, 99, m, a.blink);
+    eye(p, 112, 99, m, a.blink, q.look);
+    eye(p, 138, 99, m, a.blink, q.look);
     if (o.sunglasses) sunglasses(p);
     if (m == Mood::Bad) {  // worried brows (under the hat cuff they sit lower)
         const float by = o.hat ? 4.0f : 0.0f;
@@ -470,6 +492,7 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
         if (m == Mood::Bad) pal = {draw::lerp_rgb(pal.top, 0x8E8699, 110), draw::lerp_rgb(pal.bottom, 0xB8B0BC, 110)};
         if (d.alert) pal.top = draw::lerp_rgb(pal.top, 0xFF8A7A, static_cast<int>((wave(t, 1600) + 1) * 70));
         sky::draw(cv, w.sky, w.is_day, t, 200, 98, 0.55f, pal, false);
+        if (d.visit.who == fun::Visitor::ShootingStar) fun::shooting_star(cv, 20, 16, 220, 100, d.visit);
         if (m == Mood::Sleepy) { hill = 0x7DBD66; hill_back = 0xA5CF91; }  // the night colours come from the sky now
         if (snowy) { hill = 0xC9D8E8; hill_back = 0xE4ECF4; }
         const int gl = sky::gloom(w.sky);  // grey light under clouds and rain
@@ -523,8 +546,17 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
     if (m == Mood::Bad) haze(0, 3, 110);
 
     const Outfit outfit = outfit_for(d.weather_ok, d.weather);
-    if (outfit.umbrella) draw_squirrel(cv, 144, 156, 0.78f, m, t, outfit);  // smaller, canopy clear of the top text
-    else draw_squirrel(cv, 146, 136, 0.92f, m, t, outfit);
+    const bool bird = d.visit.who == fun::Visitor::Bird && !outfit.umbrella;
+    fun::Quirks q = d.quirks;
+    if (bird) q.hop = 0;  // sits still while the bird is on its head
+    if (outfit.umbrella) draw_squirrel(cv, 144, 156, 0.78f, m, t, outfit, q);  // smaller, canopy clear of the top text
+    else draw_squirrel(cv, 146, 136, 0.92f, m, t, outfit, q);
+    if (bird) {
+        const Bob b = squirrel_bob(m, t);
+        constexpr float s = 0.92f;
+        fun::bird_on_head(cv, 146 + (b.dx - 4) * s, 136 + (b.dy + (outfit.hat ? 56 : 76) - 150) * s, 1.2f, d.visit, t);
+    }
+    if (d.visit.who == fun::Visitor::Butterfly) fun::butterfly(cv, 14, 50, 150, 170, d.visit, t);
 
     if (m == Mood::Bad) haze(3, 5, 70);
     if (m == Mood::VeryGood) {

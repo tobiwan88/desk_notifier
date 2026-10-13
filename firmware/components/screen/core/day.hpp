@@ -105,5 +105,7 @@ struct Scene {
     bool monday = false;      // Monday morning coffee: the big mug
 };
 [[nodiscard]] Scene scene_for(const Inputs& in) noexcept;
+// Is the desk lamp on (reading in the evening)?
+[[nodiscard]] bool reading_lamp(const Scene& sc, const Inputs& in) noexcept;
 
 }  // namespace screen

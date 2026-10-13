@@ -24,6 +24,7 @@ struct Inputs {
     int hour = 0, minute = 0, second = 0;
     int weekday = 0, day = 1, month = 1;  // weekday 0 = Sunday, month 1..12
     int year = 2026;
+    int millis = 0;          // within the second, for smooth movements tied to the clock
     bool sensor_ok = false;
     sensor::Reading reading{};
     sensor::Quality quality{};
@@ -32,6 +33,7 @@ struct Inputs {
     bool weather_ok = false;
     weather::Forecast weather{};
     Schedule schedule{};     // the squirrel's day plan
+    std::uint32_t seed = 0x2545F491u;  // for the little random surprises (screen/core/fun), set at boot
 };
 
 void render_clock(const Canvas& cv, const Inputs& in) noexcept;

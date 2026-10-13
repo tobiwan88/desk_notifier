@@ -7,6 +7,7 @@
 #include <cstring>
 
 #include "screen/core/draw.hpp"
+#include "screen/core/fun.hpp"
 #include "screen/core/pages.hpp"
 #include "screen/core/props.hpp"
 #include "screen/core/sky.hpp"
@@ -370,6 +371,7 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
     Room room = room_for(bed ? Activity::Sleep : act, in.hour);
     if (party) room = {0x2A2350, 0x45306A, 150};
     const P::Win win{kWinX0, kWinY0, kWinX1, kWinY1};
+    const fun::Visit vis = fun::visit(t, in.seed, fun::allowed_visitors(Page::Day, in));
 
     // the real sky in the window, and what happens on the glass
     const auto& w = in.weather;
@@ -377,6 +379,7 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
     const bool day = party ? false : (in.weather_ok ? w.is_day : room.dark < 100);
     sky::draw(cv, sk, day, t, (kWinX0 + kWinX1) / 2, (kWinY0 + kWinY1) / 2 - 2, 0.42f, sky::colors(sk, day, t));
     wall(cv, room);
+    if (vis.who == fun::Visitor::ShootingStar) fun::shooting_star(cv, kWinX0, kWinY0, kWinX1, kWinY1, vis);
     if (party) P::fireworks(cv, win, t);
     if (in.weather_ok) {
         if (sk == weather::Sky::Snow && w.is_day) P::snowman(cv, win, t);
@@ -388,6 +391,7 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
     if (sit == Situation::Humid) P::glass_steam(cv, win, t);
     if (sit == Situation::AirOut || sit == Situation::CoolDown) P::window_open(cv, win, t, room.dark);
     else window_frame(cv, room.dark);
+    if (vis.who == fun::Visitor::Bird) fun::bird_on_sill(cv, kWinX0 + 4, kWinX1 - 2, kWinY1 + 2, vis, t);
     if (sit == Situation::Humid) P::mushroom(cv, kWinX1 - 6, kWinY1 + 2, 0.55f);
     if (occ == Occasion::StMartin && (in.hour >= 16 || in.hour < 6)) P::lantern(cv, (kWinX0 + kWinX1) / 2, kWinY0 + 4, 0.9f, t);
 
@@ -404,7 +408,7 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
 
     // who owns the left of the desk: a prop of the situation, else the reading lamp, else yesterday's mug
     const bool plant_left = sit == Situation::DryAir || sit == Situation::Watering;
-    const bool lamp_on = act == Activity::Read && !bed && !plant_left && sit != Situation::Umbrella && (room.dark > 60 || party);
+    const bool lamp_on = reading_lamp(sc, in);
     if (lamp_on) lamp(cv, t);
 
     // the face follows the air, but calmer than on the air page (no hopping at the desk)
@@ -430,7 +434,9 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
         draw::ellipse(cv, kCx, kCy - 30, 50, 28, hex(0xAEB4D8));
         draw::ellipse(cv, kCx, kCy - 32, 47, 25, hex(0xC9CEEA));
     }
-    draw_squirrel(cv, cx, kCy, kScale, mood, t, o);
+    fun::Quirks q = fun::quirks(t, in.seed);
+    q.hop = 0;  // it sits at the desk
+    draw_squirrel(cv, cx, kCy, kScale, mood, t, o, q);
     const Bob b = squirrel_bob(mood, t);
     const Pen p{cv, cx + b.dx * kScale, kCy + b.dy * kScale, kScale};  // moves with the squirrel
     const Pen still{cv, kCx, kCy, kScale};                             // the desk does not
@@ -616,6 +622,12 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
     desk_decor(cv, sc, in, t);
     if (occ == Occasion::NewYear || occ == Occasion::Birthday) P::confetti(cv, t);
     if (occ == Occasion::Valentine || occ == Occasion::Anniversary) P::hearts_rising(cv, p.X(160), p.Y(96), t);
+    switch (vis.who) {  // little visitors
+        case fun::Visitor::Ladybug: fun::ladybug(cv, 22, 218, kDeskTop + 3, vis, t); break;
+        case fun::Visitor::Moth: fun::moth(cv, 66, 116, vis, t); break;
+        case fun::Visitor::Butterfly: fun::butterfly(cv, 20, 40, 220, 160, vis, t); break;
+        default: break;
+    }
     caption(cv, sc, in);
 }
 
