@@ -102,6 +102,25 @@ The window shows the weather outside (sun, moon, clouds, rain, snow, fog, thunde
 
 Change the times, the birthday (with the name) and the anniversary in `idf.py menuconfig` → Desk notifier → Squirrel's day (times as HHMM, so 630 is 06:30; dates as MMDD, so 315 is 15 March, 0 turns it off). Bedtime may be after midnight (e.g. 30).
 
+## Little surprises
+
+Which scene shows never changes by chance. Inside a scene, small things happen at random moments, different after every boot (the seed comes from the hardware random number generator):
+
+- The squirrel blinks (sometimes twice), glances to the side, twitches an ear, flicks its tail and does a little hop.
+- On the air page it now and then waves hello, and with very good air it throws its acorn up and catches it.
+- On the full hour the clock-page squirrel pops up a little and waves for ten seconds.
+- Roughly every other minute a visitor may come by for about twelve seconds:
+
+| Visitor | Where | When |
+|---|---|---|
+| Blue tit | Lands on the squirrel's head and sings (air page), hops along the window sill and pecks (day page) | Daylight, dry, not windy |
+| Butterfly | Flutters past | Daylight, dry, 12 °C or more outside (15 °C on the day page) |
+| Ladybug | Walks along the desk | The squirrel is awake |
+| Moth | Circles the reading lamp | Reading in the evening |
+| Shooting star | Streaks across the sky or the window | Clear night |
+
+Preview them with `uv run python tools/preview_pages.py build/preview fun_air_bird fun_day_bird fun_clock_hour` (all scenes starting with `fun_`); each clip starts at a moment where its surprise happens.
+
 ## Weather
 
 The board asks [Open-Meteo](https://open-meteo.com/) every 20 minutes. No account or key is needed. The air page shows it as the sky behind the squirrel and as the squirrel's outfit, the day page in the window, the clock page as numbers. There used to be a separate weather page; it showed the same sky and temperature again and was replaced by the day page. If the last good forecast is older than 3 hours, the pages fall back to their own colours.

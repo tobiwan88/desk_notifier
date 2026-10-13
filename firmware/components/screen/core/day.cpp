@@ -266,4 +266,13 @@ Scene scene_for(const Inputs& in) noexcept {
     return sc;
 }
 
+bool reading_lamp(const Scene& sc, const Inputs& in) noexcept {
+    if (sc.activity != Activity::Read) return false;
+    switch (sc.situation) {
+        case Situation::Storm: case Situation::DryAir: case Situation::Watering: case Situation::Umbrella: return false;
+        case Situation::Party: return true;
+        default: return in.hour >= 17 || in.hour < 6;
+    }
+}
+
 }  // namespace screen

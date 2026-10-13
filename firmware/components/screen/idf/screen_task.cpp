@@ -4,12 +4,15 @@
 #include <cctype>
 #include <ctime>
 
+#include <sys/time.h>
+
 #include "clock/idf/clock.hpp"
 #include "config.hpp"
 #include "display/idf/display.hpp"
 #include "driver/gpio.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_random.h"
 #include "esp_system.h"
 #include "esp_task_wdt.h"
 #include "esp_timer.h"
@@ -84,6 +87,7 @@ void task(void*) {
         schedule.birthday_name[i] = 0;
     }
     AirTrend trend;
+    const std::uint32_t seed = esp_random();  // a different string of little surprises after every boot
     std::uint32_t snooze_until = 0, next_frame = 0, sum_us = 0, max_us = 0, n = 0;
     int stalls = 0;
     for (;;) {
@@ -112,6 +116,9 @@ void task(void*) {
                 in.time_valid = true;
                 in.hour = tm.tm_hour; in.minute = tm.tm_min; in.second = tm.tm_sec;
                 in.weekday = tm.tm_wday; in.day = tm.tm_mday; in.month = tm.tm_mon + 1; in.year = tm.tm_year + 1900;
+                timeval tv{};
+                gettimeofday(&tv, nullptr);
+                in.millis = static_cast<int>(tv.tv_usec / 1000);
             }
             in.sensor_ok = snap.ok;
             in.reading = snap.reading;
@@ -123,6 +130,7 @@ void task(void*) {
             in.weather_ok = wx.ok;
             in.weather = wx.forecast;
             in.schedule = schedule;
+            in.seed = seed;
 
             unsigned avail = 0;
             if (CONFIG_DESK_PAGE_CLOCK_S > 0) avail |= 1u << static_cast<int>(Page::Clock);

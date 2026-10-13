@@ -8,6 +8,7 @@
 
 #include "screen/core/day.hpp"
 #include "screen/core/draw.hpp"
+#include "screen/core/fun.hpp"
 #include "screen/core/pages.hpp"
 
 namespace {
@@ -47,7 +48,12 @@ screen::Inputs base_inputs() {
 
 int main(int argc, char** argv) {
     if (argc < 2) { std::fprintf(stderr, "usage: page_preview <out_dir> [scene...]\n"); return 2; }
-    struct Scene { const char* name; screen::Page page; int frames; void (*setup)(screen::Inputs&); };
+    // `want`: start the clip where that visitor is about `at_k` into its visit; `wave`: where the squirrel waves.
+    struct Scene {
+        const char* name; screen::Page page; int frames; void (*setup)(screen::Inputs&);
+        screen::fun::Visitor want = screen::fun::Visitor::None; float at_k = 0.2f; bool wave = false;
+    };
+    using V = screen::fun::Visitor;
     static const Scene kScenes[] = {
         {"clock", screen::Page::Clock, 20, [](screen::Inputs&) {}},
         {"air_very_good", screen::Page::Air, 40, [](screen::Inputs& i) { i.quality = {88, sensor::Level::Good}; }},
@@ -71,6 +77,17 @@ int main(int argc, char** argv) {
         {"day_sleep", screen::Page::Day, 40, [](screen::Inputs& i) { i.weekday = 3; i.hour = 2; i.minute = 50; i.weather = {-2.0f, false, 73, weather::Sky::Snow, 0, -5, 70}; }},
         {"day_work_bad_air", screen::Page::Day, 40, [](screen::Inputs& i) { i.weekday = 2; i.hour = 15; i.minute = 0; i.quality = {22, sensor::Level::Poor}; i.weather = {21.0f, true, 95, weather::Sky::Thunder, 26, 15, 90}; }},
         {"day_weekend_coffee", screen::Page::Day, 60, [](screen::Inputs& i) { i.weekday = 6; i.hour = 9; i.minute = 0; i.weather = {19.0f, true, 0, weather::Sky::Clear, 22, 10, 0, 8}; }},
+        // little surprises (random moments, the clip starts where one happens)
+        {"fun_air_bird", screen::Page::Air, 90, [](screen::Inputs& i) { i.weather = {16.0f, true, 2, weather::Sky::PartlyCloudy, 18, 8, 10}; }, V::Bird, 0.08f},
+        {"fun_air_butterfly", screen::Page::Air, 60, [](screen::Inputs& i) { i.weather = {19.0f, true, 0, weather::Sky::Clear, 22, 10, 0}; }, V::Butterfly, 0.35f},
+        {"fun_air_star", screen::Page::Air, 30, [](screen::Inputs& i) { i.weather = {9.0f, false, 0, weather::Sky::Clear, 14, 5, 0}; }, V::ShootingStar, 0.295f},
+        {"fun_air_wave", screen::Page::Air, 40, [](screen::Inputs& i) { i.quality = {62, sensor::Level::Fair}; }, V::None, 0, true},
+        {"fun_day_bird", screen::Page::Day, 120, [](screen::Inputs& i) { at(i, 2026, 10, 13, 10, 0); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }, V::Bird, 0.08f},
+        {"fun_day_ladybug", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 10, 13, 12, 30); i.weather = {9.0f, true, 63, weather::Sky::Rain, 11, 6, 80}; }, V::Ladybug, 0.3f},
+        {"fun_day_moth", screen::Page::Day, 50, [](screen::Inputs& i) { at(i, 2026, 10, 14, 21, 0); i.weather = {9.0f, false, 3, weather::Sky::Cloudy, 12, 6, 20}; }, V::Moth, 0.4f},
+        {"fun_day_star", screen::Page::Day, 30, [](screen::Inputs& i) { at(i, 2026, 10, 14, 23, 30); i.weather = {7.0f, false, 0, weather::Sky::Clear, 12, 4, 0}; }, V::ShootingStar, 0.295f},
+        {"fun_day_butterfly", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 10, 17, 11, 0); i.weather = {20.0f, true, 0, weather::Sky::Clear, 22, 10, 0}; }, V::Butterfly, 0.4f},
+        {"fun_clock_hour", screen::Page::Clock, 120, [](screen::Inputs& i) { i.hour = 10; i.minute = 0; }},
         // situations: the indoor climate and the weather change what the squirrel does
         {"sit_party", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 12, 31, 23, 40); i.weather = {-1.0f, false, 0, weather::Sky::Clear, 2, -4, 0}; }},
         {"sit_smell", screen::Page::Day, 40, [](screen::Inputs& i) { at(i, 2026, 10, 12, 10, 0); i.air_drop = true; i.quality = {50, sensor::Level::Fair}; }},
@@ -165,10 +182,20 @@ int main(int argc, char** argv) {
         if (!f) return 1;
         screen::Inputs in = base_inputs();
         s.setup(in);
+        std::uint32_t t0 = 100000u;  // find the moment the clip wants to show
+        for (std::uint32_t t = t0; (s.want != V::None || s.wave) && t < t0 + 36000000u; t += 100) {
+            if (s.wave ? screen::fun::quirks(t, in.seed).wave > 0.02f
+                       : [&] { const auto v = screen::fun::visit(t, in.seed, screen::fun::allowed_visitors(s.page, in));
+                               return v.who == s.want && v.k >= s.at_k; }()) {
+                t0 = t - (s.wave ? 300u : 0u);
+                break;
+            }
+        }
         for (int i = 0; i < s.frames; ++i) {
             std::fill(fb.begin(), fb.end(), gfx::Rgb565be{0});
-            in.t_ms = 100000u + static_cast<std::uint32_t>(i) * 100u;
+            in.t_ms = t0 + static_cast<std::uint32_t>(i) * 100u;
             in.second = i / 10;
+            in.millis = (i % 10) * 100;
             screen::render_page({fb}, s.page, in);
             write_frame(f, fb);
         }

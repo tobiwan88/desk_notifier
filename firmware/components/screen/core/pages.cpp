@@ -1,5 +1,6 @@
 #include "screen/core/pages.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 
@@ -60,7 +61,19 @@ void render_clock(const Canvas& cv, const Inputs& in) noexcept {
     // the squirrel sits at the bottom, bigger than a peek
     Outfit o = outfit_for(in.weather_ok, in.weather);
     o.umbrella = o.windy = false;  // too tall for the peeking squirrel
-    draw_squirrel(cv, 120, 248, 0.62f, in.sensor_ok ? mood_for(in.quality.level) : Mood::Sleepy, in.t_ms, o);
+    fun::Quirks q = fun::quirks(in.t_ms, in.seed);
+    // on the full hour it pops up and waves for ten seconds
+    float pop = 0;
+    if (in.time_valid && in.minute == 0 && in.second < 12) {
+        const float s = static_cast<float>(in.second) + static_cast<float>(in.millis) / 1000.0f;
+        pop = std::clamp(std::min(s / 0.6f, (12.0f - s) / 1.0f), 0.0f, 1.0f);
+        pop = pop * pop * (3 - 2 * pop);
+        q.wave = std::max(q.wave, std::clamp(std::min((s - 0.6f) / 0.4f, (11.0f - s) / 0.5f), 0.0f, 1.0f));
+        q.hop = 0;
+    }
+    Mood mood = in.sensor_ok ? mood_for(in.quality.level) : Mood::Sleepy;
+    if (pop > 0 && mood == Mood::Okay) mood = Mood::Good;  // it is always glad to say hello
+    draw_squirrel(cv, 120, 248 - 11 * pop, 0.62f, mood, in.t_ms, o, q);
 }
 
 void render_page(const Canvas& cv, Page p, const Inputs& in) noexcept {
@@ -71,6 +84,8 @@ void render_page(const Canvas& cv, Page p, const Inputs& in) noexcept {
             AirData a;
             a.sensor_ok = in.sensor_ok; a.reading = in.reading; a.quality = in.quality; a.alert = in.alert; a.t_ms = in.t_ms;
             a.weather_ok = in.weather_ok; a.weather = in.weather;
+            a.quirks = fun::quirks(in.t_ms, in.seed);
+            a.visit = fun::visit(in.t_ms, in.seed, fun::allowed_visitors(Page::Air, in));
             render_air(cv, a);
             return;
         }
