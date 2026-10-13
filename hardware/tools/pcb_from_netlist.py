@@ -21,7 +21,10 @@ def parse(net_text):
         value = re.search(r'\(value "([^"]*)"', blk).group(1)
         fpid = re.search(r'\(footprint "([^"]*)"', blk).group(1)
         uuid = re.findall(r'\(tstamps "([^"]+)"\)', blk)[-1]
-        comps[ref] = (value, fpid, uuid)
+        fields = dict(re.findall(r'\(field\s*\(name "([^"]+)"\)\s*"([^"]*)"\)', blk.split("(libsource", 1)[0]))
+        fields.pop("Footprint", None)
+        no_bom = '(name "exclude_from_bom")' in blk
+        comps[ref] = (value, fpid, uuid, fields, no_bom)
     pads = {}
     for blk in net_text.split("(nets", 1)[1].split("(net\n")[1:]:
         name = re.search(r'\(name "([^"]+)"', blk).group(1)
@@ -59,7 +62,7 @@ def main():
         nets[name] = net
     existing = {fp.GetReference(): fp for fp in board.GetFootprints()}
     x, y = 4.0, 4.0
-    for ref, (value, fpid, uuid) in sorted(comps.items()):
+    for ref, (value, fpid, uuid, fields, no_bom) in sorted(comps.items()):
         fp = existing.get(ref)
         if fp is None:
             lib, name = fpid.split(":")
@@ -81,4 +84,5 @@ def main():
     print(f"{pcb_file}: {len(comps)} footprints, {len(nets)} nets")
 
 
-main()
+if __name__ == "__main__":
+    main()

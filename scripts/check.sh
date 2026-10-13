@@ -15,6 +15,8 @@ cmake --build build/host -j
 
 uv run pytest -q
 
+scripts/hw-check.sh
+
 if [[ $quick -eq 0 ]]; then
   . scripts/idf-env.sh
   if command -v idf.py >/dev/null; then (cd firmware && idf.py build); else echo "SKIP: idf.py not installed" >&2; fi

@@ -23,11 +23,31 @@ def pin_pos(sch: ksa.Schematic, ref: str, number: str) -> tuple[float, float]:
     return (round(comp.position.x + x, 2), round(comp.position.y - y, 2))
 
 
+def pin_away(sch: ksa.Schematic, ref: str, number: str) -> int:
+    """Direction (degrees, CCW) pointing from the pin's end away from the symbol body."""
+    comp = sch.components.get(ref)
+    pin = next(p for p in ksa.get_symbol_info(comp.lib_id).pins if p.number == number)
+    return int(pin.rotation + (comp.rotation or 0) + 180) % 360
+
+
 def connect(sch: ksa.Schematic, nets: dict[str, list[tuple[str, str]]]) -> None:
-    """Attach a local label with the net name to every listed pin."""
+    """Attach a local label with the net name to every listed pin, text pointing away from the body."""
     for net, pins in nets.items():
         for ref, number in pins:
-            sch.add_label(net, position=pin_pos(sch, ref, number))
+            sch.add_label(net, position=pin_pos(sch, ref, number), rotation=pin_away(sch, ref, number))
+
+
+def no_connect(sch: ksa.Schematic, ref: str, numbers: list[str]) -> None:
+    for number in numbers:
+        sch.no_connects.add(pin_pos(sch, ref, number))
+
+
+def save(sch: ksa.Schematic, path: Path) -> None:
+    """Save, then right-justify labels at 180/270 degrees (kicad-sch-api always writes 'left')."""
+    sch.save(path)
+    text = re.sub(r'(\(label "[^"]*"\s*\(at [-\d.]+ [-\d.]+ (?:180|270)\)\s*\(effects\s*\(font\s*\(size [\d.]+ [\d.]+\)\s*\)\s*\(justify )left',
+                  r"\1right", path.read_text())
+    path.write_text(text)
 
 
 def netlist(sch_file: Path) -> dict[str, set[tuple[str, str]]]:
