@@ -2,7 +2,12 @@
 Usage: finish.py board.kicad_pcb
 """
 
+import json
+import os
+import shutil
+import subprocess
 import sys
+import tempfile
 
 import pcbnew
 
@@ -19,7 +24,7 @@ for layer in (pcbnew.F_Cu, pcbnew.B_Cu):
     z.SetNet(gnd)
     z.SetLocalClearance(mm(0.25))
     z.SetMinThickness(mm(0.2))
-    z.SetPadConnection(pcbnew.ZONE_CONNECTION_THT_THERMAL)
+    z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)  # thermal spokes on the THT header got starved
     z.SetThermalReliefGap(mm(0.25))
     z.SetThermalReliefSpokeWidth(mm(0.3))
     z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
@@ -29,12 +34,43 @@ for layer in (pcbnew.F_Cu, pcbnew.B_Cu):
                  (edge.GetRight(), edge.GetBottom()), (edge.GetLeft(), edge.GetBottom())):
         o.Append(x, y)
     board.Add(z)
-# drop router leftovers: tiny segments with a dangling end
-board.BuildConnectivity()
-conn = board.GetConnectivity()
-for t in list(board.GetTracks()):
-    if t.GetClass() == "PCB_TRACK" and t.GetLength() < mm(0.2) and conn.TestTrackEndpointDangling(t, False):
-        board.Remove(t)
 pcbnew.ZONE_FILLER(board).Fill(board.Zones())
 pcbnew.SaveBoard(sys.argv[1], board)
+
+# drop router leftovers (dangling tracks/vias) one at a time; keep a removal only if it opens nothing
+
+
+def drc(path):
+    report = os.path.join(tempfile.mkdtemp(), "drc.json")
+    subprocess.run(["kicad-cli", "pcb", "drc", "--format", "json", "--severity-all", "-o", report, path],
+                   capture_output=True, check=True)
+    d = json.load(open(report))
+    dangling = [i["uuid"] for v in d["violations"] if v["type"] in ("via_dangling", "track_dangling") for i in v["items"]]
+    return dangling, len(d["unconnected_items"])
+
+
+dangling, open_before = drc(sys.argv[1])
+tried = set()
+while dangling:
+    uuid = next((u for u in dangling if u not in tried), None)
+    if uuid is None:
+        break
+    tried.add(uuid)
+    backup = sys.argv[1] + ".bak"
+    shutil.copy(sys.argv[1], backup)
+    board = pcbnew.LoadBoard(sys.argv[1])
+    for t in list(board.GetTracks()):
+        if t.m_Uuid.AsString() == uuid:
+            board.Remove(t)
+    pcbnew.ZONE_FILLER(board).Fill(board.Zones())
+    pcbnew.SaveBoard(sys.argv[1], board)
+    dangling, open_after = drc(sys.argv[1])
+    if open_after > open_before:
+        shutil.copy(backup, sys.argv[1])
+        dangling, _ = drc(sys.argv[1])
+        print(f"kept {uuid}: removing it opens a connection")
+    else:
+        print(f"removed dangling {uuid}")
+    os.remove(backup)
+board = pcbnew.LoadBoard(sys.argv[1])
 print(f"finished {sys.argv[1]}: {len(board.Zones())} zones")

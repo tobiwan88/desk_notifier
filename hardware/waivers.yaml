@@ -10,3 +10,6 @@
 - type: silk_edge_clearance
   item: "of J1 on F.Silkscreen"
   reason: The USB-C footprint marks the board edge line on silkscreen; clipped at the edge.
+- type: silk_edge_clearance
+  item: "of J2 on F.Silkscreen"
+  reason: The display socket's face sits 0.4 mm past the right edge by design (display plugs in from the side); its body outline is clipped there.

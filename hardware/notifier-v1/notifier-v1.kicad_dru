@@ -1,0 +1,5 @@
+(version 1)
+# No vias in SMD pads: open vias wick solder (LGA opens, 0402 tombstones); JLC via-in-pad costs extra.
+(rule "no via in SMD pad"
+  (constraint physical_clearance (min 0.1mm))
+  (condition "A.Type == 'Via' && B.Type == 'Pad' && B.Pad_Type == 'SMD'"))
