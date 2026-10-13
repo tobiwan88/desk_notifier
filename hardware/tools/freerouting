@@ -1,0 +1,9 @@
+#!/bin/sh
+# Freerouting 2.5 JAR, headless. The native freerouting-cli 2.5.0 crashes in its router
+# thread (GraalVM serialization of ComponentOutline) and then hangs, so use the JAR.
+# Analytics off (the JAR ships a BigQuery reporter); no neckdown below the board min width.
+here="$(cd "$(dirname "$0")/.." && pwd)"
+java="${JAVA:-/opt/homebrew/opt/openjdk/bin/java}"
+exec "$java" -Djava.awt.headless=true -jar "$here/.tools/freerouting-2.5.0/freerouting-2.5.0.jar" \
+    --gui.enabled=false --usage_and_diagnostic_data.disable_analytics=true \
+    --router.automatic_neckdown=false "$@"
