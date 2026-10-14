@@ -1,7 +1,10 @@
 #include "screen/idf/screen_task.hpp"
 
 #include <atomic>
+#include <mutex>
 #include <cctype>
+#include <cstdio>
+#include <cstring>
 #include <cstdlib>
 #include <string>
 #include <ctime>
@@ -47,6 +50,25 @@ Rotator::Config rotation_config() {
     return c;
 }
 portMUX_TYPE g_mux = portMUX_INITIALIZER_UNLOCKED;
+
+// The friendship with the owner, shared between the web server (visits) and the render task (reactions).
+std::mutex g_pet_mx;
+Bond g_bond;
+char g_name[12] = "";
+Reaction g_react{};
+std::uint32_t g_react_at = 0, g_react_id = 0;
+
+std::optional<int> today() {
+    std::tm tm{};
+    if (!clock_sync::local(tm)) return std::nullopt;
+    return cal::day_number(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+}
+
+void save_bond(const Bond& b) {
+    char buf[96];
+    bond_save(b, buf, sizeof buf);
+    settings::set("bond", buf);
+}
 Stats g_stats{};
 
 std::uint32_t now_ms() { return static_cast<std::uint32_t>(esp_timer_get_time() / 1000); }
@@ -92,6 +114,14 @@ void task(void*) {
         schedule.birthday_name[i] = 0;
     }
     AirTrend trend;
+    {
+        const std::lock_guard<std::mutex> lock(g_pet_mx);
+        g_bond = bond_load(settings::get("bond").value_or("").c_str());
+        const std::string name = settings::get("sqname").value_or("");
+        std::snprintf(g_name, sizeof g_name, "%s", name.c_str());
+    }
+    std::uint32_t seen_react = 0;
+    int watered_day = 0;
     const std::uint32_t seed = esp_random();  // a different string of little surprises after every boot
     RainWatch rain;
     Plant plant = plant_load(settings::get("plant").value_or("").c_str());
@@ -152,8 +182,29 @@ void task(void*) {
                     settings::set("plant", buf);
                 }
             }
+            {  // the friendship and a reaction to a visit
+                const std::lock_guard<std::mutex> lock(g_pet_mx);
+                in.bond = g_bond;
+                std::memcpy(in.pet_name, g_name, sizeof in.pet_name);
+                const std::uint32_t age = now - g_react_at;
+                if (g_react_id != 0 && age < reaction_ms(g_react.action)) {
+                    in.react = {true, g_react, static_cast<float>(age) / static_cast<float>(reaction_ms(g_react.action))};
+                }
+                if (g_react_id != seen_react) {
+                    seen_react = g_react_id;
+                    // watering perks up the window-sill plant, once a day
+                    const int day = in.year * 10000 + in.month * 100 + in.day;
+                    if (g_react.action == Action::Water && in.time_valid && watered_day != day && plant.droop > 0) {
+                        watered_day = day;
+                        --plant.droop;
+                        char buf[64];
+                        plant_save(plant, buf, sizeof buf);
+                        settings::set("plant", buf);
+                    }
+                }
+            }
             in.plant = plant;
-            const bool golden = fun::golden(now, seed) >= 0;  // the golden acorn: counted once, shown on the air page
+            const bool golden = fun::golden(now, seed, level(in.bond) >= 3) >= 0;  // the golden acorn: counted once, shown on the air page
             if (golden && !golden_seen) {
                 ++golden_count;
                 settings::set("golden", std::to_string(golden_count));
@@ -169,7 +220,7 @@ void task(void*) {
             if (CONFIG_DESK_PAGE_AIR_S > 0) avail |= 1u << static_cast<int>(Page::Air);
             if (CONFIG_DESK_PAGE_DAY_S > 0 && in.time_valid) avail |= 1u << static_cast<int>(Page::Day);
             // bad air: the squirrel stays on screen until the alert is acknowledged
-            const bool pin_air = alert || (golden && CONFIG_DESK_PAGE_AIR_S > 0);
+            const bool pin_air = alert || in.react.active || (golden && CONFIG_DESK_PAGE_AIR_S > 0);
             const auto frame = rot.tick(now, avail, pin_air ? std::optional<Page>(Page::Air) : std::nullopt);
             g_page = static_cast<int>(frame.page);
 
@@ -201,6 +252,59 @@ std::expected<void, engine::Err> start() noexcept {
 void ack() noexcept { g_ack = true; }
 void show_page(Page p) noexcept { g_show = static_cast<int>(p); }
 void next_page() noexcept { g_show = kPageCount; }
+
+std::optional<PetResult> pet(Action a, int item) noexcept {
+    const auto day = today();
+    if (!day) return std::nullopt;
+    PetResult res;
+    {
+        const std::lock_guard<std::mutex> lock(g_pet_mx);
+        res.reaction = interact(g_bond, *day, a, item);
+        res.bond = g_bond;
+        g_react = res.reaction;
+        g_react_at = now_ms();
+        ++g_react_id;
+    }
+    save_bond(res.bond);
+    ESP_LOGI(kTag, "pet: %s, +%d, level %d", action_name(a), res.reaction.gain, res.reaction.level);
+    return res;
+}
+
+PetStatus pet_status() noexcept {
+    PetStatus s;
+    const auto day = today();
+    bool changed = false;
+    {
+        const std::lock_guard<std::mutex> lock(g_pet_mx);
+        if (day) {
+            const int before = g_bond.score;
+            settle(g_bond, *day);  // the gentle fading of days away (never below the level reached)
+            changed = g_bond.score != before;
+        }
+        s.bond = g_bond;
+        std::memcpy(s.name, g_name, sizeof s.name);
+    }
+    if (changed) save_bond(s.bond);
+    if (day && s.bond.today != *day) { s.bond.done = 0; s.bond.treats = 0; s.bond.gained = 0; }  // a new day, nothing done yet
+    s.time_valid = day.has_value();
+    return s;
+}
+
+void set_pet_name(std::string_view name) noexcept {
+    char up[12] = "";
+    std::size_t n = 0;
+    for (const char c : name) {  // letters, digits and spaces the screen font can show
+        if (n + 1 >= sizeof up) break;
+        const char u = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        if ((u >= 'A' && u <= 'Z') || (u >= '0' && u <= '9') || u == ' ' || u == '-') up[n++] = u;
+    }
+    up[n] = 0;
+    {
+        const std::lock_guard<std::mutex> lock(g_pet_mx);
+        std::memcpy(g_name, up, sizeof g_name);
+    }
+    settings::set("sqname", up);
+}
 Page page() noexcept { return static_cast<Page>(g_page.load()); }
 
 Stats stats() noexcept {

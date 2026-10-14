@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f6e7d0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Squirrel</title>
+<style>
+:root{--bg:#f6e7d0;--card:#fffaf2;--ink:#3b2a1e;--soft:#8a6f5a;--fur:#e0873a;--fur2:#b0602a;--heart:#e8506a;--ok:#5a9e5a;--line:#ead8bf}
+@media (prefers-color-scheme:dark){:root{--bg:#231a14;--card:#30251d;--ink:#f6e7d0;--soft:#c2a68f;--line:#4a3a2e}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 ui-rounded,"SF Pro Rounded",system-ui,sans-serif;padding:max(16px,env(safe-area-inset-top)) 16px 32px}
+main{max-width:460px;margin:0 auto}
+header{text-align:center;padding:8px 0 4px}
+.face{font-size:64px;line-height:1;display:inline-block;transition:transform .3s}
+.face.bounce{animation:bounce .7s}
+@keyframes bounce{30%{transform:translateY(-14px) rotate(-6deg)}60%{transform:translateY(0) rotate(4deg)}}
+h1{margin:6px 0 0;font-size:26px;cursor:pointer}
+h1 small{display:block;font-size:13px;font-weight:500;color:var(--soft)}
+.hearts{font-size:26px;letter-spacing:4px;margin:6px 0 2px}
+.hearts span{opacity:.22}.hearts span.on{opacity:1}
+.level{color:var(--soft);font-size:14px}
+.bar{height:10px;background:var(--line);border-radius:6px;overflow:hidden;margin:10px auto 4px;max-width:260px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--fur),var(--heart));border-radius:6px;transition:width .6s}
+.stats{display:flex;justify-content:center;gap:18px;color:var(--soft);font-size:14px;margin-top:6px}
+.say{background:var(--card);border:2px solid var(--line);border-radius:18px;padding:14px 16px;margin:16px 0;min-height:56px;position:relative;font-size:17px}
+.say:before{content:"";position:absolute;top:-10px;left:50%;margin-left:-9px;border:9px solid transparent;border-top:0;border-bottom-color:var(--line)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+button{font:inherit;color:inherit;border:0;cursor:pointer}
+.act{background:var(--card);border:2px solid var(--line);border-radius:20px;padding:14px 8px;display:flex;flex-direction:column;align-items:center;gap:4px;min-height:96px;transition:transform .12s,border-color .2s}
+.act:active{transform:scale(.95)}
+.act b{font-size:34px;line-height:1.1}
+.act span{font-weight:600}
+.act em{font-style:normal;font-size:12px;color:var(--ok);min-height:16px}
+.pick{display:none;gap:8px;justify-content:center;margin:10px 0 2px;flex-wrap:wrap}
+.pick.open{display:flex}
+.pick button{background:var(--card);border:2px solid var(--line);border-radius:14px;padding:8px 12px;font-size:15px}
+.pick button b{font-size:22px;display:block}
+h2{font-size:15px;color:var(--soft);font-weight:600;margin:22px 0 8px;text-align:center}
+.shelf{display:flex;justify-content:center;gap:10px;font-size:30px;min-height:40px;border-bottom:6px solid var(--fur2);border-radius:2px;padding-bottom:2px}
+.shelf .none{font-size:14px;color:var(--soft);align-self:center}
+footer{text-align:center;color:var(--soft);font-size:13px;margin-top:22px}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="face" id="face">🐿️</div>
+  <h1 id="name" title="Tap to give me a name">Your squirrel<small>tap to give me a name</small></h1>
+  <div class="hearts" id="hearts"><span>❤️</span><span>❤️</span><span>❤️</span><span>❤️</span><span>❤️</span></div>
+  <div class="level" id="level">&nbsp;</div>
+  <div class="bar"><i id="bar" style="width:0"></i></div>
+  <div class="stats"><span id="streak"></span><span id="visits"></span></div>
+</header>
+
+<div class="say" id="say">Hello! Look at the desk while you visit me.</div>
+
+<div class="grid">
+  <button class="act" data-a="feed" data-pick="treats"><b>🌰</b><span>Feed</span><em></em></button>
+  <button class="act" data-a="coffee"><b>☕</b><span>Coffee break</span><em></em></button>
+  <button class="act" data-a="party"><b>🎉</b><span>Party</span><em></em></button>
+  <button class="act" data-a="pet"><b>🤗</b><span>Pet</span><em></em></button>
+  <button class="act" data-a="play"><b>🎾</b><span>Play catch</span><em></em></button>
+  <button class="act" data-a="water"><b>🪴</b><span>Water the plant</span><em></em></button>
+  <button class="act" data-a="goodnight"><b>🌙</b><span>Good night</span><em></em></button>
+  <button class="act" data-a="gift" data-pick="gifts"><b>🎁</b><span>Give a gift</span><em></em></button>
+</div>
+<div class="pick" id="treats">
+  <button data-item="acorn"><b>🌰</b>Acorn</button>
+  <button data-item="hazelnut"><b>🥜</b>Hazelnut</button>
+  <button data-item="berry"><b>🍓</b>Berry</button>
+</div>
+<div class="pick" id="gifts">
+  <button data-item="flower"><b>🌸</b>Flower</button>
+  <button data-item="pebble"><b>🪨</b>Pebble</button>
+  <button data-item="feather"><b>🪶</b>Feather</button>
+  <button data-item="shell"><b>🐚</b>Shell</button>
+  <button data-item="pinecone"><b>🌲</b>Pine cone</button>
+  <button data-item="heart"><b>❤️</b>Heart</button>
+</div>
+
+<h2>My shelf</h2>
+<div class="shelf" id="shelf"><span class="none">Nothing yet. Gifts end up here, and on the wall at the desk.</span></div>
+
+<footer>A visit a day makes me happiest. I never forget a friend. 💛</footer>
+</main>
+<script>
+const ICON={flower:"🌸",pebble:"🪨",feather:"🪶",shell:"🐚",pinecone:"🌲",heart:"❤️",acorn:"🌰",hazelnut:"🥜",berry:"🍓"};
+const LEVEL_TEXT=["We are just getting to know each other.","I like you!","You are my friend.","Best friends forever!","You are family. 💛"];
+const $=id=>document.getElementById(id);
+let state=null;
+
+function say(t){$("say").textContent=t;const f=$("face");f.classList.remove("bounce");void f.offsetWidth;f.classList.add("bounce")}
+
+function show(s){
+  state=s;
+  const nm=s.name?s.name.charAt(0)+s.name.slice(1).toLowerCase():"";
+  $("name").innerHTML=(nm||"Your squirrel")+"<small>"+(nm?"tap to rename":"tap to give me a name")+"</small>";
+  document.title=nm||"Squirrel";
+  [...$("hearts").children].forEach((h,i)=>h.classList.toggle("on",i<s.hearts));
+  $("level").textContent=s.level_name.charAt(0)+s.level_name.slice(1).toLowerCase()+": "+LEVEL_TEXT[s.level];
+  const lo=s.level*20,hi=s.next;$("bar").style.width=(s.level>=4?100:Math.max(4,(s.score-lo)/(hi-lo)*100))+"%";
+  $("streak").textContent=s.streak>1?"🔥 "+s.streak+" days in a row":s.streak==1?"🌱 visited today":"";
+  $("visits").textContent=s.visits?"🐾 "+s.visits+" visits":"";
+  document.querySelectorAll(".act").forEach(b=>{b.querySelector("em").textContent=s.done_today.includes(b.dataset.a)?"✓ today":""});
+  $("shelf").innerHTML=s.gifts.length?s.gifts.map(g=>"<span title='"+g+"'>"+ICON[g]+"</span>").join(""):"<span class='none'>Nothing yet. Gifts end up here, and on the wall at the desk.</span>";
+}
+
+function message(r){
+  const it=r.item?ICON[r.item]:"";
+  const words={
+    feed:r.too_full?"So full… but thank you! "+it+" I'll keep it for later.":"Nom nom! "+it+" Delicious, thank you!",
+    coffee:"Cheers! ☕ A break together is the best break.",
+    party:"Party time! 🎉 Watch me dance!",
+    pet:"Purrr… 🤗 That's the spot.",
+    play:"Catch! 🎾 Again, again!",
+    water:"Fresh water! 🪴 The plant says thanks too.",
+    goodnight:"Night night. 🌙 Sweet dreams!",
+    gift:r.new_gift?"For me? "+it+" I'll put it on my shelf!":"Another one! "+it+" Thank you!"
+  };
+  let t=words[r.action]||"Thank you!";
+  const WE=["getting to know each other","friendly","friends","best friends","family"];
+  if(r.level_up)t="Yay! We're "+WE[r.level]+" now! ❤️ "+t;
+  else if(r.welcome_back)t="You're back! I'm so happy to see you. "+t;
+  return t;
+}
+
+async function load(){
+  try{const r=await fetch("/api/pet");show(await r.json())}catch(e){}
+}
+
+async function act(action,item){
+  document.querySelectorAll(".pick").forEach(p=>p.classList.remove("open"));
+  try{
+    const r=await fetch("/api/pet",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(item?{action,item}:{action})});
+    const j=await r.json();
+    if(!j.ok){say(j.message||"Just a moment, I'm waking up!");return}
+    show(j);say(message(j));
+  }catch(e){say("I can't hear you right now. Are you on the same Wi-Fi?")}
+}
+
+document.querySelectorAll(".act").forEach(b=>b.addEventListener("click",()=>{
+  const pick=b.dataset.pick;
+  if(pick){const p=$(pick);const open=!p.classList.contains("open");document.querySelectorAll(".pick").forEach(x=>x.classList.remove("open"));p.classList.toggle("open",open);return}
+  act(b.dataset.a);
+}));
+document.querySelectorAll("#treats button").forEach(b=>b.addEventListener("click",()=>act("feed",b.dataset.item)));
+document.querySelectorAll("#gifts button").forEach(b=>b.addEventListener("click",()=>act("gift",b.dataset.item)));
+$("name").addEventListener("click",async()=>{
+  const n=prompt("What's my name?",state&&state.name?state.name.charAt(0)+state.name.slice(1).toLowerCase():"");
+  if(n===null)return;
+  try{const r=await fetch("/api/pet",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:n.trim().replace(/[^A-Za-z0-9-]/g,"").slice(0,11)})});show(await r.json());if(n.trim())say("I love it! Call me "+n.trim()+".")}catch(e){}
+});
+load();setInterval(load,30000);
+</script>
+</body>
+</html>

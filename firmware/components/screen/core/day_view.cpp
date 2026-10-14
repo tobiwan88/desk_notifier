@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <cstring>
 #include <string_view>
 
@@ -445,6 +446,7 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
     if (occ == Occasion::Birthday || occ == Occasion::SquirrelDay || occ == Occasion::NewYearsEve || party)
         P::bunting(cv, 22, t, false);
     if (occ == Occasion::Anniversary || occ == Occasion::Valentine) P::bunting(cv, 22, t, true);
+    if (in.bond.gifts) P::gift_shelf(cv, 46, 48, 42, in.bond.gifts);  // the owner's gifts
     if (sc.countdown > 0) P::wall_calendar(cv, 37, 76, 1.0f, sc.countdown, sc.countdown_to != Occasion::Christmas);
 
     // who owns the left of the desk: a prop of the situation, else the reading lamp, else yesterday's mug
@@ -716,13 +718,21 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
         const float y = x < edge ? kDeskTop - 4 : kDeskTop - 4 + (x - edge) * (x - edge) * 0.08f;
         rolling_acorn(cv, x, y, (x - 60) / 4.5f);
     }
+    const int lvl = level(in.bond);
+    const float gift = lvl >= 4 && !bed ? fun::present_for_you(t, in.seed) : -1.0f;  // family: a present for you
+    if (gift >= 0) P::present(cv, 64, kDeskTop + 2, 1.6f, t);
+    char hi[24] = "";
+    if (in.pet_name[0] && lvl >= 2) std::snprintf(hi, sizeof hi, "HI, I'M %s", in.pet_name);
     const char* say = nullptr;
-    if (gag.gag == fun::Gag::ClockWatch) say = "ALMOST WEEKEND";
+    if (gift >= 0) say = "A GIFT FOR YOU!";
+    else if (gag.gag == fun::Gag::ClockWatch) say = "ALMOST WEEKEND";
     else if (gag.gag == fun::Gag::Sigh) say = "SIGH...";
     else if (startled) say = "I'M AWAKE!";
     else if (gag.gag == fun::Gag::Cheeks) say = "NOM NOM NOM";
     else if (sit == Situation::None && occ == Occasion::None && sc.countdown == 0)
         say = fun::pun(t, in.seed, static_cast<int>(act));
+    if (say && hi[0] && gift < 0 && gag.gag == fun::Gag::None && (t / 6000u) % 2 == 0 && text_width(hi, 2) <= 184)
+        say = hi;  // now and then it says its name instead of a pun
     caption(cv, sc, in, say);
 }
 

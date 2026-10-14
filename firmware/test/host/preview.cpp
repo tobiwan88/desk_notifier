@@ -30,6 +30,16 @@ void at(screen::Inputs& i, int y, int m, int d, int h, int mi) {
     i.weekday = screen::cal::weekday(y, m, d);
 }
 
+// A visit from the pet page playing on screen, at friendship level `lvl`.
+void react(screen::Inputs& i, screen::Action a, int lvl, int item = 0) {
+    i.react.active = true;
+    i.react.r.action = a;
+    i.react.r.item = item;
+    i.react.r.level = lvl;
+    i.bond.score = lvl * 20 + 5;
+    i.bond.best = lvl;
+}
+
 screen::Inputs base_inputs() {
     screen::Inputs in;
     in.time_valid = true; in.hour = 9; in.minute = 41; in.weekday = 0; in.day = 11; in.month = 10;
@@ -121,6 +131,23 @@ int main(int argc, char** argv) {
         {"gag_clock_watch", screen::Page::Day, 70, [](screen::Inputs& i) { at(i, 2026, 10, 16, 16, 0); }, V::None, 0, false, [](std::uint32_t t, const screen::Inputs& in) { const auto g = screen::fun::gag(t, in.seed, screen::allowed_gags(screen::scene_for(in), in)); return g.gag == screen::fun::Gag::ClockWatch && g.k > 0.02f; }},
         {"gag_sigh", screen::Page::Day, 70, [](screen::Inputs& i) { at(i, 2026, 10, 12, 9, 15); }, V::None, 0, false, [](std::uint32_t t, const screen::Inputs& in) { const auto g = screen::fun::gag(t, in.seed, screen::allowed_gags(screen::scene_for(in), in)); return g.gag == screen::fun::Gag::Sigh && g.k > 0.02f; }},
         {"gag_stretch", screen::Page::Day, 70, [](screen::Inputs& i) { at(i, 2026, 10, 13, 10, 0); i.quality = {40, sensor::Level::Stale}; i.weather = {18.0f, true, 2, weather::Sky::PartlyCloudy, 20, 9, 10}; }, V::None, 0, false, [](std::uint32_t t, const screen::Inputs& in) { const auto g = screen::fun::gag(t, in.seed, screen::allowed_gags(screen::scene_for(in), in)); return g.gag == screen::fun::Gag::Stretch && g.k > 0.02f; }},
+        // the friendship: reactions to the pet page and the level perks
+        {"pet_feed", screen::Page::Air, 120, [](screen::Inputs& i) { react(i, screen::Action::Feed, 2, 1); }},
+        {"pet_feed_full", screen::Page::Air, 60, [](screen::Inputs& i) { react(i, screen::Action::Feed, 2, 0); i.react.r.too_full = true; }},
+        {"pet_coffee", screen::Page::Air, 120, [](screen::Inputs& i) { react(i, screen::Action::Coffee, 1); i.react.r.welcome_back = true; }},
+        {"pet_party", screen::Page::Air, 100, [](screen::Inputs& i) { react(i, screen::Action::Party, 1); }},
+        {"pet_party_best", screen::Page::Air, 100, [](screen::Inputs& i) { react(i, screen::Action::Party, 3); i.react.r.level_up = true; }},
+        {"pet_pet", screen::Page::Air, 80, [](screen::Inputs& i) { react(i, screen::Action::Pet, 2); std::strcpy(i.pet_name, "NUTTY"); }},
+        {"pet_play", screen::Page::Air, 120, [](screen::Inputs& i) { react(i, screen::Action::Play, 2); }},
+        {"pet_water", screen::Page::Air, 100, [](screen::Inputs& i) { react(i, screen::Action::Water, 2); i.plant.leaves = 6; i.plant.droop = 1; }},
+        {"pet_goodnight", screen::Page::Air, 100, [](screen::Inputs& i) { react(i, screen::Action::GoodNight, 2); i.weather = {8.0f, false, 0, weather::Sky::Clear, 12, 4, 0}; }},
+        {"pet_gift", screen::Page::Air, 120, [](screen::Inputs& i) { react(i, screen::Action::Gift, 2, 3); i.react.r.new_gift = true; }},
+        {"perk_fox", screen::Page::Air, 80, [](screen::Inputs& i) { at(i, 2026, 10, 14, 11, 0); i.bond.score = 85; i.bond.best = 4; i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }, V::Fox, 0.3f},
+        {"perk_friend", screen::Page::Air, 80, [](screen::Inputs& i) { at(i, 2026, 10, 17, 11, 0); i.bond.score = 85; i.bond.best = 4; i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }, V::Friend, 0.35f},
+        {"perk_shelf_present", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 10, 14, 10, 0); i.bond.score = 85; i.bond.best = 4; i.bond.gifts = 0x3F; }, V::None, 0, false,
+         [](std::uint32_t t, const screen::Inputs& in) { return screen::fun::present_for_you(t, in.seed) > 0.05f; }},
+        {"perk_name", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 10, 14, 10, 0); i.bond.score = 45; i.bond.best = 2; i.bond.gifts = 0x05; std::strcpy(i.pet_name, "NUTTY"); }, V::None, 0, false,
+         [](std::uint32_t t, const screen::Inputs& in) { return screen::fun::pun(t, in.seed, 2) != nullptr && (t / 6000u) % 2 == 0 && screen::fun::gag(t, in.seed, screen::allowed_gags(screen::scene_for(in), in)).gag == screen::fun::Gag::None; }},
         // situations: the indoor climate and the weather change what the squirrel does
         {"sit_party", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 12, 31, 23, 40); i.weather = {-1.0f, false, 0, weather::Sky::Clear, 2, -4, 0}; }},
         {"sit_smell", screen::Page::Day, 40, [](screen::Inputs& i) { at(i, 2026, 10, 12, 10, 0); i.air_drop = true; i.quality = {50, sensor::Level::Fair}; }},
@@ -230,6 +257,7 @@ int main(int argc, char** argv) {
             in.t_ms = t0 + static_cast<std::uint32_t>(i) * 100u;
             in.second = i / 10;
             in.millis = (i % 10) * 100;
+            if (in.react.active) in.react.k = static_cast<float>(i) / static_cast<float>(s.frames);  // the whole reaction
             screen::render_page({fb}, s.page, in);
             write_frame(f, fb);
         }

@@ -87,8 +87,13 @@ void render_page(const Canvas& cv, Page p, const Inputs& in) noexcept {
             a.quirks = fun::quirks(in.t_ms, in.seed);
             a.visit = fun::visit(in.t_ms, in.seed, fun::allowed_visitors(Page::Air, in));
             a.rainbow = fun::rainbow_alpha(in);
-            a.golden = fun::golden(in.t_ms, in.seed);
+            a.golden = fun::golden(in.t_ms, in.seed, level(in.bond) >= 3);
             a.golden_count = in.golden_count;
+            a.react = in.react;
+            a.level = level(in.bond);
+            if (a.level >= 1) a.quirks.wave = std::max(a.quirks.wave, fun::hello(in.t_ms, in.seed));
+            std::memcpy(a.pet_name, in.pet_name, sizeof a.pet_name);
+            a.plant = in.plant;
             if (in.time_valid) {
                 a.moon_phase = cal::moon_phase(in.year, in.month, in.day, in.hour);
                 const bool night = in.weather_ok ? !in.weather.is_day : (in.hour >= 19 || in.hour < 5);
