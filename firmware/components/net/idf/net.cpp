@@ -51,12 +51,7 @@ void on_event(void*, esp_event_base_t base, std::int32_t id, void* data) {
 }  // namespace
 
 std::string hostname() noexcept {
-    if (auto h = settings::get("hostname")) return *h;
-    std::uint8_t mac[6]{};
-    esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    char b[20];
-    std::snprintf(b, sizeof b, "desk-%02x%02x%02x", mac[3], mac[4], mac[5]);
-    return b;
+    return settings::get("hostname").value_or(CONFIG_DESK_HOSTNAME);
 }
 
 bool open_access() noexcept {
