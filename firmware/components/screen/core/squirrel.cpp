@@ -5,6 +5,7 @@
 #include <cstdio>
 
 #include "screen/core/draw.hpp"
+#include "screen/core/friend_view.hpp"
 #include "screen/core/props.hpp"
 #include "screen/core/sky.hpp"
 
@@ -560,6 +561,23 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
         if (hog) props::hedgehog(cv, x, hill_y(x) + 2, 1.4f, dir, t);
         else props::snail(cv, x, hill_y(x) + 2, 1.7f, dir, t);
     }
+    if ((v.who == fun::Visitor::Fox || v.who == fun::Visitor::Friend) && !d.react.active) {  // family visits
+        const float k = v.k;
+        auto ease = [](float e) { e = std::clamp(e, 0.0f, 1.0f); return e * e * (3 - 2 * e); };
+        const float x = k < 0.15f ? -30 + 80 * ease(k / 0.15f) : k > 0.85f ? 50 - 80 * ease((k - 0.85f) / 0.15f) : 50;
+        if (v.who == fun::Visitor::Fox) {
+            props::fox(cv, x, hill_y(x) + 3, 1.5f, 1, t);
+        } else {  // a little squirrel friend with a bow, waving
+            constexpr float s = 0.42f;
+            fun::Quirks fq;
+            fq.wave = std::min(ease((k - 0.3f) / 0.1f), ease((0.7f - k) / 0.1f));
+            fq.blink = ph(t + 777, 3100) > 0.95f;
+            const float cy = hill_y(x) + 2 - 35 * s;
+            draw_squirrel(cv, x, cy, s, Mood::Good, t + 1234, Outfit{}, fq);
+            const Bob b = squirrel_bob(Mood::Good, t + 1234);
+            props::bow(cv, x + (142 - 125 + b.dx) * s, cy + (70 - 150 + b.dy) * s, 1.0f);
+        }
+    }
     if (v.who == fun::Visitor::Bee) {  // from flower to flower
         const float k = v.k, a = k * 2 * kPi * 2;
         float x = 52 + std::cos(a) * 30 + std::sin(a * 2.3f) * 8, y = 170 + std::sin(a) * 18;
@@ -567,6 +585,9 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
         if (k > 0.9f) { const float e = (k - 0.9f) / 0.1f; x += (260 - x) * e; y += (110 - y) * e; }
         props::bee(cv, x, y, 1.7f, t);
     }
+
+    const bool reacting = d.react.active;  // a visit from the pet page
+    if (reacting) friends::back(cv, d);
 
     if (wx) sky::precipitation(cv, sk, t);  // in front of the hills, behind the squirrel
 
@@ -584,7 +605,7 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
 
     const Outfit outfit = outfit_for(d.weather_ok, d.weather);
     const bool bird = d.visit.who == fun::Visitor::Bird && !outfit.umbrella;
-    const bool gold = d.golden >= 0 && m != Mood::Bad;
+    const bool gold = d.golden >= 0 && m != Mood::Bad && !reacting;
     fun::Quirks q = d.quirks;
     if (bird) q.hop = 0;  // sits still while the bird is on its head
     Mood face = m;
@@ -598,15 +619,18 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
     }
     Outfit look = outfit;
     look.wolf = d.wolf;
-    if (outfit.umbrella) draw_squirrel(cv, 144, 156, 0.78f, face, t, look, q);  // smaller, canopy clear of the top text
-    else draw_squirrel(cv, 146, 136, 0.92f, face, t, look, q);
-    if (q.howl > 0.05f) fun::howl_text(cv, 150, 106, 178, 128, q.howl, t);
-    if (bird) {
+    friends::Pose pose{face, look, q};
+    if (reacting) pose = friends::pose(d, face, look, q);
+    if (pose.outfit.umbrella) draw_squirrel(cv, 144, 156, 0.78f, pose.face, t, pose.outfit, pose.q);  // smaller, canopy clear of the top text
+    else draw_squirrel(cv, 146, 136, 0.92f, pose.face, t, pose.outfit, pose.q);
+    if (reacting) friends::front(cv, d, pose, 146, 136, 0.92f);
+    if (q.howl > 0.05f && !reacting) fun::howl_text(cv, 150, 106, 178, 128, q.howl, t);
+    if (bird && !reacting) {
         const Bob b = squirrel_bob(m, t);
         constexpr float s = 0.92f;
         fun::bird_on_head(cv, 146 + (b.dx - 4) * s, 136 + (b.dy + (outfit.hat ? 56 : 76) - 150) * s, 1.2f, d.visit, t);
     }
-    if (d.visit.who == fun::Visitor::Butterfly) fun::butterfly(cv, 14, 50, 150, 170, d.visit, t);
+    if (d.visit.who == fun::Visitor::Butterfly && !reacting) fun::butterfly(cv, 14, 50, 150, 170, d.visit, t);
     if (d.visit.who == fun::Visitor::Leaves) props::falling_leaves(cv, d.visit.k, t, d.visit.r);
     if (d.visit.who == fun::Visitor::Petals) props::petals(cv, d.visit.k, t, d.visit.r);
 
@@ -641,6 +665,10 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
         draw::label(cv, 22, 2, white, buf);
     } else {
         draw::label(cv, 22, 2, white, "NO SENSOR");
+    }
+    if (reacting) {
+        friends::labels(cv, d);
+        return;
     }
     if (gold) {
         draw::label(cv, 186, 2, hex(0xFFE27A), "GOLDEN ACORN!");
