@@ -27,6 +27,8 @@ PLACE = {
     "R7": (13.7, 12.6, 0, "F"), "R8": (13.7, 13.9, 0, "F"),        # I2C pull-ups
     # BME688 peninsula (top-left): notch on the module side and below, neck at the left edge
     "U4": (4.5, 4.6, 0, "F"), "C7": (3.3, 7.9, 0, "F"), "C8": (5.3, 7.9, 0, "F"),
+    # SHT40 in the island's bottom-right corner, 6 mm from the BME688 (no pour between them)
+    "U5": (8.8, 8.8, 90, "F"), "C9": (8.8, 6.9, 180, "F"),
     # buttons on the left under the island
     "SW1": (4.8, 17.8, 0, "F"), "SW2": (4.8, 25.6, 0, "F"),
     # USB-C at the bottom edge, ESD and CC resistors next to it, then the polyfuse
@@ -53,17 +55,18 @@ PLACE = {
 # BME688 peninsula: notch (slot width 1.2 mm) along the module side and below, open to the top edge;
 # the island hangs on a 2.6 mm neck at the left board edge, away from the module and the buck
 S = 1.2
-OUTLINE = [(0, 0), (10.4, 0), (10.4, 10.4), (2.6, 10.4), (2.6, 10.4 + S), (10.4 + S, 10.4 + S), (10.4 + S, 0),
+IH = 11.8  # island height
+OUTLINE = [(0, 0), (10.4, 0), (10.4, IH), (3.6, IH), (3.6, IH + S), (10.4 + S, IH + S), (10.4 + S, 0),
            (W, 0), (W, H), (0, H)]
-ISLAND = [(0, 0), (10.4, 0), (10.4, 10.4), (0, 10.4)]
-NECK = [(0, 10.4), (4.5, 10.4), (4.5, 13.2), (0, 13.2)]          # no pours here: keep plane heat off the neck
+ISLAND = [(0, 0), (10.4, 0), (10.4, IH), (0, IH)]
+NECK = [(0, IH), (4.5, IH), (4.5, IH + 2.8), (0, IH + 2.8)]          # no pours here: keep plane heat off the neck
 ANTENNA_STRIP = [(10.4 + S, 0), (W, 0), (W, 1.8), (10.4 + S, 1.8)]  # no pours/vias beside the antenna
 
 SILK = [  # (text, x, y, size, layer)
-    ("RST", 4.8, 13.8, 1.0, "F"), ("BOOT", 4.8, 21.9, 1.0, "F"), ("BTN", 36.4, 35.0, 0.8, "F"),
+    ("RST", 4.8, 14.2, 1.0, "F"), ("BOOT", 4.8, 21.9, 1.0, "F"), ("BTN", 36.4, 35.0, 0.8, "F"),
     ("TX", 36.3, 4.4, 0.8, "F"), ("RX", 38.6, 4.4, 0.8, "F"), ("GND", 40.9, 4.4, 0.8, "F"),
     ("3V3", 43.2, 4.4, 0.8, "F"), ("EN", 45.5, 4.4, 0.8, "F"), ("IO0", 47.8, 4.4, 0.8, "F"),
-    ("5V", 33.6, 21.4, 0.8, "F"), ("3V3", 33.4, 25.0, 0.8, "F"), ("BME688", 5.0, 9.4, 0.8, "F"),
+    ("5V", 33.6, 21.4, 0.8, "F"), ("3V3", 33.4, 25.0, 0.8, "F"), ("BME688", 4.9, 10.3, 0.8, "F"),
     ("desk notifier v1", 25.0, 21.8, 1.0, "F"), ("LCD", 44.5, 7.5, 1.0, "F"), ("1", 39.8, 28.6, 0.8, "F"),
 ] + [(name, 37.4, 26.0 - 2.54 * i, 0.8, "B") for i, name in enumerate(("VCC", "GND", "SCL", "SDA", "DC", "CS", "RST"))]
 
@@ -195,6 +198,24 @@ def main():
     missing = sorted(set(PLACE) - set(comps))
     if missing:
         sys.exit(f"placement for unknown refs: {missing}")
+
+    def pad(ref, num):
+        return next(q for q in board.FindFootprintByReference(ref).Pads() if q.GetNumber() == num)
+
+    def trk(a, pts, width=0.2):
+        for p0, p1 in zip(pts, pts[1:]):
+            t = pcbnew.PCB_TRACK(board)
+            t.SetStart(p0), t.SetEnd(p1), t.SetWidth(mm(width)), t.SetLayer(pcbnew.F_Cu), t.SetNet(a.GetNet())
+            board.Add(t)
+
+    # SHT40 pads are 0.3 mm apart and its footprint keepout only lets tracks leave a pad straight:
+    # hand-draw C9 -> VDD/VSS and short stubs off SDA/SCL, which the router then extends
+    for n9, n5 in (("1", "3"), ("2", "4")):
+        q = pad("U5", n5).GetPosition()
+        trk(pad("U5", n5), [q, pcbnew.VECTOR2I(q.x, q.y - mm(0.6)), pad("C9", n9).GetPosition()])
+    for n5 in ("1", "2"):
+        q = pad("U5", n5).GetPosition()
+        trk(pad("U5", n5), [q, pcbnew.VECTOR2I(q.x, q.y + mm(0.8))])
 
     full = [(0, 0), (W, 0), (W, H), (0, H)]
     zone(board, pcbnew.In1_Cu, "/GND", full)

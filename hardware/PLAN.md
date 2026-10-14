@@ -25,6 +25,9 @@ scripts/hw-check.sh [--bom --qty N]      # the gate alone (also part of scripts/
   and warm the sensor; the design review caught it.
 - **Sensor**: BME688 at 0x77 on a peninsula (1.2 mm notch facing the module and below, neck at the
   left edge), no pours on the island or neck, far from the module and the buck.
+- **Temperature/humidity**: SHT40-AD1B (C2909890, 0x44, ±1.8 %RH / ±0.2 °C) on the same island, in the
+  corner away from the BME688: its gas heater warms the BME688, so T/RH come from the SHT40 and the
+  BME688 is used for gas/air quality (and pressure).
 - **Display**: 7-pin GC9A01 module (VCC GND SCL SDA DC CS RST) on a right-angle 1x7 female socket
   (C22436148) whose face sits 0.4 mm past the right edge; pin names on the bottom silkscreen.
   JP1 selects LCD VCC: 3V3 (default, bridged) or 5V.

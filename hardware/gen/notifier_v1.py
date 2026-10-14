@@ -1,4 +1,4 @@
-"""notifier-v1 schematic: ESP32-S3-WROOM-1, USB-C power/data, TLV62569 buck, BME688, 7-pin GC9A01 header.
+"""notifier-v1 schematic: ESP32-S3-WROOM-1, USB-C power/data, TLV62569 buck, BME688, 7-pin GC9A01 header, SHT40.
 
 PARTS and NETS are the source of truth; the checks (tools/checks.py) import them.
 Run: uv run --package desk-hardware python hardware/gen/notifier_v1.py [out_dir]
@@ -47,6 +47,9 @@ PARTS = {
     "U4": ("Sensor:BME680", "BME688", "Package_LGA:Bosch_LGA-8_3x3mm_P0.8mm_ClockwisePinNumbering", "C3664478", (90, 200), 0),
     "C7": ("Device:C", "100n", C0402, "C1525", (60, 185), 0),
     "C8": ("Device:C", "100n", C0402, "C1525", (70, 185), 0),
+    # SHT40 (0x44): temperature/humidity away from the BME688's gas heater
+    "U5": ("Sensor_Humidity:SHT4x", "SHT40-AD1B", "Sensor_Humidity:Sensirion_DFN-4_1.5x1.5mm_P0.8mm_SHT4x_NoCentralPad", "C2909890", (125, 215), 0),
+    "C9": ("Device:C", "100n", C0402, "C1525", (105, 225), 0),
     "R7": ("Device:R", "4.7k", R0402, "C25900", (120, 185), 0),
     "R8": ("Device:R", "4.7k", R0402, "C25900", (130, 185), 0),
     # GC9A01 display header and its supply selector (default 3V3, cut and bridge 2-3 for 5 V)
@@ -79,9 +82,9 @@ NETS = {
     "GND": [("J1", "A1"), ("J1", "A12"), ("J1", "B1"), ("J1", "B12"), ("J1", "SH"), ("R1", "2"), ("R2", "2"), ("U2", "2"),
             ("U3", "2"), ("R10", "2"), ("C1", "2"), ("C2", "2"), ("C3", "2"), ("D1", "1"), ("U1", "1"), ("U1", "40"), ("U1", "41"),
             ("C5", "2"), ("C6", "2"), ("C4", "2"), ("SW1", "2"), ("SW2", "2"), ("SW3", "2"), ("U4", "1"), ("U4", "7"),
-            ("C7", "2"), ("C8", "2"), ("J2", "2"), ("TP3", "1"), ("#FLG02", "1")],
+            ("C7", "2"), ("C8", "2"), ("U5", "4"), ("C9", "2"), ("J2", "2"), ("TP3", "1"), ("#FLG02", "1")],
     "+3V3": [("L1", "2"), ("R9", "1"), ("TP4", "1"), ("#FLG03", "1"), ("C2", "1"), ("C3", "1"), ("R3", "1"), ("U1", "2"), ("C5", "1"), ("C6", "1"), ("R4", "1"),
-             ("R5", "1"), ("R6", "1"), ("U4", "8"), ("U4", "6"), ("U4", "2"), ("U4", "5"), ("C7", "1"), ("C8", "1"),
+             ("R5", "1"), ("R6", "1"), ("U4", "8"), ("U4", "6"), ("U4", "2"), ("U4", "5"), ("C7", "1"), ("C8", "1"), ("U5", "3"), ("C9", "1"),
              ("R7", "1"), ("R8", "1"), ("JP1", "1")],
     "CC1": [("J1", "A5"), ("R1", "1")],
     "CC2": [("J1", "B5"), ("R2", "1")],
@@ -91,8 +94,8 @@ NETS = {
     "EN": [("U1", "3"), ("R4", "2"), ("C4", "1"), ("SW1", "1"), ("TP5", "1")],
     "BOOT": [("U1", "27"), ("R5", "2"), ("SW2", "1"), ("TP6", "1")],
     "BTN": [("U1", "6"), ("R6", "2"), ("SW3", "1")],
-    "I2C_SDA": [("U1", "4"), ("U4", "3"), ("R7", "2")],
-    "I2C_SCL": [("U1", "5"), ("U4", "4"), ("R8", "2")],
+    "I2C_SDA": [("U1", "4"), ("U4", "3"), ("U5", "1"), ("R7", "2")],
+    "I2C_SCL": [("U1", "5"), ("U4", "4"), ("U5", "2"), ("R8", "2")],
     "LCD_VCC": [("JP1", "2"), ("J2", "1")],
     "LCD_SCLK": [("U1", "20"), ("J2", "3")],
     "LCD_MOSI": [("U1", "19"), ("J2", "4")],

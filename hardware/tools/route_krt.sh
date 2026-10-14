@@ -18,7 +18,7 @@ $P "$K/py_router/route_diff.py" poured.kicad_pcb diffed.kicad_pcb --nets "/USB_D
     --layers F.Cu B.Cu $common > diff.log 2>&1
 # inside_out: the default ordering put vias into EN pads despite --same-net-pad-clearance
 $P "$K/py_router/route.py" diffed.kicad_pcb routed.kicad_pcb --nets "*" --layers F.Cu B.Cu --ordering inside_out \
-    --power-nets "/VBUS_IN" "/VBUS" "/SW" "/+3V3" "/GND" --power-nets-widths 0.4 0.4 0.4 0.3 0.3 --track-width 0.2 \
+    --power-nets "/VBUS_IN" "/VBUS" "/SW" "/+3V3" "/GND" --power-nets-widths 0.4 0.4 0.4 0.2 0.2 --track-width 0.2 \
     --clearance 0.15 --json-out route.json $common > route.log 2>&1
 grep -h "JSON_SUMMARY_MIN" route.log | cut -c1-400
 cd - >/dev/null
