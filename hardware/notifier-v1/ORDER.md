@@ -23,7 +23,7 @@ it must end with `hardware checks: OK`).
 - Quantity: assemble all boards ordered (e.g. 5) or 2 to save on the BME688 ($11.7 each).
 - Tooling holes: added by JLCPCB.
 
-## Parts (19 BOM lines, 8 Extended: setup fee each)
+## Parts (20 BOM lines, 9 Extended: setup fee each)
 Run `scripts/hw-check.sh --bom --qty N` right before ordering: it fails on missing stock.
 Watch: **BME688 C3664478** (stock about 200, fluctuates), **ESP32-S3-WROOM-1-N8R2 C2913204** (about 1.7k;
 N8R8 C2913201 is the fallback, it needs `CONFIG_SPIRAM_MODE_OCT=y`), J2 header C22436148 (about 680).
@@ -35,6 +35,8 @@ In JLC's 3D/placement preview, confirm pin 1 against the silkscreen dot for each
 - [ ] U2 USBLC6-2SC6 (SOT-23-6, -90 applied).
 - [ ] U3 TLV62569 (SOT-23-5, -90 applied by the SOT-23 rule; most likely to be wrong).
 - [ ] U4 BME688 (LGA-8, no correction): pin 1 marker top-left; the vent hole up.
+- [ ] U5 SHT40 (DFN-4 1.5 mm, no correction): pin 1 (SDA) against the silkscreen dot. JLC lists it as
+  "DFN-4-EP"; the KiCad footprint has no centre pad: check the land pattern against the datasheet.
 - [ ] J1 USB-C (+180 applied): opening at the bottom edge.
 - [ ] D1 LED cathode toward the GND side; L1, F1 non-polar.
 - [ ] J2 header: body toward the right edge, opening outward.
@@ -51,5 +53,5 @@ Fix any wrong part in JLC's editor and note the correction in `ROTATION` in `har
 3. Flash over the native USB (S3 USB Serial/JTAG):
    `cd firmware && idf.py -B build-s3 -DIDF_TARGET=esp32s3 -DSDKCONFIG=build-s3/sdkconfig -p /dev/cu.usbmodem* flash monitor`
    If it does not enumerate: hold BOOT, tap RST, release BOOT. Fallback: UART pads TX/RX/GND (+EN/IO0) with a USB-UART adapter.
-4. Wi-Fi credentials over the console, then `GET /api/status`: `sensor.i2c` must list 0x77.
+4. Wi-Fi credentials over the console, then `GET /api/status`: `sensor.i2c` must list 0x44 (SHT40) and 0x77 (BME688).
 5. Plug in the display (JP1 on 3V3), check orientation and colours (DESK_LCD_MIRROR_X/BGR may differ from the breadboard).

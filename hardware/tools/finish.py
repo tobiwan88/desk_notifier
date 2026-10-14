@@ -51,6 +51,7 @@ def drc(path):
 
 dangling, open_before = drc(sys.argv[1])
 tried = set()
+keep = []  # SWIG frees a board/filler the moment its last Python reference goes: later loads then break
 while dangling:
     uuid = next((u for u in dangling if u not in tried), None)
     if uuid is None:
@@ -59,10 +60,12 @@ while dangling:
     backup = sys.argv[1] + ".bak"
     shutil.copy(sys.argv[1], backup)
     board = pcbnew.LoadBoard(sys.argv[1])
+    keep.append(board)
     for t in list(board.GetTracks()):
         if t.m_Uuid.AsString() == uuid:
             board.Remove(t)
-    pcbnew.ZONE_FILLER(board).Fill(board.Zones())
+    keep.append(pcbnew.ZONE_FILLER(board))
+    keep[-1].Fill(board.Zones())
     pcbnew.SaveBoard(sys.argv[1], board)
     dangling, open_after = drc(sys.argv[1])
     if open_after > open_before:
