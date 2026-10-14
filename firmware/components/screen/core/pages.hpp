@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <optional>
 
+#include "screen/core/bond.hpp"
 #include "screen/core/day.hpp"
 #include "screen/core/font.hpp"
 #include "screen/core/memory.hpp"
@@ -38,6 +39,9 @@ struct Inputs {
     int since_rain_min = -1; // minutes since the rain stopped, -1 = not lately (RainWatch)
     int golden_count = 0;    // golden acorns found so far
     Plant plant{};           // the window-sill plant (how good the air was day after day)
+    Bond bond{};             // the friendship with the owner
+    ReactionNow react{};     // the squirrel reacting to a visit from the pet page
+    char pet_name[12] = "";  // the squirrel's name (upper case), empty = none
 };
 
 void render_clock(const Canvas& cv, const Inputs& in) noexcept;

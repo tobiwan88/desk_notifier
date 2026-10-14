@@ -22,7 +22,7 @@ struct Canvas {
     }
 };
 
-// Glyph rows, bit 4 = leftmost column. '^' is the degree sign.
+// Glyph rows, bit 4 = leftmost column. '^' is the degree sign, '#' a heart.
 constexpr std::array<std::uint8_t, 7> glyph(char c) noexcept {
     switch (c) {
         case '0': return {0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110};
@@ -68,6 +68,8 @@ constexpr std::array<std::uint8_t, 7> glyph(char c) noexcept {
         case '/': return {0b00001, 0b00010, 0b00010, 0b00100, 0b01000, 0b01000, 0b10000};
         case '!': return {0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0, 0b00100};
         case '\'': return {0b00100, 0b00100, 0b01000, 0, 0, 0, 0};
+        case '#': return {0b01010, 0b11111, 0b11111, 0b11111, 0b01110, 0b00100, 0};  // a heart
+        case ',': return {0, 0, 0, 0, 0b00110, 0b00100, 0b01000};
         case '?': return {0b01110, 0b10001, 0b00001, 0b00110, 0b00100, 0, 0b00100};
         case '&': return {0b01100, 0b10010, 0b10100, 0b01000, 0b10101, 0b10010, 0b01101};
         case '^': return {0b01100, 0b10010, 0b10010, 0b01100, 0, 0, 0};

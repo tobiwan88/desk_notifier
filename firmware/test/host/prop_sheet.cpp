@@ -142,6 +142,13 @@ int main(int argc, char** argv) {
              if (step == 1) P::memory_plant(c, 120, y, s, t, 9, 0, true);
              if (step == 2) P::memory_plant(c, 120, y, s, t, 6, 3, false);
          }},
+        {"fox", stand([](const Canvas& c, float x, float y, float s, std::uint32_t t) { P::fox(c, x, y, s, 1, t); })},
+        {"present", stand([](const Canvas& c, float x, float y, float s, std::uint32_t t) { P::present(c, x, y, s, t); })},
+        {"gift_icons", [](const Canvas& c, std::uint32_t, bool big) { room(c); for (int i = 0; i < 6; ++i) P::gift_icon(c, 60 + i * 24.0f, 120, big ? 2.0f : 1.0f, i); }},
+        {"gift_shelf", [](const Canvas& c, std::uint32_t t, bool big) { room(c); P::gift_shelf(c, 120, 110, big ? 160 : 46, t / 1000 % 3 == 0 ? 0x05u : 0x3Fu); }},
+        {"treats", [](const Canvas& c, std::uint32_t t, bool big) { room(c); for (int i = 0; i < 3; ++i) P::treat(c, 80 + i * 40.0f, 120, big ? 3.0f : 1.0f, i, static_cast<float>(t) / 400.0f); }},
+        {"nightcap", hat([](const Canvas& c, float x, float y, float w, std::uint32_t) { P::nightcap(c, x, y, w); })},
+        {"bow", [](const Canvas& c, std::uint32_t, bool big) { room(c); P::bow(c, 120, 120, big ? 4 : 1); }},
         {"window_open", [small, large](const Canvas& c, std::uint32_t t, bool big) {
              room(c);
              const Win w = big ? large : small;
