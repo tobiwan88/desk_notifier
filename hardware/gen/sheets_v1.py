@@ -124,7 +124,7 @@ def draw_power(parts) -> Sheet:
     s.power("GND", 112 + b, 52)
     s.text(14, 62, "Notes\n"
            "- Buck instead of LDO: from 5 V an LDO would burn about 0.6 W and warm the sensors.\n"
-           "- USB D+/D- are a 90 ohm pair (0.25 mm / 0.15 mm gap): keep short, ESD diode U2 right at J1.\n"
+           "- USB D+/D- are a 90 ohm pair (0.27 mm / 0.15 mm gap, top layer over In1 GND): keep short, ESD diode U2 right at J1.\n"
            "- CC1/CC2 5.1k to GND: the host offers 5 V. VBUS_IN is before the polyfuse, VBUS after it.\n"
            "- Layout: buck bottom centre, far from the BME688; input cap C1 at VIN, output caps at L1.\n"
            "- Output caps: C2 + C11 22 uF 0805 derate to about 11 uF each at 3.3 V; TLV62569 wants 10-47 uF effective.", 1.27)
@@ -166,7 +166,7 @@ def draw_mcu(parts, no_connect) -> Sheet:
         s.label(net, 66, y, 180, "hier")
         s.wire((ref, "2"), (73, y), ("U1", pin))
         s.wire((73, y), (73, y - 1 if up else y + 1))
-        s.label(net + "_MCU", 73, y - 1 if up else y + 1, 180)
+        s.label("MCU_" + net, 73, y - 1 if up else y + 1, 180)
         s.tag(ref, (0, -5.2 if up else 5.2), (0, -3.9 if up else 3.9), just="center")
     s.wire(("U1", "37"), (70, 46), (70, 43))
     s.label("TXD0", 70, 45, 0)

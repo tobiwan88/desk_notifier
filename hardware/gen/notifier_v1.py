@@ -44,8 +44,8 @@ PARTS = {
     "C10": ("Device:C", "1u", C0402, "C52923", "MCU", 0),
     # USB D+/D- series resistors, 22 ohm, close to the module pins: Espressif schematic checklist, section "USB"
     # (same URL): "series resistors of 22 to 33 ohm" on D+/D-. UNI-ROYAL 0402WGF220JTCE, 1 %, Basic.
-    "R11": ("Device:R", "22", R0402, "C25092", "MCU", 0),   # USB_DN -> USB_DN_MCU (module pin 13)
-    "R12": ("Device:R", "22", R0402, "C25092", "MCU", 0),   # USB_DP -> USB_DP_MCU (module pin 14)
+    "R11": ("Device:R", "22", R0402, "C25092", "MCU", 0),   # USB_DN -> MCU_USB_DN (module pin 13)
+    "R12": ("Device:R", "22", R0402, "C25092", "MCU", 0),   # USB_DP -> MCU_USB_DP (module pin 14)
     "R4": ("Device:R", "10k", R0402, "C25744", "MCU", 0),
     "C4": ("Device:C", "1u", C0402, "C52923", "MCU", 0),
     "SW1": ("Switch:SW_Push", "RESET", "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A", "C318884", "MCU", 90),
@@ -99,9 +99,9 @@ NETS = {
     "CC1": [("J1", "A5"), ("R1", "1")],
     "CC2": [("J1", "B5"), ("R2", "1")],
     "USB_DP": [("J1", "A6"), ("J1", "B6"), ("U2", "1"), ("U2", "6"), ("R12", "1")],
-    "USB_DP_MCU": [("R12", "2"), ("U1", "14")],
+    "MCU_USB_DP": [("R12", "2"), ("U1", "14")],
     "USB_DN": [("J1", "A7"), ("J1", "B7"), ("U2", "3"), ("U2", "4"), ("R11", "1")],
-    "USB_DN_MCU": [("R11", "2"), ("U1", "13")],
+    "MCU_USB_DN": [("R11", "2"), ("U1", "13")],
     "LED_A": [("R3", "2"), ("D1", "2")],
     "EN": [("U1", "3"), ("R4", "2"), ("C4", "1"), ("SW1", "1"), ("TP5", "1")],
     "BOOT": [("U1", "27"), ("R5", "2"), ("SW2", "1"), ("TP6", "1")],

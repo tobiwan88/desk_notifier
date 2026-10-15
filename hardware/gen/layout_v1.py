@@ -36,7 +36,7 @@ PLACE = {
     # USB-C at the bottom edge, ESD and CC resistors next to it, then the polyfuse
     "J1": (15.0, H - 3.4, 0, "F"),
     "R1": (8.6, H - 5.6, 90, "F"), "R2": (21.4, H - 5.6, 90, "F"),
-    "U2": (15.0, 24.5, 0, "F"), "F1": (23.4, 33.8, 0, "F"),
+    "U2": (15.0, 24.0, 270, "F"), "F1": (23.4, 33.8, 0, "F"),     # U2 rot 270: D- flows 4->3, D+ 6->1
     # buck converter bottom centre, far from the sensor
     "U3": (30.0, 30.5, 180, "F"), "C1": (26.6, 28.2, 90, "F"), "L1": (34.8, 30.5, 0, "F"),
     "R9": (27.0, 31.6, 0, "F"), "R10": (27.0, 32.9, 0, "F"),
@@ -72,7 +72,8 @@ SILK = [  # (text, x, y, size, layer)
     ("desk notifier v1", 25.0, 21.8, 1.0, "F"), ("LCD", 44.5, 7.5, 1.0, "F"), ("1", 39.8, 28.6, 0.8, "F"),
 ] + [(name, 37.4, 26.0 - 2.54 * i, 0.8, "B") for i, name in enumerate(("VCC", "GND", "SCL", "SDA", "DC", "CS", "RST"))]
 
-NETCLASS_PATTERNS = {"Power": ["VBUS_IN", "VBUS", "+3V3", "GND", "SW"], "USB": ["/USB_DP", "/USB_DN", "/USB_DP_MCU", "/USB_DN_MCU"]}
+USB_W, USB_GAP = 0.27, 0.15  # 90 ohm differential, see the USB block in main()
+NETCLASS_PATTERNS = {"Power": ["VBUS_IN", "VBUS", "+3V3", "GND", "SW"], "USB": ["/USB_DP", "/USB_DN", "/MCU/MCU_USB_DP", "/MCU/MCU_USB_DN"]}
 
 
 def v(x, y):
@@ -143,15 +144,15 @@ def rules(board):
     default.SetClearance(mm(0.15))
     default.SetViaDiameter(mm(0.6))
     default.SetViaDrill(mm(0.3))
-    for name, width in (("Power", 0.4), ("USB", 0.25)):
+    for name, width in (("Power", 0.4), ("USB", USB_W)):
         cls = pcbnew.NETCLASS(name)
         cls.SetTrackWidth(mm(width))
         cls.SetClearance(mm(0.15))
         cls.SetViaDiameter(mm(0.6))
         cls.SetViaDrill(mm(0.3))
         if name == "USB":
-            cls.SetDiffPairWidth(mm(0.25))
-            cls.SetDiffPairGap(mm(0.15))
+            cls.SetDiffPairWidth(mm(USB_W))
+            cls.SetDiffPairGap(mm(USB_GAP))
         nc.SetNetclass(name, cls)
         for pattern in NETCLASS_PATTERNS[name]:
             nc.SetNetclassPatternAssignment(pattern, name)
@@ -204,10 +205,11 @@ def main():
     def pad(ref, num):
         return next(q for q in board.FindFootprintByReference(ref).Pads() if q.GetNumber() == num)
 
-    def trk(a, pts, width=0.2):
+    def trk(a, pts, width=0.2, locked=False):
         for p0, p1 in zip(pts, pts[1:]):
             t = pcbnew.PCB_TRACK(board)
             t.SetStart(p0), t.SetEnd(p1), t.SetWidth(mm(width)), t.SetLayer(pcbnew.F_Cu), t.SetNet(a.GetNet())
+            t.SetLocked(locked)
             board.Add(t)
 
     # SHT40 pads are 0.3 mm apart and its footprint keepout only lets tracks leave a pad straight:
@@ -218,6 +220,50 @@ def main():
     for n5 in ("1", "2"):
         q = pad("U5", n5).GetPosition()
         trk(pad("U5", n5), [q, pcbnew.VECTOR2I(q.x, q.y + mm(0.8))])
+
+    # USB D+/D- by hand (the router left them partial with ~8 vias): 0.27 mm / 0.15 mm gap on F.Cu over
+    # the In1 GND plane = 90 ohm differential on JLC04161H-7628 (prepreg 0.2104 mm, er 4.4, 1 oz, mask).
+    # Connector D+ (A6/B6) joined above the pad row, D- (A7/B7) below it; straight through the ESD
+    # (flow-through), coupled up to R11/R12, short stubs to module pins 13/14. Locked: the router keeps it.
+    def path(net_pad, pts, width=USB_W):
+        trk(net_pad, [v(x, y) for x, y in pts], width, locked=True)
+
+    def via(net_pad, x, y):
+        t = pcbnew.PCB_VIA(board)
+        t.SetPosition(v(x, y)), t.SetWidth(mm(0.6)), t.SetDrill(mm(0.3)), t.SetNet(net_pad.GetNet())
+        t.SetLocked(True)
+        board.Add(t)
+
+    def at(ref, num):
+        q = pad(ref, num).GetPosition()
+        return round(pcbnew.ToMM(q.x) - OX, 3), round(pcbnew.ToMM(q.y) - OY, 3)
+
+    dn, dp = at("U2", "4"), at("U2", "6")                     # bottom row (connector side)
+    assert dn[0] < dp[0] and at("U2", "3")[0] == dn[0] and at("U2", "3")[1] < dn[1], "U2 orientation"
+    gap = USB_W + USB_GAP                                    # centre to centre
+    d45 = gap * 2 ** 0.5                                     # horizontal offset of parallel 45 deg lines
+    (b7x, py), (a6x, _), (a7x, _), (b6x, _) = at("J1", "B7"), at("J1", "A6"), at("J1", "A7"), at("J1", "B6")
+    top, bot = py - 1.25, py + 1.05                          # join rows above / below the pad row
+    path(pad("J1", "A6"), [(a6x, py), (a6x, top), (b6x, top), (b6x, py)])
+    path(pad("J1", "A6"), [(b6x, top), (dp[0], top - 0.2), at("U2", "6"), at("U2", "1")])
+    path(pad("J1", "B7"), [(a7x, py), (a7x, bot), (b7x, bot), (b7x, py)])
+    path(pad("J1", "B7"), [(b7x, py), (b7x, top), (dn[0], top - 0.2), at("U2", "4"), at("U2", "3")])
+    r12, r11 = at("R12", "1"), at("R11", "1")
+    turn_p = (dp[0], r12[1] + 0.92 + (dp[0] - r12[0]))      # 45 deg up-left from here ends below R12.1
+    end_p = (r12[0], r12[1] + 0.92)
+    path(pad("R12", "1"), [at("U2", "1"), turn_p, end_p, r12])
+    x_n = r12[0] - d45                                       # D- parallel left of D+, passes R12 on the left
+    turn_n = (dn[0], end_p[1] + (dn[0] - x_n))
+    path(pad("R11", "1"), [at("U2", "3"), turn_n, (x_n, end_p[1]), (x_n, r11[1] + (r11[0] - x_n)), r11])
+    for r, mod in (("R11", "13"), ("R12", "14")):
+        a, b_ = at(r, "2"), at("U1", mod)
+        path(pad(r, "2"), [a, (b_[0] - 1.25, a[1]), (b_[0] - 1.25 + (b_[1] - a[1]), b_[1]), b_])
+    # ESD middle pins: VBUS_IN via below (it cannot leave between the pair), GND via above
+    u5, u2 = at("U2", "5"), at("U2", "2")
+    path(pad("U2", "5"), [u5, (u5[0], u5[1] + 1.25)], 0.4)
+    via(pad("U2", "5"), u5[0], u5[1] + 1.25)
+    path(pad("U2", "2"), [u2, (u2[0], u2[1] - 1.2)], 0.4)
+    via(pad("U2", "2"), u2[0], u2[1] - 1.2)
 
     full = [(0, 0), (W, 0), (W, H), (0, H)]
     zone(board, pcbnew.In1_Cu, "GND", full)

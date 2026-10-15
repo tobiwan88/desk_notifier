@@ -2,7 +2,7 @@
 	(version 20250114)
 	(generator "eeschema")
 	(generator_version "9.0")
-	(uuid "2eb0dafb-6667-4d64-99e1-4cb0bc9b7bc6")
+	(uuid "6079faa8-b643-423a-a25b-f0f84d145ef7")
 	(paper "A4")
 	(title_block
 		(title "desk notifier v1")
@@ -970,7 +970,7 @@
 		(on_board yes)
 		(dnp no)
 		(fields_autoplaced no)
-		(uuid "312183ad-4a28-40a4-b24e-29397bb5b30a")
+		(uuid "8f362515-91ed-4f70-ac23-75545cb1ccd2")
 		(property "Reference" "JP1"
 			(at 83.2 54.88 0)
 			(effects
@@ -997,13 +997,13 @@
 			)
 		)
 		(pin "1"
-			(uuid "7b705976-7c15-4d17-a964-f3e09d5de43e")
+			(uuid "c853773a-9037-4dc3-adcb-01db847aa918")
 		)
 		(pin "2"
-			(uuid "78d116ff-f27c-40bb-a371-8463ceed606c")
+			(uuid "d32998cf-96e9-4bc9-96df-a6781503ad73")
 		)
 		(pin "3"
-			(uuid "f3b3b056-1578-4066-bf0d-b852ef55d806")
+			(uuid "7121d7ed-6b83-4971-8366-7dcbb2037ad0")
 		)
 		(instances
 			(project "notifier-v1"
@@ -1023,7 +1023,7 @@
 		(on_board yes)
 		(dnp no)
 		(fields_autoplaced no)
-		(uuid "9996bf96-149b-48ef-9344-2d8e646d6bb7")
+		(uuid "f87acef2-489f-44af-babe-2534f831ba69")
 		(property "Reference" "#PWR31"
 			(at 71.12 44.45 0.0000)
 			(effects
@@ -1043,7 +1043,7 @@
 			)
 		)
 		(pin "1"
-			(uuid "581cb4c5-b4d7-4367-a71f-21254c9bf58b")
+			(uuid "edb180a7-bc8d-4fd2-9902-677b60e5bb20")
 		)
 		(instances
 			(project "notifier-v1"
@@ -1063,7 +1063,7 @@
 		(on_board yes)
 		(dnp no)
 		(fields_autoplaced no)
-		(uuid "e31e7949-89ec-40d7-ba8e-d7c27a220c19")
+		(uuid "dccf4e4c-f1c2-4495-8359-7464cf25e20b")
 		(property "Reference" "#PWR32"
 			(at 81.28 44.45 0.0000)
 			(effects
@@ -1083,7 +1083,7 @@
 			)
 		)
 		(pin "1"
-			(uuid "ddc31d29-c0c7-4820-aaf7-e79d2ea2b84d")
+			(uuid "6a35ac14-f6b9-48a1-af21-179c221af383")
 		)
 		(instances
 			(project "notifier-v1"
@@ -1103,7 +1103,7 @@
 		(on_board yes)
 		(dnp no)
 		(fields_autoplaced no)
-		(uuid "20b8bc48-fecf-4ef9-b7a8-507dd79b1cd7")
+		(uuid "747b475d-790a-4eed-b3a0-54af0f114e59")
 		(property "Reference" "J2"
 			(at 150.4 79.44 0)
 			(effects
@@ -1139,25 +1139,25 @@
 			)
 		)
 		(pin "1"
-			(uuid "f84b3ef6-7a13-464c-a561-b1e8da22c441")
+			(uuid "304bcf27-16f9-4e78-8494-7a93c5692b53")
 		)
 		(pin "2"
-			(uuid "addec8e7-46de-4715-9fd5-ccc1504c49bd")
+			(uuid "64eac581-2fab-4863-8c68-18c41ca1a4b5")
 		)
 		(pin "3"
-			(uuid "7128c9d5-467a-4152-94e6-c0aa663b5a54")
+			(uuid "9b5736d6-75f6-4671-8e52-1305050a7b8b")
 		)
 		(pin "4"
-			(uuid "54838bfa-bbdd-4c0e-bde9-65eac843b713")
+			(uuid "7e23a867-02f2-4390-a733-82efbf20df6d")
 		)
 		(pin "5"
-			(uuid "2ae62572-dc31-4711-8021-cf6f68261d4a")
+			(uuid "4358d053-9f53-4490-a3ab-49c69028236e")
 		)
 		(pin "6"
-			(uuid "5c52593d-a337-48e0-b4c6-f7575241ac1f")
+			(uuid "7abfd3de-ba3c-4d62-915b-7828c1283e9b")
 		)
 		(pin "7"
-			(uuid "a2677626-8b1d-4e8c-9638-de8909bb616f")
+			(uuid "e276ccac-dbc1-4284-88ad-a06ded123ad5")
 		)
 		(instances
 			(project "notifier-v1"
@@ -1177,7 +1177,7 @@
 		(on_board yes)
 		(dnp no)
 		(fields_autoplaced no)
-		(uuid "c67199b4-b6d7-464e-8dd0-0ed8fb21aa44")
+		(uuid "b0c6ec61-e82b-4128-aadb-a6cd5b56042f")
 		(property "Reference" "#PWR33"
 			(at 119.38 85.09 0.0000)
 			(effects
@@ -1197,7 +1197,7 @@
 			)
 		)
 		(pin "1"
-			(uuid "64d6fb7f-3362-46c1-8db6-5ea2b1563cdc")
+			(uuid "f219cbf1-6a4c-4250-909f-916a58ba8cfd")
 		)
 		(instances
 			(project "notifier-v1"

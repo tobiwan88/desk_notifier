@@ -12,7 +12,9 @@ it must end with `hardware checks: OK`).
 ## PCB options
 - Layers **4**, size 50 x 36 mm (the module antenna overhangs the top edge, not part of the outline), FR-4, **1.6 mm**.
 - Stackup **JLC04161H-7628** (the rules in `hardware/rules/jlc-4layer.json` assume it; no impedance control ordered,
-  USB is full speed).
+  USB is full speed). USB D+/D- are 0.27 mm / 0.15 mm gap on L1 over the In1 GND plane, about 90 ohm
+  differential with this stackup (prepreg 7628 0.2104 mm, er 4.4, 1 oz, mask). To check in https://jlcpcb.com/impedance:
+  4 layers, 1.6 mm, JLC04161H-7628, outer 1 oz, differential, L1 with reference L2, width 0.27, spacing 0.15.
 - Surface finish **ENIG** (flat pads for the BME688 LGA and the module).
 - Outer copper 1 oz, inner 0.5 oz. Via covering: tented. Min via 0.3/0.6 mm, no via-in-pad option needed.
 - The BME688 sits on a peninsula cut by a 1.2 mm notch: milled outline, inner corners get the tool radius. Nothing to select.

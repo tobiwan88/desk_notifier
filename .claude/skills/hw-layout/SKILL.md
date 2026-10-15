@@ -24,7 +24,7 @@ description: Use for PCB placement and routing in hardware/ (notifier-v1): editi
 - Fine-pitch parts (SHT4x DFN, 0.3 mm pad gap): footprint keepout allows only straight exits. Hand-draw escape stubs in `layout_v1.py` (the router extends them).
 
 ## Constraints and classes
-- Net classes (`layout_v1.py`): Default track 0.2 / clearance 0.15 / via 0.6/0.3. Power 0.4 mm. USB diff pair 0.25 / gap 0.15. Generic "1.0 mm power traces" is the default for high-current new boards; here power tracks are 0.4 mm (route_krt uses 0.4 for VBUS_IN/VBUS/SW and 0.2 for +3V3/GND tracks; planes carry the rest).
+- Net classes (`layout_v1.py`): Default track 0.2 / clearance 0.15 / via 0.6/0.3. Power 0.4 mm. USB diff pair 0.27 / gap 0.15 (`USB_W`/`USB_GAP`): 90 ohm on JLC04161H-7628 L1 over In1 GND (check widths in the JLC impedance calculator, https://jlcpcb.com/impedance; KRT's `py_router/impedance.py` without mask gives ~96 ohm for 0.25/0.15, mask lowers ~3 ohm). Diff pairs stay on one outer layer next to a GND plane, never on B.Cu over the 3V3 plane. Generic "1.0 mm power traces" is the default for high-current new boards; here power tracks are 0.4 mm (route_krt uses 0.4 for VBUS_IN/VBUS/SW and 0.2 for +3V3/GND tracks; planes carry the rest).
 - Fab floors must match in two files: `rules/jlc-4layer.json` (JLC capabilities) and `rules/krt-fab.txt` (router). Change both or neither. Current floors: clearance 0.127, track 0.127, via 0.45/0.2, hole-to-hole 0.5, edge 0.3.
 - `rules/notifier.kicad_dru`: "no via in SMD pad" (open vias wick solder). Do not waive it.
 - `layout_v1.py` writes the project and `.kicad_dru`. Edit rules there, not in the GUI.
@@ -33,7 +33,7 @@ description: Use for PCB placement and routing in hardware/ (notifier-v1): editi
 ## Routing (phase 3)
 - Use `tools/route_krt.sh placed.kicad_pcb routed.kicad_pcb`. Its order and flags, and why:
   - Planes first (`route_planes.py`): GND on In1, +3V3 on In2, clearance 0.15. Inner layers stay solid.
-  - USB pair (`route_diff.py`) on `F.Cu B.Cu`.
+  - USB pair: drawn and locked in `layout_v1.py` (USB-C D+/D- pads are interleaved A6/B6 vs A7/B7; route_diff left it partial, the general router then snaked it over B.Cu with ~8 vias and failed DRC 2 of 3 runs). D+ pads joined above the pad row, D- below; ESD USBLC6 rotated 270 for flow-through (4->3, 6->1), VBUS/GND middle pins leave by via. route.py skips complete nets; `--keep-input-copper` keeps it. KRT pairs nets only by suffix (`..._DP`/`_DN`, `_P`/`_N`): name series-R nets `MCU_USB_DP`, not `USB_DP_MCU`.
   - Rest (`route.py`) on `F.Cu B.Cu` only (`--layers`): signals never cross the inner planes.
   - `--ordering inside_out` (default order put vias into EN pads despite the clearance flag).
   - `--same-net-pad-clearance 0.1`: stops same-net vias in pads.
