@@ -102,12 +102,15 @@ def draw_power(parts) -> Sheet:
     s.power("GND", 84 + b, 51)
     s.part("C2", 90 + b, 43)                                  # output caps
     s.part("C3", 94 + b, 43)
+    s.part("C11", 98 + b, 43)                                 # second 22 uF: TI wants >= 10 uF effective (DC-bias derating)
+    s.wire(("C11", "1"), (98 + b, 39))
     s.wire(("C2", "1"), (90 + b, 39))
     s.wire(("C3", "1"), (94 + b, 39))
     s.wire(("C2", "2"), (90 + b, 47), (94 + b, 47), ("C3", "2"))
+    s.wire((94 + b, 47), (98 + b, 47), ("C11", "2"))
     s.wire((92 + b, 47), (92 + b, 50))
     s.power("GND", 92 + b, 50)
-    s.flag("#FLG03", 98 + b, 39)
+    s.flag("#FLG03", 102 + b, 39)
     s.wire((60 + b, 28), ("C1", "1"))                         # VBUS trunk down to the buck input
     # --- power LED ---
     s.frame(112 + b, 30, 124 + b, 56, "Power LED")
@@ -123,7 +126,8 @@ def draw_power(parts) -> Sheet:
            "- Buck instead of LDO: from 5 V an LDO would burn about 0.6 W and warm the sensors.\n"
            "- USB D+/D- are a 90 ohm pair (0.25 mm / 0.15 mm gap): keep short, ESD diode U2 right at J1.\n"
            "- CC1/CC2 5.1k to GND: the host offers 5 V. VBUS_IN is before the polyfuse, VBUS after it.\n"
-           "- Layout: buck bottom centre, far from the BME688; input cap C1 at VIN, output caps at L1.", 1.27)
+           "- Layout: buck bottom centre, far from the BME688; input cap C1 at VIN, output caps at L1.\n"
+           "- Output caps: C2 + C11 22 uF 0805 derate to about 11 uF each at 3.3 V; TLV62569 wants 10-47 uF effective.", 1.27)
     return s
 
 
@@ -142,6 +146,10 @@ def draw_mcu(parts, no_connect) -> Sheet:
     for r, x in (("C5", 76), ("C6", 72)):
         s.wire((r, "2"), (x, 40))
         s.power("GND", x, 40)
+    s.part("C10", 68, 37.5)                                   # 1 uF: 10 uF + 1 uF + 0.1 uF at the 3V3 pin
+    s.wire((72, 36), (68, 36))
+    s.wire(("C10", "2"), (68, 40))
+    s.power("GND", 68, 40)
     s.wire((80, 36), (84, 36))
     s.part("TP4", 84, 36)
     s.wire(("U1", "1"), (80, 70))
@@ -149,10 +157,17 @@ def draw_mcu(parts, no_connect) -> Sheet:
     s.wire((80, 68), (84, 68))
     s.part("TP3", 84, 68, 180)
     # USB data and UART pads on the left
-    s.wire(("U1", "13"), (66, 50))
-    s.label("USB_DN", 66, 50, 180, "hier")
-    s.wire(("U1", "14"), (66, 51))
-    s.label("USB_DP", 66, 51, 180, "hier")
+    for ref, pin, net, y, up in (("R11", "13", "USB_DN", 50, True), ("R12", "14", "USB_DP", 51, False)):
+        s.part(ref, 70, y, 90)                                # 22 ohm series resistors at the module pins
+        a, b_ = s.at(ref, "1"), s.at(ref, "2")
+        left, right = ("1", "2") if a[0] < b_[0] else ("2", "1")
+        assert left == "1", "R pin 1 must face the connector side"
+        s.wire((ref, "1"), (66, y))
+        s.label(net, 66, y, 180, "hier")
+        s.wire((ref, "2"), (73, y), ("U1", pin))
+        s.wire((73, y), (73, y - 1 if up else y + 1))
+        s.label(net + "_MCU", 73, y - 1 if up else y + 1, 180)
+        s.tag(ref, (0, -5.2 if up else 5.2), (0, -3.9 if up else 3.9), just="center")
     s.wire(("U1", "37"), (70, 46), (70, 43))
     s.label("TXD0", 70, 45, 0)
     s.part("TP1", 70, 43)

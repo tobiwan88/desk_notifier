@@ -11,7 +11,7 @@ Scope: parts and ordering. Schematic: `hw-schematic`. Layout, routing, environme
 - Start from the requirement: function, supply voltage and current, package, temperature, the datasheet's application circuit.
 - Collect 2-3 LCSC candidates per requirement.
 - Stock and price: `uv run --package desk-hardware python hardware/tools/jlcparts.py C123456`, or `... -s "keyword" -n 20` for a search. Read `library`, `stock`, `price`.
-- Prefer Basic parts. Each Extended part costs a setup fee (v1: 9 of 20 BOM lines are Extended).
+- Prefer Basic parts. Each Extended part costs a setup fee (v1: 9 of 21 BOM lines are Extended).
 - Stock must cover the order quantity (boards x parts per board) with margin, not just be >0. Re-check before ordering.
 - KiCad stock symbol and footprint only, no custom libraries.
 - Compare the footprint's land pattern and pin 1 with the datasheet, not only the package name. Example: SHT40 is "DFN-4-EP" at JLC, the KiCad footprint has no centre pad (verify which the board needs).

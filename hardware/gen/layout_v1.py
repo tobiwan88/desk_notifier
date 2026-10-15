@@ -22,6 +22,8 @@ PLACE = {
     # module: antenna (local y < -6.75) overhangs the top edge
     "U1": (25.0, 6.75, 0, "F"),
     "C5": (13.8, 2.4, 90, "F"), "C6": (13.7, 4.6, 0, "F"),         # 3V3 pin 2 at (16.25, 2.76)
+    "C10": (13.7, 10.6, 0, "F"),                                   # 1 uF for 3V3 pin 2 (no room beside C5/C6; plane vias carry 3V3)
+    "R11": (13.5, 16.45, 0, "F"), "R12": (13.5, 17.72, 0, "F"),    # USB 22 ohm at module pins 13/14 (x 16.25)
     "R4": (13.7, 5.9, 0, "F"), "C4": (13.7, 7.2, 0, "F"),          # EN pin 3 at (16.25, 4.03)
     "R6": (13.7, 8.6, 0, "F"),                                     # IO6 pin 6 at (16.25, 7.84)
     "R7": (13.7, 12.6, 0, "F"), "R8": (13.7, 13.9, 0, "F"),        # I2C pull-ups
@@ -38,7 +40,7 @@ PLACE = {
     # buck converter bottom centre, far from the sensor
     "U3": (30.0, 30.5, 180, "F"), "C1": (26.6, 28.2, 90, "F"), "L1": (34.8, 30.5, 0, "F"),
     "R9": (27.0, 31.6, 0, "F"), "R10": (27.0, 32.9, 0, "F"),
-    "C2": (34.0, 26.8, 0, "F"), "C3": (37.0, 27.0, 90, "F"),
+    "C2": (34.0, 26.8, 0, "F"), "C3": (37.0, 27.0, 90, "F"), "C11": (30.2, 26.9, 0, "F"),
     "R3": (28.0, 24.3, 0, "F"), "D1": (31.0, 24.3, 0, "F"),
     # BOOT pull-up near IO0 (pin 27 at (33.75, 18.0))
     "R5": (36.3, 19.0, 90, "F"),
@@ -70,7 +72,7 @@ SILK = [  # (text, x, y, size, layer)
     ("desk notifier v1", 25.0, 21.8, 1.0, "F"), ("LCD", 44.5, 7.5, 1.0, "F"), ("1", 39.8, 28.6, 0.8, "F"),
 ] + [(name, 37.4, 26.0 - 2.54 * i, 0.8, "B") for i, name in enumerate(("VCC", "GND", "SCL", "SDA", "DC", "CS", "RST"))]
 
-NETCLASS_PATTERNS = {"Power": ["VBUS_IN", "VBUS", "+3V3", "GND", "SW"], "USB": ["/USB_DP", "/USB_DN"]}
+NETCLASS_PATTERNS = {"Power": ["VBUS_IN", "VBUS", "+3V3", "GND", "SW"], "USB": ["/USB_DP", "/USB_DN", "/USB_DP_MCU", "/USB_DN_MCU"]}
 
 
 def v(x, y):
