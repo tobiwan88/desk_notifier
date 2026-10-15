@@ -363,6 +363,14 @@
       {
         "netclass": "USB",
         "pattern": "/USB_DN"
+      },
+      {
+        "netclass": "USB",
+        "pattern": "/USB_DP_MCU"
+      },
+      {
+        "netclass": "USB",
+        "pattern": "/USB_DN_MCU"
       }
     ]
   },

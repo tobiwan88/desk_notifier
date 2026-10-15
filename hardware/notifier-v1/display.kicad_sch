@@ -2,7 +2,7 @@
 	(version 20250114)
 	(generator "eeschema")
 	(generator_version "9.0")
-	(uuid "27edb83a-5aad-41f8-aad1-ab33fd813581")
+	(uuid "2eb0dafb-6667-4d64-99e1-4cb0bc9b7bc6")
 	(paper "A4")
 	(title_block
 		(title "desk notifier v1")
@@ -970,7 +970,7 @@
 		(on_board yes)
 		(dnp no)
 		(fields_autoplaced no)
-		(uuid "d1b2a62d-ed2e-4d33-ad6f-99a9e7bba08d")
+		(uuid "312183ad-4a28-40a4-b24e-29397bb5b30a")
 		(property "Reference" "JP1"
 			(at 83.2 54.88 0)
 			(effects
@@ -997,13 +997,13 @@
 			)
 		)
 		(pin "1"
-			(uuid "079432b0-ed9d-48ca-a457-ba3e733bb60e")
+			(uuid "7b705976-7c15-4d17-a964-f3e09d5de43e")
 		)
 		(pin "2"
-			(uuid "4da5019f-e215-4197-b72b-3be0c0b0c1fb")
+			(uuid "78d116ff-f27c-40bb-a371-8463ceed606c")
 		)
 		(pin "3"
-			(uuid "5a73b8c9-fcd5-43c9-a8cd-511eb6178c8c")
+			(uuid "f3b3b056-1578-4066-bf0d-b852ef55d806")
 		)
 		(instances
 			(project "notifier-v1"
@@ -1023,8 +1023,8 @@
 		(on_board yes)
 		(dnp no)
 		(fields_autoplaced no)
-		(uuid "c9fcdc95-b647-44c9-90cd-75be794ba71a")
-		(property "Reference" "#PWR30"
+		(uuid "9996bf96-149b-48ef-9344-2d8e646d6bb7")
+		(property "Reference" "#PWR31"
 			(at 71.12 44.45 0.0000)
 			(effects
 				(font
@@ -1043,12 +1043,12 @@
 			)
 		)
 		(pin "1"
-			(uuid "9c3b3b69-082b-4219-bd89-c17c4b6cf577")
+			(uuid "581cb4c5-b4d7-4367-a71f-21254c9bf58b")
 		)
 		(instances
 			(project "notifier-v1"
 				(path "/85cf2753-6181-5f74-b525-c66aecc4c100/8a2bb1b3-013f-50c9-a102-f283f433baba"
-					(reference "#PWR30")
+					(reference "#PWR31")
 					(unit 1)
 				)
 			)
@@ -1063,8 +1063,8 @@
 		(on_board yes)
 		(dnp no)
 		(fields_autoplaced no)
-		(uuid "cc418bf7-1e0f-452e-a457-80e0bada4eb7")
-		(property "Reference" "#PWR31"
+		(uuid "e31e7949-89ec-40d7-ba8e-d7c27a220c19")
+		(property "Reference" "#PWR32"
 			(at 81.28 44.45 0.0000)
 			(effects
 				(font
@@ -1083,12 +1083,12 @@
 			)
 		)
 		(pin "1"
-			(uuid "46a98039-0a30-4c43-95c0-33e2ff851f7a")
+			(uuid "ddc31d29-c0c7-4820-aaf7-e79d2ea2b84d")
 		)
 		(instances
 			(project "notifier-v1"
 				(path "/85cf2753-6181-5f74-b525-c66aecc4c100/8a2bb1b3-013f-50c9-a102-f283f433baba"
-					(reference "#PWR31")
+					(reference "#PWR32")
 					(unit 1)
 				)
 			)
@@ -1103,7 +1103,7 @@
 		(on_board yes)
 		(dnp no)
 		(fields_autoplaced no)
-		(uuid "947955c4-1d35-4f3c-a14c-fc918fbcc839")
+		(uuid "20b8bc48-fecf-4ef9-b7a8-507dd79b1cd7")
 		(property "Reference" "J2"
 			(at 150.4 79.44 0)
 			(effects
@@ -1139,25 +1139,25 @@
 			)
 		)
 		(pin "1"
-			(uuid "a5ab4451-2872-422a-903f-daef5e36fac6")
+			(uuid "f84b3ef6-7a13-464c-a561-b1e8da22c441")
 		)
 		(pin "2"
-			(uuid "3d5511f3-7c8c-4d65-8c43-ad7adf4a09eb")
+			(uuid "addec8e7-46de-4715-9fd5-ccc1504c49bd")
 		)
 		(pin "3"
-			(uuid "74d95bce-0bdd-4adf-9d86-791db9fffc86")
+			(uuid "7128c9d5-467a-4152-94e6-c0aa663b5a54")
 		)
 		(pin "4"
-			(uuid "334d9d1c-70e8-4437-8991-c6d086c70193")
+			(uuid "54838bfa-bbdd-4c0e-bde9-65eac843b713")
 		)
 		(pin "5"
-			(uuid "f0c88eb4-afe8-4f57-8ae5-5ea151753253")
+			(uuid "2ae62572-dc31-4711-8021-cf6f68261d4a")
 		)
 		(pin "6"
-			(uuid "0166529f-1524-4774-9867-0addf7f34888")
+			(uuid "5c52593d-a337-48e0-b4c6-f7575241ac1f")
 		)
 		(pin "7"
-			(uuid "4a16366e-3e31-4072-b8bd-9bc7441aea7c")
+			(uuid "a2677626-8b1d-4e8c-9638-de8909bb616f")
 		)
 		(instances
 			(project "notifier-v1"
@@ -1177,8 +1177,8 @@
 		(on_board yes)
 		(dnp no)
 		(fields_autoplaced no)
-		(uuid "3c5504e1-4d20-4e76-b60d-90c3d6ba2980")
-		(property "Reference" "#PWR32"
+		(uuid "c67199b4-b6d7-464e-8dd0-0ed8fb21aa44")
+		(property "Reference" "#PWR33"
 			(at 119.38 85.09 0.0000)
 			(effects
 				(font
@@ -1197,39 +1197,39 @@
 			)
 		)
 		(pin "1"
-			(uuid "ca89a15b-fd1e-4517-8a60-41d63891fd7f")
+			(uuid "64d6fb7f-3362-46c1-8db6-5ea2b1563cdc")
 		)
 		(instances
 			(project "notifier-v1"
 				(path "/85cf2753-6181-5f74-b525-c66aecc4c100/8a2bb1b3-013f-50c9-a102-f283f433baba"
-					(reference "#PWR32")
+					(reference "#PWR33")
 					(unit 1)
 				)
 			)
 		)
 	)
-	(wire (pts (xy 71.12 55.88) (xy 71.12 48.26)) (stroke (width 0) (type default)) (uuid "739c50ef-62f4-558b-a3ca-08f4c8ef2fde"))
-	(wire (pts (xy 81.28 55.88) (xy 81.28 48.26)) (stroke (width 0) (type default)) (uuid "cb6610df-2fa8-5eb9-acc1-4a1734303cd3"))
-	(wire (pts (xy 76.2 59.69) (xy 76.2 83.82)) (stroke (width 0) (type default)) (uuid "992ea36c-4800-5088-a4ac-7a8c386f82ce"))
-	(wire (pts (xy 76.2 83.82) (xy 147.32 83.82)) (stroke (width 0) (type default)) (uuid "56c86122-ebc8-56d3-832c-4b8da0a57532"))
-	(wire (pts (xy 147.32 86.36) (xy 119.38 86.36)) (stroke (width 0) (type default)) (uuid "37965abb-db27-5b7f-bcd4-b5ab9200cf6b"))
-	(wire (pts (xy 119.38 86.36) (xy 119.38 91.44)) (stroke (width 0) (type default)) (uuid "7d589a19-475d-5ca6-b91f-d4e9c5bfaefc"))
-	(wire (pts (xy 147.32 88.9) (xy 139.7 88.9)) (stroke (width 0) (type default)) (uuid "0ec1718f-50ec-5a03-b9c1-9be059964c7c"))
-	(wire (pts (xy 147.32 91.44) (xy 139.7 91.44)) (stroke (width 0) (type default)) (uuid "8fe2b9c8-f881-5a5f-9cac-c93d8a7f258c"))
-	(wire (pts (xy 147.32 93.98) (xy 139.7 93.98)) (stroke (width 0) (type default)) (uuid "197a6383-790c-5959-bdeb-ad84aba4cf17"))
-	(wire (pts (xy 147.32 96.52) (xy 139.7 96.52)) (stroke (width 0) (type default)) (uuid "22c2ee7f-247a-57a2-a34c-9796461d4480"))
-	(wire (pts (xy 147.32 99.06) (xy 139.7 99.06)) (stroke (width 0) (type default)) (uuid "6bbe3889-ac0b-5e27-9a7c-4131529cd3bc"))
-	(rectangle (start 25.4 25.4) (end 111.76 71.12) (stroke (width 0.2) (type dash)) (fill (type none)) (uuid "c4f8ec5e-c5c1-5959-bf0d-b4b61406b117"))
-	(text "Display supply" (exclude_from_sim no) (at 26.67 26.42 0) (effects (font (size 1.5 1.5) bold) (justify left top)) (uuid "3a201037-f63e-5595-b8b7-352151f691ff"))
-	(label "LCD_VCC" (at 101.6 83.82 0) (effects (font (size 1.27 1.27)) (justify left)) (uuid "4abe00d5-13ad-5efb-bc78-394fa66bb21c"))
-	(rectangle (start 25.4 76.2) (end 182.88 116.84) (stroke (width 0.2) (type dash)) (fill (type none)) (uuid "0842a7aa-f862-589a-9d82-a949bc97cb3e"))
-	(text "GC9A01 module (SPI, write only)" (exclude_from_sim no) (at 26.67 77.22 0) (effects (font (size 1.5 1.5) bold) (justify left top)) (uuid "340ecfff-27c7-5cd6-b074-43504bff93f5"))
-	(hierarchical_label "LCD_SCLK" (shape bidirectional) (at 139.7 88.9 180) (effects (font (size 1.27 1.27)) (justify right)) (uuid "9bba1d6b-861e-5d3c-bf47-bbd93e89c4e6"))
-	(hierarchical_label "LCD_MOSI" (shape bidirectional) (at 139.7 91.44 180) (effects (font (size 1.27 1.27)) (justify right)) (uuid "452eb85a-5873-58b0-8148-00aa8584286a"))
-	(hierarchical_label "LCD_DC" (shape bidirectional) (at 139.7 93.98 180) (effects (font (size 1.27 1.27)) (justify right)) (uuid "3ed59e37-34cc-5d00-9f25-0ff24aa5760a"))
-	(hierarchical_label "LCD_CS" (shape bidirectional) (at 139.7 96.52 180) (effects (font (size 1.27 1.27)) (justify right)) (uuid "dafd6403-94c0-5316-a45f-e35011b63654"))
-	(hierarchical_label "LCD_RST" (shape bidirectional) (at 139.7 99.06 180) (effects (font (size 1.27 1.27)) (justify right)) (uuid "92995c2f-34a8-53d9-9a77-042b5f0493de"))
-	(text "Notes\n- JP1: 1-2 bridged = LCD_VCC from 3V3 (default, 3.3 V modules).\n  For 5 V modules cut the 1-2 bridge and bridge 2-3 (VBUS).\n- J2 pin order = module header: VCC, GND, SCL, SDA, DC, CS, RST\n  (no MISO, no backlight pin).\n- Display plugs in from the side; its face sits past the board edge." (exclude_from_sim no) (at 25.4 127.0 0) (effects (font (size 1.27 1.27)) (justify left top)) (uuid "bfa54947-463b-590a-a3cf-c642a14280ae"))
+	(wire (pts (xy 71.12 55.88) (xy 71.12 48.26)) (stroke (width 0) (type default)) (uuid "40d0c582-62cd-59bf-b324-7aaa58a60aa0"))
+	(wire (pts (xy 81.28 55.88) (xy 81.28 48.26)) (stroke (width 0) (type default)) (uuid "057bc84d-a8b5-5650-8627-3416d286a3b8"))
+	(wire (pts (xy 76.2 59.69) (xy 76.2 83.82)) (stroke (width 0) (type default)) (uuid "bbe0d094-bb29-5747-bdc5-16aeb39292fe"))
+	(wire (pts (xy 76.2 83.82) (xy 147.32 83.82)) (stroke (width 0) (type default)) (uuid "3a1bb58f-2f76-57dd-9f5f-e66d81c3ff65"))
+	(wire (pts (xy 147.32 86.36) (xy 119.38 86.36)) (stroke (width 0) (type default)) (uuid "2f43f426-b620-53c5-8c4e-be8d9788475a"))
+	(wire (pts (xy 119.38 86.36) (xy 119.38 91.44)) (stroke (width 0) (type default)) (uuid "25980d35-6bc6-5bbe-ae38-8490bfa11368"))
+	(wire (pts (xy 147.32 88.9) (xy 139.7 88.9)) (stroke (width 0) (type default)) (uuid "49e8ff68-4546-51f3-9d06-7da4cd6e3511"))
+	(wire (pts (xy 147.32 91.44) (xy 139.7 91.44)) (stroke (width 0) (type default)) (uuid "d6a69ec5-e252-53e5-a725-90e5242df6a4"))
+	(wire (pts (xy 147.32 93.98) (xy 139.7 93.98)) (stroke (width 0) (type default)) (uuid "8c9386c0-f3fd-552b-b01c-33fdb36a0429"))
+	(wire (pts (xy 147.32 96.52) (xy 139.7 96.52)) (stroke (width 0) (type default)) (uuid "bf98dc2c-dcde-5c83-9d05-fa599494a83d"))
+	(wire (pts (xy 147.32 99.06) (xy 139.7 99.06)) (stroke (width 0) (type default)) (uuid "5b5a4ca7-0a2a-527b-889b-1aa9d22ce81a"))
+	(rectangle (start 25.4 25.4) (end 111.76 71.12) (stroke (width 0.2) (type dash)) (fill (type none)) (uuid "4abe00d5-13ad-5efb-bc78-394fa66bb21c"))
+	(text "Display supply" (exclude_from_sim no) (at 26.67 26.42 0) (effects (font (size 1.5 1.5) bold) (justify left top)) (uuid "0842a7aa-f862-589a-9d82-a949bc97cb3e"))
+	(label "LCD_VCC" (at 101.6 83.82 0) (effects (font (size 1.27 1.27)) (justify left)) (uuid "340ecfff-27c7-5cd6-b074-43504bff93f5"))
+	(rectangle (start 25.4 76.2) (end 182.88 116.84) (stroke (width 0.2) (type dash)) (fill (type none)) (uuid "9bba1d6b-861e-5d3c-bf47-bbd93e89c4e6"))
+	(text "GC9A01 module (SPI, write only)" (exclude_from_sim no) (at 26.67 77.22 0) (effects (font (size 1.5 1.5) bold) (justify left top)) (uuid "452eb85a-5873-58b0-8148-00aa8584286a"))
+	(hierarchical_label "LCD_SCLK" (shape bidirectional) (at 139.7 88.9 180) (effects (font (size 1.27 1.27)) (justify right)) (uuid "3ed59e37-34cc-5d00-9f25-0ff24aa5760a"))
+	(hierarchical_label "LCD_MOSI" (shape bidirectional) (at 139.7 91.44 180) (effects (font (size 1.27 1.27)) (justify right)) (uuid "dafd6403-94c0-5316-a45f-e35011b63654"))
+	(hierarchical_label "LCD_DC" (shape bidirectional) (at 139.7 93.98 180) (effects (font (size 1.27 1.27)) (justify right)) (uuid "92995c2f-34a8-53d9-9a77-042b5f0493de"))
+	(hierarchical_label "LCD_CS" (shape bidirectional) (at 139.7 96.52 180) (effects (font (size 1.27 1.27)) (justify right)) (uuid "bfa54947-463b-590a-a3cf-c642a14280ae"))
+	(hierarchical_label "LCD_RST" (shape bidirectional) (at 139.7 99.06 180) (effects (font (size 1.27 1.27)) (justify right)) (uuid "045e4307-41cd-5169-bc1b-51644a8d1df4"))
+	(text "Notes\n- JP1: 1-2 bridged = LCD_VCC from 3V3 (default, 3.3 V modules).\n  For 5 V modules cut the 1-2 bridge and bridge 2-3 (VBUS).\n- J2 pin order = module header: VCC, GND, SCL, SDA, DC, CS, RST\n  (no MISO, no backlight pin).\n- Display plugs in from the side; its face sits past the board edge." (exclude_from_sim no) (at 25.4 127.0 0) (effects (font (size 1.27 1.27)) (justify left top)) (uuid "8f0d5b6f-8241-5b29-8410-af78b99c673c"))
 	(sheet_instances
 		(path "/"
 			(page "1")

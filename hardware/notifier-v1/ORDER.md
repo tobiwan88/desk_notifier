@@ -23,7 +23,7 @@ it must end with `hardware checks: OK`).
 - Quantity: assemble all boards ordered (e.g. 5) or 2 to save on the BME688 ($11.7 each).
 - Tooling holes: added by JLCPCB.
 
-## Parts (20 BOM lines, 9 Extended: setup fee each)
+## Parts (21 BOM lines, 9 Extended: setup fee each)
 Run `scripts/hw-check.sh --bom --qty N` right before ordering: it fails on missing stock.
 Watch: **BME688 C3664478** (stock about 200, fluctuates), **ESP32-S3-WROOM-1-N8R2 C2913204** (about 1.7k;
 N8R8 C2913201 is the fallback, it needs `CONFIG_SPIRAM_MODE_OCT=y`), J2 header C22436148 (about 680).

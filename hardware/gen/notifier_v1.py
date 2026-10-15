@@ -27,14 +27,25 @@ PARTS = {
     "R9": ("Device:R", "100k", R0402, "C25741", "Power", 0),   # Vout = 0.6 V * (1 + R9/R10) = 3.33 V
     "R10": ("Device:R", "22k", R0402, "C25768", "Power", 0),
     "C1": ("Device:C", "10u", C0603, "C19702", "Power", 0),
+    # Output cap: TI TLV62569 datasheet (https://www.ti.com/lit/ds/symlink/tlv62569.pdf) sec 8.2.2.5: 10-47 uF effective.
+    # One 22 uF 0805 derates to about 11 uF at 3.3 V DC bias, so C11 is a second one for margin.
     "C2": ("Device:C", "22u", C0805, "C45783", "Power", 0),
+    "C11": ("Device:C", "22u", C0805, "C45783", "Power", 0),
     "C3": ("Device:C", "100n", C0402, "C1525", "Power", 0),
     "R3": ("Device:R", "4.7k", R0402, "C25900", "Power", 0),
     "D1": ("Device:LED", "red", "LED_SMD:LED_0603_1608Metric", "C2286", "Power", 90),
     # ESP32-S3 module, reset, boot, user button
     "U1": ("RF_Module:ESP32-S3-WROOM-1", "ESP32-S3-WROOM-1-N8R2", "RF_Module:ESP32-S3-WROOM-1", "C2913204", "MCU", 0),
+    # 3V3 decoupling per Espressif ESP32-S3 Hardware Design Guidelines, schematic checklist "Power Supply"
+    # (https://docs.espressif.com/projects/esp-hardware-design-guidelines/en/latest/esp32s3/schematic-checklist.html):
+    # 10 uF + 1 uF + 0.1 uF at the module 3V3 pin. C5 22 uF 0805 (>=10 uF after derating), C10 1 uF, C6 100 nF.
     "C5": ("Device:C", "22u", C0805, "C45783", "MCU", 0),
     "C6": ("Device:C", "100n", C0402, "C1525", "MCU", 0),
+    "C10": ("Device:C", "1u", C0402, "C52923", "MCU", 0),
+    # USB D+/D- series resistors, 22 ohm, close to the module pins: Espressif schematic checklist, section "USB"
+    # (same URL): "series resistors of 22 to 33 ohm" on D+/D-. UNI-ROYAL 0402WGF220JTCE, 1 %, Basic.
+    "R11": ("Device:R", "22", R0402, "C25092", "MCU", 0),   # USB_DN -> USB_DN_MCU (module pin 13)
+    "R12": ("Device:R", "22", R0402, "C25092", "MCU", 0),   # USB_DP -> USB_DP_MCU (module pin 14)
     "R4": ("Device:R", "10k", R0402, "C25744", "MCU", 0),
     "C4": ("Device:C", "1u", C0402, "C52923", "MCU", 0),
     "SW1": ("Switch:SW_Push", "RESET", "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A", "C318884", "MCU", 90),
@@ -79,16 +90,18 @@ NETS = {
     "SW": [("U3", "3"), ("L1", "1")],
     "FB": [("U3", "5"), ("R9", "2"), ("R10", "1")],
     "GND": [("J1", "A1"), ("J1", "A12"), ("J1", "B1"), ("J1", "B12"), ("J1", "SH"), ("R1", "2"), ("R2", "2"), ("U2", "2"),
-            ("U3", "2"), ("R10", "2"), ("C1", "2"), ("C2", "2"), ("C3", "2"), ("D1", "1"), ("U1", "1"), ("U1", "40"), ("U1", "41"),
-            ("C5", "2"), ("C6", "2"), ("C4", "2"), ("SW1", "2"), ("SW2", "2"), ("SW3", "2"), ("U4", "1"), ("U4", "7"),
+            ("U3", "2"), ("R10", "2"), ("C1", "2"), ("C2", "2"), ("C3", "2"), ("C11", "2"), ("D1", "1"), ("U1", "1"), ("U1", "40"), ("U1", "41"),
+            ("C5", "2"), ("C6", "2"), ("C10", "2"), ("C4", "2"), ("SW1", "2"), ("SW2", "2"), ("SW3", "2"), ("U4", "1"), ("U4", "7"),
             ("C7", "2"), ("C8", "2"), ("U5", "4"), ("C9", "2"), ("J2", "2"), ("TP3", "1"), ("#FLG02", "1")],
-    "+3V3": [("L1", "2"), ("R9", "1"), ("TP4", "1"), ("#FLG03", "1"), ("C2", "1"), ("C3", "1"), ("R3", "1"), ("U1", "2"), ("C5", "1"), ("C6", "1"), ("R4", "1"),
+    "+3V3": [("L1", "2"), ("R9", "1"), ("TP4", "1"), ("#FLG03", "1"), ("C2", "1"), ("C3", "1"), ("C11", "1"), ("C10", "1"), ("R3", "1"), ("U1", "2"), ("C5", "1"), ("C6", "1"), ("R4", "1"),
              ("R5", "1"), ("R6", "1"), ("U4", "8"), ("U4", "6"), ("U4", "2"), ("U4", "5"), ("C7", "1"), ("C8", "1"), ("U5", "3"), ("C9", "1"),
              ("R7", "1"), ("R8", "1"), ("JP1", "1")],
     "CC1": [("J1", "A5"), ("R1", "1")],
     "CC2": [("J1", "B5"), ("R2", "1")],
-    "USB_DP": [("J1", "A6"), ("J1", "B6"), ("U2", "1"), ("U2", "6"), ("U1", "14")],
-    "USB_DN": [("J1", "A7"), ("J1", "B7"), ("U2", "3"), ("U2", "4"), ("U1", "13")],
+    "USB_DP": [("J1", "A6"), ("J1", "B6"), ("U2", "1"), ("U2", "6"), ("R12", "1")],
+    "USB_DP_MCU": [("R12", "2"), ("U1", "14")],
+    "USB_DN": [("J1", "A7"), ("J1", "B7"), ("U2", "3"), ("U2", "4"), ("R11", "1")],
+    "USB_DN_MCU": [("R11", "2"), ("U1", "13")],
     "LED_A": [("R3", "2"), ("D1", "2")],
     "EN": [("U1", "3"), ("R4", "2"), ("C4", "1"), ("SW1", "1"), ("TP5", "1")],
     "BOOT": [("U1", "27"), ("R5", "2"), ("SW2", "1"), ("TP6", "1")],
