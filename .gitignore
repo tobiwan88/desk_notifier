@@ -39,8 +39,10 @@ hardware/out/
 fp-info-cache
 *.kicad_prl
 *.lck
-firmware/build-s3/
+firmware/build*/
 hardware/notifier-v1/*.net
 *.dsn
 *.ses
 *.freerouting.log
+*.bak
+_autosave-*

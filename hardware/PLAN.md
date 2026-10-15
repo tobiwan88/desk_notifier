@@ -89,3 +89,19 @@ reviews the whole design. 5. Opus decides fixes; repeat. 6. Human checkpoint.
 - 3D model for the HRO USB-C is missing in renders; STEP export for an enclosure.
 - Placement is hand-written coordinates; try `py_placer` from KiCadRoutingTools on the next board.
 - Buck input cap is ~3 mm from VIN; tighten on the next revision.
+
+## Long-term direction (research 2026-10-15)
+- **Keep the Python generators for now.** No alternative is clearly better yet: atopile (MIT, 0.15.x) is
+  pre-release, needs Python 3.14, and its KiCad schematic output, layout reuse and JLC part flow could not
+  be verified; SKiDL writes schematics but no layout; circuit-synth and Diode `pcb` (Zener) are young.
+  Worth a one-board spike with atopile before the next design.
+- **Stop overwriting manual edits.** Schematic stays generated (KiCad has no official schematic API).
+  For the board, follow KiCad's forward annotation model: keep footprints, tracks and positions that
+  exist, add new parts off-board, and pull positions edited in KiCad back into `PLACE`
+  (a `tools/pull_placement.py`), so the generator and the GUI agree.
+- **Move off pcbnew SWIG before KiCad 11** (removal planned; ~Feb 2027): KiCad 11 brings a headless IPC
+  API server (`kicad-cli api-server`); port `layout_v1.py`/`finish.py`/`board_geom.py` to kipy then.
+- **Add review layers, not generators:** kicad-happy (MIT, Claude Code skills: schematic/PCB review,
+  EMC pre-check, JLC BOM/CPL) as a second opinion; visual diffs (KiRI / kidiff) for board changes.
+- MCP servers (mixelpixx KiCAD-MCP-Server, lamaalrajih kicad-mcp) and cloud tools (Quilter, Flux, CELUS)
+  would not replace the generator; Quilter only if KRT's routing stops being good enough.
