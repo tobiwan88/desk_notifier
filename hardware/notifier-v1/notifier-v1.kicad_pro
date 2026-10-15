@@ -338,23 +338,23 @@
     "netclass_patterns": [
       {
         "netclass": "Power",
-        "pattern": "/VBUS_IN"
+        "pattern": "VBUS_IN"
       },
       {
         "netclass": "Power",
-        "pattern": "/VBUS"
+        "pattern": "VBUS"
       },
       {
         "netclass": "Power",
-        "pattern": "/+3V3"
+        "pattern": "+3V3"
       },
       {
         "netclass": "Power",
-        "pattern": "/GND"
+        "pattern": "GND"
       },
       {
         "netclass": "Power",
-        "pattern": "/SW"
+        "pattern": "SW"
       },
       {
         "netclass": "USB",

@@ -21,6 +21,9 @@ def parse(net_text):
         value = re.search(r'\(value "([^"]*)"', blk).group(1)
         fpid = re.search(r'\(footprint "([^"]*)"', blk).group(1)
         uuid = re.findall(r'\(tstamps "([^"]+)"\)', blk)[-1]
+        sheet = re.search(r'\(sheetpath\s*\(names "[^"]*"\)\s*\(tstamps "([^"]*)"\)', blk)
+        if sheet and sheet.group(1).strip("/"):
+            uuid = sheet.group(1).strip("/") + "/" + uuid  # hierarchical: footprint path is sheet uuid / symbol uuid
         fields = dict(re.findall(r'\(field\s*\(name "([^"]+)"\)\s*"([^"]*)"\)', blk.split("(libsource", 1)[0]))
         fields.pop("Footprint", None)
         no_bom = '(name "exclude_from_bom")' in blk

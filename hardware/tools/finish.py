@@ -13,7 +13,7 @@ import pcbnew
 
 mm = pcbnew.FromMM
 board = pcbnew.LoadBoard(sys.argv[1])
-gnd = board.FindNet("/GND")
+gnd = board.FindNet("GND")
 edge = board.GetBoardEdgesBoundingBox()
 for z in list(board.Zones()):
     if not z.GetIsRuleArea() and z.GetLayer() in (pcbnew.F_Cu, pcbnew.B_Cu):

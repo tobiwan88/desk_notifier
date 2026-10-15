@@ -70,7 +70,7 @@ SILK = [  # (text, x, y, size, layer)
     ("desk notifier v1", 25.0, 21.8, 1.0, "F"), ("LCD", 44.5, 7.5, 1.0, "F"), ("1", 39.8, 28.6, 0.8, "F"),
 ] + [(name, 37.4, 26.0 - 2.54 * i, 0.8, "B") for i, name in enumerate(("VCC", "GND", "SCL", "SDA", "DC", "CS", "RST"))]
 
-NETCLASS_PATTERNS = {"Power": ["/VBUS_IN", "/VBUS", "/+3V3", "/GND", "/SW"], "USB": ["/USB_DP", "/USB_DN"]}
+NETCLASS_PATTERNS = {"Power": ["VBUS_IN", "VBUS", "+3V3", "GND", "SW"], "USB": ["/USB_DP", "/USB_DN"]}
 
 
 def v(x, y):
@@ -218,8 +218,8 @@ def main():
         trk(pad("U5", n5), [q, pcbnew.VECTOR2I(q.x, q.y + mm(0.8))])
 
     full = [(0, 0), (W, 0), (W, H), (0, H)]
-    zone(board, pcbnew.In1_Cu, "/GND", full)
-    zone(board, pcbnew.In2_Cu, "/+3V3", full)
+    zone(board, pcbnew.In1_Cu, "GND", full)
+    zone(board, pcbnew.In2_Cu, "+3V3", full)
     # outer GND pours are added after routing (tools/finish.py), so the router sees free layers
     # no pours on the sensor island: keep the module's and regulator's heat out (tracks still allowed)
     copper = [pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.B_Cu]

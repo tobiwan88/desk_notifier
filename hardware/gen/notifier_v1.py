@@ -8,66 +8,65 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import kicad_sch_api as ksa  # noqa: E402
-from schkit import check_nets, connect, no_connect, save  # noqa: E402
+from schkit import check_nets  # noqa: E402
 
 R0402, C0402 = "Resistor_SMD:R_0402_1005Metric", "Capacitor_SMD:C_0402_1005Metric"
 C0603, C0805 = "Capacitor_SMD:C_0603_1608Metric", "Capacitor_SMD:C_0805_2012Metric"
 
-# ref: (symbol, value, footprint, LCSC, (x, y) on the A3 sheet in mm, rotation)
+# ref: (symbol, value, footprint, LCSC, schematic sheet, rotation on the PCB-era sketch (unused by the drawing))
 PARTS = {
     # USB-C input and ESD
-    "J1": ("Connector:USB_C_Receptacle_USB2.0_16P", "USB-C", "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12", "C165948", (45, 80), 0),
-    "R1": ("Device:R", "5.1k", R0402, "C25905", (80, 105), 0),
-    "R2": ("Device:R", "5.1k", R0402, "C25905", (90, 105), 0),
-    "U2": ("Power_Protection:USBLC6-2SC6", "USBLC6-2SC6", "Package_TO_SOT_SMD:SOT-23-6", "C7519", (95, 45), 0),
+    "J1": ("Connector:USB_C_Receptacle_USB2.0_16P", "USB-C PWR/DATA", "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12", "C165948", "Power", 0),
+    "R1": ("Device:R", "5.1k", R0402, "C25905", "Power", 0),
+    "R2": ("Device:R", "5.1k", R0402, "C25905", "Power", 0),
+    "U2": ("Power_Protection:USBLC6-2SC6", "USBLC6-2SC6", "Package_TO_SOT_SMD:SOT-23-6", "C7519", "Power", 0),
     # VBUS polyfuse, 3.3 V buck (a linear regulator would burn ~0.6 W and warm the BME688)
-    "F1": ("Device:Polyfuse", "500mA", "Fuse:Fuse_1206_3216Metric", "C70077", (120, 30), 90),
-    "U3": ("Regulator_Switching:TLV62569DBV", "TLV62569", "Package_TO_SOT_SMD:SOT-23-5", "C141836", (160, 45), 0),
-    "L1": ("Device:L", "2.2u", "Inductor_SMD:L_Cenker_CKCS4030", "C354584", (185, 40), 90),
-    "R9": ("Device:R", "100k", R0402, "C25741", (200, 55), 0),   # Vout = 0.6 V * (1 + R9/R10) = 3.33 V
-    "R10": ("Device:R", "22k", R0402, "C25768", (200, 70), 0),
-    "C1": ("Device:C", "10u", C0603, "C19702", (140, 60), 0),
-    "C2": ("Device:C", "22u", C0805, "C45783", (215, 60), 0),
-    "C3": ("Device:C", "100n", C0402, "C1525", (225, 60), 0),
-    "R3": ("Device:R", "4.7k", R0402, "C25900", (240, 45), 0),
-    "D1": ("Device:LED", "red", "LED_SMD:LED_0603_1608Metric", "C2286", (240, 65), 90),
+    "F1": ("Device:Polyfuse", "500mA", "Fuse:Fuse_1206_3216Metric", "C70077", "Power", 90),
+    "U3": ("Regulator_Switching:TLV62569DBV", "TLV62569", "Package_TO_SOT_SMD:SOT-23-5", "C141836", "Power", 0),
+    "L1": ("Device:L", "2.2u", "Inductor_SMD:L_Cenker_CKCS4030", "C354584", "Power", 90),
+    "R9": ("Device:R", "100k", R0402, "C25741", "Power", 0),   # Vout = 0.6 V * (1 + R9/R10) = 3.33 V
+    "R10": ("Device:R", "22k", R0402, "C25768", "Power", 0),
+    "C1": ("Device:C", "10u", C0603, "C19702", "Power", 0),
+    "C2": ("Device:C", "22u", C0805, "C45783", "Power", 0),
+    "C3": ("Device:C", "100n", C0402, "C1525", "Power", 0),
+    "R3": ("Device:R", "4.7k", R0402, "C25900", "Power", 0),
+    "D1": ("Device:LED", "red", "LED_SMD:LED_0603_1608Metric", "C2286", "Power", 90),
     # ESP32-S3 module, reset, boot, user button
-    "U1": ("RF_Module:ESP32-S3-WROOM-1", "ESP32-S3-WROOM-1-N8R2", "RF_Module:ESP32-S3-WROOM-1", "C2913204", (300, 150), 0),
-    "C5": ("Device:C", "22u", C0805, "C45783", (250, 90), 0),
-    "C6": ("Device:C", "100n", C0402, "C1525", (260, 90), 0),
-    "R4": ("Device:R", "10k", R0402, "C25744", (215, 120), 0),
-    "C4": ("Device:C", "1u", C0402, "C52923", (225, 140), 0),
-    "SW1": ("Switch:SW_Push", "RESET", "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A", "C318884", (205, 140), 90),
-    "R5": ("Device:R", "10k", R0402, "C25744", (215, 165), 0),
-    "SW2": ("Switch:SW_Push", "BOOT", "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A", "C318884", (205, 185), 90),
-    "R6": ("Device:R", "10k", R0402, "C25744", (235, 165), 0),
-    "SW3": ("Switch:SW_Push", "BUTTON", "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A", "C318884", (235, 185), 90),
+    "U1": ("RF_Module:ESP32-S3-WROOM-1", "ESP32-S3-WROOM-1-N8R2", "RF_Module:ESP32-S3-WROOM-1", "C2913204", "MCU", 0),
+    "C5": ("Device:C", "22u", C0805, "C45783", "MCU", 0),
+    "C6": ("Device:C", "100n", C0402, "C1525", "MCU", 0),
+    "R4": ("Device:R", "10k", R0402, "C25744", "MCU", 0),
+    "C4": ("Device:C", "1u", C0402, "C52923", "MCU", 0),
+    "SW1": ("Switch:SW_Push", "RESET", "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A", "C318884", "MCU", 90),
+    "R5": ("Device:R", "10k", R0402, "C25744", "MCU", 0),
+    "SW2": ("Switch:SW_Push", "BOOT", "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A", "C318884", "MCU", 90),
+    "R6": ("Device:R", "10k", R0402, "C25744", "MCU", 0),
+    "SW3": ("Switch:SW_Push", "BUTTON", "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A", "C318884", "MCU", 90),
     # BME688 (BME680 symbol: same LGA-8 pinout)
-    "U4": ("Sensor:BME680", "BME688", "Package_LGA:Bosch_LGA-8_3x3mm_P0.8mm_ClockwisePinNumbering", "C3664478", (90, 200), 0),
-    "C7": ("Device:C", "100n", C0402, "C1525", (60, 185), 0),
-    "C8": ("Device:C", "100n", C0402, "C1525", (70, 185), 0),
+    "U4": ("Sensor:BME680", "BME688", "Package_LGA:Bosch_LGA-8_3x3mm_P0.8mm_ClockwisePinNumbering", "C3664478", "Sensors", 0),
+    "C7": ("Device:C", "100n", C0402, "C1525", "Sensors", 0),
+    "C8": ("Device:C", "100n", C0402, "C1525", "Sensors", 0),
     # SHT40 (0x44): temperature/humidity away from the BME688's gas heater
-    "U5": ("Sensor_Humidity:SHT4x", "SHT40-AD1B", "Sensor_Humidity:Sensirion_DFN-4_1.5x1.5mm_P0.8mm_SHT4x_NoCentralPad", "C2909890", (125, 215), 0),
-    "C9": ("Device:C", "100n", C0402, "C1525", (105, 225), 0),
-    "R7": ("Device:R", "4.7k", R0402, "C25900", (120, 185), 0),
-    "R8": ("Device:R", "4.7k", R0402, "C25900", (130, 185), 0),
+    "U5": ("Sensor_Humidity:SHT4x", "SHT40-AD1B", "Sensor_Humidity:Sensirion_DFN-4_1.5x1.5mm_P0.8mm_SHT4x_NoCentralPad", "C2909890", "Sensors", 0),
+    "C9": ("Device:C", "100n", C0402, "C1525", "Sensors", 0),
+    "R7": ("Device:R", "4.7k", R0402, "C25900", "Sensors", 0),
+    "R8": ("Device:R", "4.7k", R0402, "C25900", "Sensors", 0),
     # GC9A01 display header and its supply selector (default 3V3, cut and bridge 2-3 for 5 V)
-    "J2": ("Connector_Generic:Conn_01x07", "GC9A01", "Connector_PinSocket_2.54mm:PinSocket_1x07_P2.54mm_Horizontal", "C22436148", (170, 230), 0),
-    "JP1": ("Jumper:SolderJumper_3_Bridged12", "LCD_VCC", "Jumper:SolderJumper-3_P1.3mm_Bridged12_RoundedPad1.0x1.5mm", None, (140, 215), 0),
+    "J2": ("Connector_Generic:Conn_01x07", "GC9A01 DISPLAY", "Connector_PinSocket_2.54mm:PinSocket_1x07_P2.54mm_Horizontal", "C22436148", "Display", 0),
+    "JP1": ("Jumper:SolderJumper_3_Bridged12", "LCD_VCC", "Jumper:SolderJumper-3_P1.3mm_Bridged12_RoundedPad1.0x1.5mm", None, "Display", 0),
     # debug UART pads, mounting holes
-    "TP1": ("Connector:TestPoint", "TXD0", "TestPoint:TestPoint_Pad_D1.0mm", None, (370, 120), 0),
-    "TP2": ("Connector:TestPoint", "RXD0", "TestPoint:TestPoint_Pad_D1.0mm", None, (380, 120), 0),
-    "TP3": ("Connector:TestPoint", "GND", "TestPoint:TestPoint_Pad_D1.0mm", None, (390, 120), 0),
-    "TP4": ("Connector:TestPoint", "3V3", "TestPoint:TestPoint_Pad_D1.0mm", None, (400, 120), 0),
-    "TP5": ("Connector:TestPoint", "EN", "TestPoint:TestPoint_Pad_D1.0mm", None, (370, 140), 0),
-    "TP6": ("Connector:TestPoint", "IO0", "TestPoint:TestPoint_Pad_D1.0mm", None, (380, 140), 0),
-    "TP7": ("Connector:TestPoint", "VBUS", "TestPoint:TestPoint_Pad_D1.0mm", None, (390, 140), 0),
-    "H1": ("Mechanical:MountingHole", "M2", "MountingHole:MountingHole_2.2mm_M2", None, (370, 250), 0),
-    "H2": ("Mechanical:MountingHole", "M2", "MountingHole:MountingHole_2.2mm_M2", None, (385, 250), 0),
-    "#FLG01": ("power:PWR_FLAG", "PWR_FLAG", None, None, (30, 30), 0),
-    "#FLG02": ("power:PWR_FLAG", "PWR_FLAG", None, None, (45, 30), 0),
-    "#FLG03": ("power:PWR_FLAG", "PWR_FLAG", None, None, (60, 30), 0),
+    "TP1": ("Connector:TestPoint", "TXD0", "TestPoint:TestPoint_Pad_D1.0mm", None, "MCU", 0),
+    "TP2": ("Connector:TestPoint", "RXD0", "TestPoint:TestPoint_Pad_D1.0mm", None, "MCU", 0),
+    "TP3": ("Connector:TestPoint", "GND", "TestPoint:TestPoint_Pad_D1.0mm", None, "MCU", 0),
+    "TP4": ("Connector:TestPoint", "3V3", "TestPoint:TestPoint_Pad_D1.0mm", None, "MCU", 0),
+    "TP5": ("Connector:TestPoint", "EN", "TestPoint:TestPoint_Pad_D1.0mm", None, "MCU", 0),
+    "TP6": ("Connector:TestPoint", "IO0", "TestPoint:TestPoint_Pad_D1.0mm", None, "MCU", 0),
+    "TP7": ("Connector:TestPoint", "VBUS", "TestPoint:TestPoint_Pad_D1.0mm", None, "Power", 0),
+    "H1": ("Mechanical:MountingHole", "M2", "MountingHole:MountingHole_2.2mm_M2", None, "MCU", 0),
+    "H2": ("Mechanical:MountingHole", "M2", "MountingHole:MountingHole_2.2mm_M2", None, "MCU", 0),
+    "#FLG01": ("power:PWR_FLAG", "PWR_FLAG", None, None, "Power", 0),
+    "#FLG02": ("power:PWR_FLAG", "PWR_FLAG", None, None, "Power", 0),
+    "#FLG03": ("power:PWR_FLAG", "PWR_FLAG", None, None, "Power", 0),
 }
 
 # module pin -> GPIO, for the pin map check against firmware Kconfig
@@ -108,22 +107,13 @@ NETS = {
 NO_CONNECT = {"J1": ["A8", "B8"], "U1": U1_UNUSED}
 
 
+
+
 def build(out: Path) -> Path:
+    """Write the hierarchical schematic (root + sheets, drawn in sheets_v1.py) into out/."""
+    import sheets_v1
     out.mkdir(parents=True, exist_ok=True)
-    sch = ksa.Schematic.create("notifier-v1")
-    sch.set_paper_size("A3")
-    sch.set_title_block(title="desk notifier v1", rev="1", company="desk_notifier")
-    for ref, (sym, value, fp, lcsc, pos, rot) in PARTS.items():
-        props = {"LCSC": lcsc} if lcsc else {}
-        comp = sch.components.add(sym, ref, value, pos, fp, rotation=rot, **props)
-        if not lcsc and not ref.startswith("#"):
-            comp.in_bom = False
-    connect(sch, NETS)
-    for ref, pins in NO_CONNECT.items():
-        no_connect(sch, ref, pins)
-    path = out / "notifier-v1.kicad_sch"
-    save(sch, path)
-    return path
+    return sheets_v1.build(out, PARTS, NO_CONNECT)
 
 
 if __name__ == "__main__":
