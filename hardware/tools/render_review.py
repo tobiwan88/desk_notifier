@@ -13,7 +13,7 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 LAYER = {"F.Cu": (215, 40, 40), "B.Cu": (40, 90, 220), "In1.Cu": (40, 160, 60), "In2.Cu": (230, 150, 0)}
-NET = {"/GND": (120, 120, 120), "/+3V3": (240, 150, 30), "/VBUS": (150, 60, 190)}
+NET = {"GND": (120, 120, 120), "+3V3": (240, 150, 30), "VBUS": (150, 60, 190)}
 
 
 def font(px):

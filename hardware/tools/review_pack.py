@@ -63,17 +63,13 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     index = []
 
-    # schematic: full page and 2x2 tiles
+    # schematic: one image per sheet (root block diagram, Power, MCU, Sensors, Display)
     pdf = out / "schematic.pdf"
     run("kicad-cli", "sch", "export", "pdf", "-o", str(pdf), str(sch))
-    page = pymupdf.open(pdf)[0]
-    r = page.rect
-    for i in range(2):
-        for j in range(2):
-            png = out / f"sch_{j}{i}.png"
-            clip = pymupdf.Rect(r.x0 + i * r.width / 2, r.y0 + j * r.height / 2, r.x0 + (i + 1) * r.width / 2, r.y0 + (j + 1) * r.height / 2)
-            page.get_pixmap(matrix=pymupdf.Matrix(2.5, 2.5), clip=clip).save(png)
-            index.append({"image": png.name, "kind": "schematic", "focus": f"schematic tile row {j} col {i}"})
+    for n, page in enumerate(pymupdf.open(pdf), 1):
+        png = out / f"sch_p{n}.png"
+        page.get_pixmap(matrix=pymupdf.Matrix(2.2, 2.2)).save(png)
+        index.append({"image": png.name, "kind": "schematic", "focus": f"schematic sheet {n}"})
 
     # PCB layers, cropped to the board (plots keep page coordinates)
     x0, y0, x1, y1 = board_box(pcb)
