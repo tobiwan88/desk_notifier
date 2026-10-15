@@ -20,7 +20,7 @@ description: Use for PCB placement and routing in hardware/ (notifier-v1): editi
 - Edge keepout: our floor is copper-to-edge 0.3 mm (`rules/jlc-4layer.json`, `board_edge` in `krt-fab.txt`). Generic "3 mm" advice is the default for new boards with panelisation/handling needs, not this board (verify with the JLC panel if the outline changes).
 - Thermal: no linear LDO from 5 V (about 0.6 W warms the sensor): use a buck, placed far from the BME688/SHT40.
 - Antenna (module): keepout strip with no copper or vias under the antenna (`ANTENNA_STRIP`, `vias=True`); the antenna overhangs the top edge (local y < -6.75).
-- Sensor island (BME688 peninsula): notch on the module side and below, neck at the left edge (`NECK`, 3.6 mm wide; island 10.4 x 11.8 mm). No pours on island or neck. All island nets leave as tracks through the neck. SHT40 sits in the island corner, away from the BME688.
+- Sensor island (BME688 peninsula): notch on the module side and below, neck at the left edge (`NECK`, 3.6 mm wide; island 10.4 x 11.8 mm). No outer/In2 pours on island or neck; In1 GND hatched as return path. All island nets leave as tracks through the neck. SHT40 sits in the island corner, away from the BME688.
 - Fine-pitch parts (SHT4x DFN, 0.3 mm pad gap): footprint keepout allows only straight exits. Hand-draw escape stubs in `layout_v1.py` (the router extends them).
 
 ## Constraints and classes
@@ -40,7 +40,7 @@ description: Use for PCB placement and routing in hardware/ (notifier-v1): editi
   - `--no-fix-drc-settings --fab-overrides rules/krt-fab.txt`: KRT otherwise rewrites the project's fab rules.
   - `--power-nets-widths` sets the power widths above.
 - Freerouting (`tools/freerouting` JAR wrapper) is the fallback: the native CLI 2.5.0 hangs. Automatic neckdown is off in the wrapper. Left 12 nets open last time (verify on re-run).
-- Ground reference rule (every signal): each signal needs a continuous GND reference, either a solid plane or an adjacent GND track, including across the island neck and slots. A signal that crosses a plane split or void is a fail: move it or add a GND track beside it. The I2C lines over the sensor island are the open item here (verify after the fix).
+- Ground reference rule (every signal): each signal needs a continuous GND reference, either a solid plane or an adjacent GND track, including across the island neck and slots. A signal that crosses a plane split or void is a fail: move it or add a GND track beside it. Sensor island/neck: In1 GND is a hatched zone (0.3 mm lines, 1.2 mm gap, ~35 % copper) under island and neck, added in `finish.py` (KRT's plane router drops zones made in the layout); outer and In2 pours stay forbidden there.
 - Stitching vias: 2-3 mm apart between top and bottom GND pours, and at high-current layer transitions. Place them outside the antenna strip and island.
 - After routing, run `finish.py`: removes dangling stubs and vias, DRC-driven, one at a time, reverting any that open a connection. Keep SWIG references (`keep` list) or the second iteration crashes.
 - Non-determinism: router output differs run to run. After experiments run `git checkout hardware/notifier-v1/` to restore the committed board. Pipeline output is not byte-stable.

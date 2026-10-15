@@ -14,7 +14,7 @@ The schematic is generated. Edit `hardware/gen/notifier_v1.py` (`PARTS`, `NETS`,
 - Everything else (layout, routing, fab): `hardware/README.md`.
 
 ## Readability rules
-- Split into hierarchical sheets: a root block diagram plus Power, MCU, Sensors, Display (verify: the generator currently writes one A3 sheet, so hierarchy is a planned change).
+- Hierarchical sheets: root block diagram + Power, MCU, Sensors, Display (`gen/sheets_v1.py` draws them, `schkit.Sheet` gives wires, junctions, power symbols, labels, notes, group frames, title blocks).
 - Signal flow left to right: inputs and power entry left, MCU middle, connectors and outputs right. Positive rails at the top, GND at the bottom.
 - Group by function. Decoupling caps sit beside the IC power pins they serve.
 - Draw full wires for tightly coupled connections; use labels only for buses and far nets.
@@ -31,7 +31,7 @@ The schematic is generated. Edit `hardware/gen/notifier_v1.py` (`PARTS`, `NETS`,
   - kicad-sch-api 0.5.x rotates pins wrong at 90 and 270 degrees (LEDs and diodes come out reversed with ERC clean). `schkit.pin_pos` and `pin_away` do the pin math; do not trust the library's pin positions.
   - Labels are always written left-justified. `schkit.save` right-justifies labels at 180 and 270 degrees.
 - Keep `check_nets` (net intent) in step with the netlist: it compares the generator's NETS against `kicad-cli sch export netlist`.
-- Hierarchy: a net's full name changes with its sheet path (`/Power/SW` instead of `SW`). Nets referenced by the router, netclasses or checks must use global labels or power symbols, or be updated together with them (verify before adding sheets).
+- Hierarchy: a net's full name changes with its sheet path (`/Power/CC1`). Power symbols and global labels give root names without `/` (`GND`, `+3V3`, `VBUS`, `VBUS_IN`, `SW`); hierarchical labels keep `/USB_DP`, `/I2C_SDA`, `/LCD_*`. `route_krt.sh`, `NETCLASS_PATTERNS` and `finish.py` use these names: rename them together. `check_nets` maps hierarchical names back to the NETS keys.
 - Parts without an `LCSC` field are kept out of the BOM (`in_bom = False`): test points, holes, jumpers.
 
 ## Verification
@@ -46,7 +46,8 @@ The schematic is generated. Edit `hardware/gen/notifier_v1.py` (`PARTS`, `NETS`,
 |---|---|---|
 | LED or diode reversed, ERC clean | kicad-sch-api 0.5.x pin rotation at 90/270 | use `schkit.pin_pos`/`pin_away`; net-intent check |
 | Labels all left-justified, unreadable | library default | `schkit.save` justification |
-| Net name changed after adding a sheet | full net name includes sheet path | global labels / power symbols, or update router and checks together (verify) |
+| Net name changed after adding a sheet | full net name includes sheet path | global labels / power symbols, or update router and checks together |
+| ERC "global label only once" | single global label per net | place it twice (VBUS_IN, SW) or use a power symbol |
 | Huge schematic diff, every UUID changed | regeneration assigns new UUIDs | restore committed files after test runs; commit only real changes |
 | `nets OK` fails after an edit | NETS does not match PARTS pins | fix NETS; the netlist is the truth |
 | Pin conflict or unconnected pin in ERC | missing NETS entry or wrong pin number | check the symbol's pin numbers in the datasheet and the stock symbol |
