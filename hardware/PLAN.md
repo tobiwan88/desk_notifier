@@ -22,7 +22,7 @@ scripts/hw-check.sh [--bom --qty N]      # the gate alone (also part of scripts/
   `CONFIG_SPIRAM_MODE_OCT=y`, GPIO35-37 are unused anyway). Antenna overhangs the top edge.
   Firmware: `DESK_BOARD_NOTIFIER_V1` (Kconfig choice, default on S3) sets the pin map;
   `sdkconfig.defaults.esp32s3`; build with `idf.py -B build-s3 -DIDF_TARGET=esp32s3 -DSDKCONFIG=build-s3/sdkconfig build`.
-  Datasheet fixes: 22 ohm series R11/R12 (C25092) on USB D+/D- at the module (nets `USB_DP_MCU`/`USB_DN_MCU`), 1 uF C10 at 3V3, second 22 uF C11 on the buck output (Espressif checklist, TLV62569 sec 8.2.2.5).
+  Datasheet fixes: 22 ohm series R11/R12 (C25092) on USB D+/D- at the module (nets `MCU_USB_DP`/`MCU_USB_DN`), 1 uF C10 at 3V3, second 22 uF C11 on the buck output (Espressif checklist, TLV62569 sec 8.2.2.5).
 - **Power**: USB-C (HRO TYPE-C-31-M-12), 5.1k CC, USBLC6-2SC6 ESD, 500 mA polyfuse, TLV62569 buck
   (2 A, 3.33 V via 100k/22k) with a 2.2 uH Cenker CKCS4030. A linear regulator would burn ~0.6 W
   and warm the sensor; the design review caught it.
@@ -46,7 +46,7 @@ scripts/hw-check.sh [--bom --qty N]      # the gate alone (also part of scripts/
 |---|---|
 | Schematic | `gen/notifier_v1.py` (PARTS + NETS = source of truth) on kicad-sch-api via `gen/schkit.py` (own pin math, label justification, net-intent check against KiCad's netlist) |
 | Placement | `gen/layout_v1.py` (pcbnew SWIG in KiCad's Python): outline, positions, planes, keepouts, rules, silk; writes `.kicad_pro` + `.kicad_dru` |
-| Routing | KiCadRoutingTools 0.23 (`tools/route_krt.sh`): planes on In1/In2, USB diff pair, rest on F/B only, `--ordering inside_out`, `--same-net-pad-clearance`, fab floors pinned (`rules/krt-fab.txt`, `--no-fix-drc-settings`) |
+| Routing | KiCadRoutingTools 0.23 (`tools/route_krt.sh`): planes on In1/In2, rest on F/B only (USB pair hand-drawn in `gen/layout_v1.py`, 0.27/0.15 = 90 ohm), `--ordering inside_out`, `--same-net-pad-clearance`, fab floors pinned (`rules/krt-fab.txt`, `--no-fix-drc-settings`) |
 | Routing alt | Freerouting 2.5 JAR (`tools/autoroute.py`, `tools/freerouting`): fine on simple boards, left 12 nets open here (planes, island) |
 | Finish | `tools/finish.py`: outer GND pours, refill, DRC-driven removal of dangling router leftovers (undone if it opens a connection) |
 | Checks | `tools/checks.py`: ERC + DRC + schematic parity (JSON), `waivers.yaml`, pin map vs Kconfig, reserved S3 pins, live JLC BOM (`tools/jlcparts.py`) |

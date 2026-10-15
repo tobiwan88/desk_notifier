@@ -366,11 +366,11 @@
       },
       {
         "netclass": "USB",
-        "pattern": "/USB_DP_MCU"
+        "pattern": "/MCU/MCU_USB_DP"
       },
       {
         "netclass": "USB",
-        "pattern": "/USB_DN_MCU"
+        "pattern": "/MCU/MCU_USB_DN"
       }
     ]
   },
