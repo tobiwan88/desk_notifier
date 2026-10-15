@@ -42,6 +42,11 @@ In JLC's 3D/placement preview, confirm pin 1 against the silkscreen dot for each
 - [ ] J2 header: body toward the right edge, opening outward.
 Fix any wrong part in JLC's editor and note the correction in `ROTATION` in `hardware/tools/fab_package.py`.
 
+## Sensors (datasheet handling notes)
+- No conformal coating, no-clean flux only near U4/U5: the SHT40 sensor opening must stay open (SHT4x datasheet 5.3),
+  the BME688 vent must not be contaminated (Bosch BME68x handling instructions, BST-BME680-HS000).
+- In the enclosure: an air path to both sensors, BME688 vent away from direct light, no heat source next to the island.
+
 ## Not assembled
 - The GC9A01 display module (7 pins: VCC GND SCL SDA DC CS RST). Check the pin order on the module you bought
   against the bottom silkscreen next to J2 before plugging it in: a VCC/GND swap kills it.
