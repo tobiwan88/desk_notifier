@@ -5,8 +5,8 @@ cd "$(dirname "$0")/../.."
 . scripts/kicad-env.sh
 P=hardware/notifier-v1/notifier-v1
 hardware/tools/build_v1.sh
-cp $P.kicad_pcb hardware/out/v1-placed.kicad_pcb && cp $P.kicad_pro hardware/out/v1-placed.kicad_pro
-hardware/tools/route_krt.sh hardware/out/v1-placed.kicad_pcb $P.kicad_pcb
+cp $P.kicad_pcb hardware/out/v1-placed.kicad_pcb  # unrouted, for comparison (no .kicad_pro: not a project)
+hardware/tools/route_krt.sh $P.kicad_pcb $P.kicad_pcb
 "$KICAD_PYTHON" hardware/tools/finish.py $P.kicad_pcb 2>&1 | grep -v -e Fontconfig -e stdpbase -e swig
 uv run --package desk-hardware python hardware/tools/checks.py "$@"
 "$KICAD_PYTHON" hardware/tools/board_geom.py $P.kicad_pcb hardware/out/geom.json 2>&1 | grep -v -e Fontconfig -e stdpbase -e swig

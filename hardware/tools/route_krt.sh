@@ -2,12 +2,15 @@
 # Route a placed board with KiCadRoutingTools: planes (In1 GND, In2 3V3), USB pair, then the rest
 # on the outer layers only, so the inner planes stay solid. Fab floors pinned (rules/krt-fab.txt).
 # Usage: route_krt.sh placed.kicad_pcb routed.kicad_pcb
+# Stage boards live in a temp dir (no stray KiCad projects in the repo); logs go to hardware/out/route/.
 set -e
 here="$(cd "$(dirname "$0")/.." && pwd)"
 K="$here/.tools/KiCadRoutingTools"; P="$K/.venv/bin/python"; F="$here/rules/krt-fab.txt"
 [ -x "$P" ] || { echo "KiCadRoutingTools missing: run hardware/tools/setup_tools.sh" >&2; exit 1; }
 in="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"; out="$2"
-work="$here/out/krt"; mkdir -p "$work"; cd "$work"
+work="$(mktemp -d)"; logs="$here/out/route"
+trap 'mkdir -p "$logs"; cp "$work"/*.log "$work"/route.json "$logs"/ 2>/dev/null; rm -rf "$work"' EXIT
+cd "$work"
 pro="${in%.kicad_pcb}.kicad_pro"
 cp "$in" placed.kicad_pcb
 for f in placed poured diffed; do cp "$pro" "$f.kicad_pro"; done

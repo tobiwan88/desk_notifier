@@ -7,6 +7,8 @@ Goal: a small board for the desk notifier, fully assembled at JLCPCB, designed b
 Open before ordering: human review in KiCad, JLC placement preview (rotations), display pinout
 check against the real module. See `notifier-v1/ORDER.md`.
 
+See `README.md` for where to look during a review.
+
 ## One command
 ```
 hardware/tools/setup_tools.sh             # once: routers into hardware/.tools (KRT 0.23.0, Freerouting 2.5.0 JAR)
