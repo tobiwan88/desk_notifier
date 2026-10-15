@@ -109,3 +109,22 @@ reviews the whole design. 5. Opus decides fixes; repeat. 6. Human checkpoint.
   EMC pre-check, JLC BOM/CPL) as a second opinion; visual diffs (KiRI / kidiff) for board changes.
 - MCP servers (mixelpixx KiCAD-MCP-Server, lamaalrajih kicad-mcp) and cloud tools (Quilter, Flux, CELUS)
   would not replace the generator; Quilter only if KRT's routing stops being good enough.
+
+## KiCad 10.0.x file format (research 2026-10-15)
+- **Now:** the board is written by pcbnew SWIG from KiCad 10 (version 20260206). Schematics come from
+  `schkit` with the 9.0 header (20250114); `build_v1.sh` runs `kicad-cli sch upgrade --force` on every
+  sheet, giving 20260306 / "10.0". KiCad's own loader and saver do this, so it is the authoritative
+  format. A second upgrade changes nothing (checked). Nets and ERC are unchanged. The upgrade also
+  replaces our cached `lib_symbols` with the installed library versions.
+- **Native 10 writer (next step, small):** have `schkit` emit the 10.0 header and property format
+  (`(show_name no)(do_not_autoplace no)`, `duplicate_pin_numbers_are_jumpers` in lib symbols), and copy
+  `lib_symbols` straight from the installed `.kicad_sym` files. Keep the upgrade as a gate: generate,
+  upgrade, fail if anything beyond whitespace/UUIDs changes. kicad-sch-api 0.5.6 only claims KiCad 7/8
+  output (no 10 support): keep it only for what `schkit` already wraps, or drop it.
+  Format history: https://gitlab.com/kicad/code/kicad/-/blob/master/eeschema/sch_file_versions.h
+- **KiCad 11:** pcbnew SWIG is removed, so `layout_v1.py`, `finish.py` and `board_geom.py` need another way
+  to write the board. Either kipy over the IPC API (needs headless `kicad-cli api-server`; verify it ships in
+  11) or direct `.kicad_pcb` S-expression writing (fallback, no dependency on the GUI). The IPC API in 10
+  has no schematic commands (community sources only, unverified), so schematics stay with the text writer.
+  On each KiCad release: re-check `sch_file_versions.h`, re-run the upgrade gate, pin the KiCad version in
+  `scripts/kicad-env.sh`.
