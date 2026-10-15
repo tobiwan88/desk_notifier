@@ -223,8 +223,11 @@ def main():
     # outer GND pours are added after routing (tools/finish.py), so the router sees free layers
     # no pours on the sensor island: keep the module's and regulator's heat out (tracks still allowed)
     copper = [pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.B_Cu]
-    keepout(board, copper, ISLAND)
-    keepout(board, copper, NECK)
+    # In1 stays pourable there: tools/finish.py adds a hatched GND plane under island + neck as the
+    # return path for SDA/SCL/3V3 (KRT's plane router replaces the zones made here, so it lives in finish.py)
+    outer = [pcbnew.F_Cu, pcbnew.In2_Cu, pcbnew.B_Cu]
+    keepout(board, outer, ISLAND)
+    keepout(board, outer, NECK)
     keepout(board, copper, ANTENNA_STRIP, vias=True)
 
     filler = pcbnew.ZONE_FILLER(board)
