@@ -517,6 +517,7 @@ source = { virtual = "hardware" }
 dependencies = [
     { name = "kicad-python" },
     { name = "kicad-sch-api" },
+    { name = "pillow" },
     { name = "pymupdf" },
     { name = "pyyaml" },
 ]
@@ -525,6 +526,7 @@ dependencies = [
 requires-dist = [
     { name = "kicad-python", specifier = ">=0.8.0" },
     { name = "kicad-sch-api", specifier = ">=0.5.6" },
+    { name = "pillow", specifier = ">=12.3.0" },
     { name = "pymupdf", specifier = ">=1.28.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
 ]

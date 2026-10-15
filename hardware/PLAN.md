@@ -27,6 +27,9 @@ scripts/hw-check.sh [--bom --qty N]      # the gate alone (also part of scripts/
   and warm the sensor; the design review caught it.
 - **Sensor**: BME688 at 0x77 on a peninsula (1.2 mm notch facing the module and below, neck at the
   left edge), no pours on the island or neck, far from the module and the buck.
+  I2C/3V3 tracks cross the neck with a return path: In1 GND is a HATCHED zone (0.3 mm lines, 1.2 mm gap, ~35 % copper,
+  `tools/finish.py`) under island + neck, stitched to the solid plane at the neck; F/B/In2 stay empty there, so thermal
+  isolation is nearly unchanged (neck is 2.8 mm wide, tracks already conduct).
 - **Temperature/humidity**: SHT40-AD1B (C2909890, 0x44, ±1.8 %RH / ±0.2 °C) on the same island, in the
   corner away from the BME688: its gas heater warms the BME688, so T/RH come from the SHT40 and the
   BME688 is used for gas/air quality (and pressure).
