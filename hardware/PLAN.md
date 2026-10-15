@@ -122,6 +122,15 @@ reviews the whole design. 5. Opus decides fixes; repeat. 6. Human checkpoint.
   upgrade, fail if anything beyond whitespace/UUIDs changes. kicad-sch-api 0.5.6 only claims KiCad 7/8
   output (no 10 support): keep it only for what `schkit` already wraps, or drop it.
   Format history: https://gitlab.com/kicad/code/kicad/-/blob/master/eeschema/sch_file_versions.h
+- **Tool survey (2026-10-15, second pass):** nothing writes verified KiCad 10 schematics natively.
+  Official: kicad-cli 10 has only `sch erc/export/upgrade`; no eeschema Python bindings in the bundle; IPC API
+  (kicad-python 0.8.0) is PCB-only in 10, `get_schematic()` is marked "added in KiCad 11" (write coverage
+  unconfirmed). Python: kicad-sch-api 0.5.6 (Nov 2025, KiCad 7/8 claims, open corruption issues #212/#207/#204),
+  SKiDL 2.3.0 (active, KiCad 10 unverified), circuit-synth 0.12.1, kiutils/kicad-skip stale (2024).
+  Rust: kiutils-rs / `kiutils_kicad` 0.3.0 (MIT, Sep 2026, lossless CST read/write of .kicad_sch, docs say
+  KiCad 10 primary; creating schematics from scratch undocumented) - the one worth a spike if we leave Python.
+  Diode `pcb` (Zener) targets KiCad 10 but emits layout/netlist, not schematics; tscircuit's KiCad schematic
+  converter has no multi-sheet support. Decision: keep `schkit` + upgrade gate; revisit when KiCad 11 ships.
 - **KiCad 11:** pcbnew SWIG is removed, so `layout_v1.py`, `finish.py` and `board_geom.py` need another way
   to write the board. Either kipy over the IPC API (needs headless `kicad-cli api-server`; verify it ships in
   11) or direct `.kicad_pcb` S-expression writing (fallback, no dependency on the GUI). The IPC API in 10
