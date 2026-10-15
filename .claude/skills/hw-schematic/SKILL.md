@@ -32,6 +32,8 @@ The schematic is generated. Edit `hardware/gen/notifier_v1.py` (`PARTS`, `NETS`,
   - Labels are always written left-justified. `schkit.save` right-justifies labels at 180 and 270 degrees.
 - Keep `check_nets` (net intent) in step with the netlist: it compares the generator's NETS against `kicad-cli sch export netlist`.
 - Hierarchy: a net's full name changes with its sheet path (`/Power/CC1`). Power symbols and global labels give root names without `/` (`GND`, `+3V3`, `VBUS`, `VBUS_IN`, `SW`); hierarchical labels keep `/USB_DP`, `/I2C_SDA`, `/LCD_*`. `route_krt.sh`, `NETCLASS_PATTERNS` and `finish.py` use these names: rename them together. `check_nets` maps hierarchical names back to the NETS keys.
+- File format: `schkit` writes the KiCad 9 header (20250114); `build_v1.sh` then runs `kicad-cli sch upgrade --force` on every `.kicad_sch` (KiCad 10.0.x: 20260306). Upgrading only the root leaves sub-sheets old, and KiCad 10 warns "created by an older version" on open. After a generator change check `head -1 hardware/notifier-v1/*.kicad_sch`. Native KiCad 10 writing: see PLAN.md long-term direction.
+- Diff-pair net names end in the polarity: `USB_DP`/`USB_DN`, series-R side `MCU_USB_DP`/`MCU_USB_DN` (not `USB_DP_MCU`): the router pairs nets by suffix only. Rename in NETS, the sheet labels, `NETCLASS_PATTERNS`, `route_krt.sh` and `checks.py` together.
 - Parts without an `LCSC` field are kept out of the BOM (`in_bom = False`): test points, holes, jumpers.
 
 ## Verification
@@ -51,4 +53,6 @@ The schematic is generated. Edit `hardware/gen/notifier_v1.py` (`PARTS`, `NETS`,
 | Huge schematic diff, every UUID changed | regeneration assigns new UUIDs | restore committed files after test runs; commit only real changes |
 | `nets OK` fails after an edit | NETS does not match PARTS pins | fix NETS; the netlist is the truth |
 | Pin conflict or unconnected pin in ERC | missing NETS entry or wrong pin number | check the symbol's pin numbers in the datasheet and the stock symbol |
+| KiCad: "file created by an older version" | sheets written in the 9.0 format | `build_v1.sh` upgrades every sheet; don't skip it when running the generator by hand |
+| Diff pair routed as two single nets | net names don't end in DP/DN or _P/_N | rename (e.g. `MCU_USB_DP`) |
 | Stray `.kicad_sch` or lock file in repo | GUI session or test run | delete the stray file, `~*.lck` only when no KiCad runs |

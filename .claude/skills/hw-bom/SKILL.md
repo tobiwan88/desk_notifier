@@ -48,6 +48,8 @@ Scope: parts and ordering. Schematic: `hw-schematic`. Layout, routing, environme
 - `ROTATION` comes from an old community table. Verify every IC in JLC's placement preview (ORDER.md checklist). For each wrong part add a `ROTATION` entry and note it. Do not hand-edit the CPL.
 - Parts without an LCSC field are excluded from BOM and CPL.
 
+- Impedance: the stackup is part of the order (JLC04161H-7628, no impedance control ordered). JLC's calculator (https://jlcpcb.com/impedance) is an interactive page an agent can't run: compute with KRT `py_router/impedance.py` (stackup numbers are on that page: prepreg 7628 0.2104 mm, er 4.4, core 4.6, mask 3.8), subtract ~3 ohm for mask, write the exact calculator inputs into ORDER.md and ask the human to confirm. Changing stackup changes the widths.
+
 ## 5. Before ordering
 - `scripts/hw-check.sh --bom --qty N` must print `hardware checks: OK` (fails on missing stock). Run it right before ordering.
 - Walk the `hardware/notifier-v1/ORDER.md` checklist: PCB and assembly options, placement preview of U1-U5, J1, D1, L1, F1, J2.

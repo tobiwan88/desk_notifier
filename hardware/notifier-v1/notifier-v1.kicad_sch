@@ -1,88 +1,744 @@
-(kicad_sch (version 20250114) (generator "eeschema") (generator_version "9.0")
+(kicad_sch
+	(version 20260306)
+	(generator "eeschema")
+	(generator_version "10.0")
 	(uuid "85cf2753-6181-5f74-b525-c66aecc4c100")
 	(paper "A3")
-	(title_block (title "desk notifier v1") (date "2026-10-15") (rev "v1") (company "desk_notifier") (comment 1 "Sheet: root (block diagram)"))
+	(title_block
+		(title "desk notifier v1")
+		(date "2026-10-15")
+		(rev "v1")
+		(company "desk_notifier")
+		(comment 1 "Sheet: root (block diagram)")
+	)
 	(lib_symbols)
-	(wire (pts (xy 111.76 96.52) (xy 162.56 96.52)) (stroke (width 0) (type default)) (uuid "0ec9d3cd-a73b-5e06-be06-8c1fca29df2b"))
-	(wire (pts (xy 111.76 101.6) (xy 162.56 101.6)) (stroke (width 0) (type default)) (uuid "7243e6cb-63d6-5639-b2b6-8b05b1163495"))
-	(wire (pts (xy 254.0 76.2) (xy 304.8 76.2)) (stroke (width 0) (type default)) (uuid "7f71ca23-030b-555a-a887-f7b53a2b29fd"))
-	(wire (pts (xy 254.0 81.28) (xy 304.8 81.28)) (stroke (width 0) (type default)) (uuid "af3e9568-affe-5cf0-8b89-5acd24c127d3"))
-	(wire (pts (xy 254.0 116.84) (xy 304.8 116.84)) (stroke (width 0) (type default)) (uuid "4ef3bdc2-cb35-56d4-9258-be1d41626ace"))
-	(wire (pts (xy 254.0 121.92) (xy 304.8 121.92)) (stroke (width 0) (type default)) (uuid "6d1007a0-ee1d-5a40-98b6-51a2b5b5cb56"))
-	(wire (pts (xy 254.0 127.0) (xy 304.8 127.0)) (stroke (width 0) (type default)) (uuid "41adb716-2db4-598c-8f09-c9fb21f56631"))
-	(wire (pts (xy 254.0 132.08) (xy 304.8 132.08)) (stroke (width 0) (type default)) (uuid "2cee073c-e4de-5c6c-ab56-7e492ee86e78"))
-	(wire (pts (xy 254.0 137.16) (xy 304.8 137.16)) (stroke (width 0) (type default)) (uuid "759a4cf0-111d-5ba1-9040-02f9d7cf3a11"))
-	(label "USB_DP" (at 127.0 96.52 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "def6e0f7-6ca3-5825-aa37-a2c7406da1b2"))
-	(label "USB_DN" (at 127.0 101.6 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "370643e9-56d4-5add-b4df-c058f947c77b"))
-	(label "I2C_SDA" (at 269.24 76.2 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "5554b8e2-6f99-5301-b7eb-1fc9f4f70fe5"))
-	(label "I2C_SCL" (at 269.24 81.28 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "f1342a3b-46da-5d6a-a810-6c83df2356b1"))
-	(label "LCD_SCLK" (at 269.24 116.84 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "d581bf68-d294-5f45-bc31-c0e886063e4d"))
-	(label "LCD_MOSI" (at 269.24 121.92 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "d281a3ad-13e8-532c-8bf0-fa5d1f02786e"))
-	(label "LCD_DC" (at 269.24 127.0 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "e3325b23-b90a-57b8-af3f-2edca9aa6b45"))
-	(label "LCD_CS" (at 269.24 132.08 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "ea89699b-ddb1-5f13-94ae-41622ba632e1"))
-	(label "LCD_RST" (at 269.24 137.16 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "016446ce-1326-533d-b9c4-d21af789e9f7"))
-	(sheet (at 35.56 76.2) (size 76.2 55.88) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced yes)
-		(stroke (width 0.2) (type solid)) (fill (color 255 255 200 0.5))
+	(text "BME688 (gas, 0x77)\nSHT40 (T/RH, 0x44)\nI2C pull-ups"
+		(exclude_from_sim no)
+		(at 307.34 60.96 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left top)
+		)
+		(uuid "049b7d75-7686-5afb-9794-e0fd8c27b402")
+	)
+	(text "GC9A01 round display\nheader J2, LCD_VCC jumper JP1"
+		(exclude_from_sim no)
+		(at 307.34 111.76 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left top)
+		)
+		(uuid "4b54298a-fd20-5338-baa1-999a561f0ea2")
+	)
+	(text "- SHT40 for temperature/humidity: the BME688 gas heater self-heats."
+		(exclude_from_sim no)
+		(at 35.56 203.2 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left top)
+		)
+		(uuid "5610656e-8ffc-5090-b8bb-35665646e798")
+	)
+	(text "- USB D+/D- are a 90 ohm pair: keep short. Antenna keepout under the module's antenna."
+		(exclude_from_sim no)
+		(at 35.56 210.82 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left top)
+		)
+		(uuid "57be42c2-6910-5818-86b1-14af7e8482f9")
+	)
+	(text "Display: GC9A01 header, LCD_VCC jumper JP1"
+		(exclude_from_sim no)
+		(at 35.56 170.18 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left top)
+		)
+		(uuid "5b831c5e-d3da-593c-b6b9-2a8399e14cde")
+	)
+	(text "Sensors: BME688 (gas), SHT40 (T/RH), I2C pull-ups"
+		(exclude_from_sim no)
+		(at 35.56 162.56 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left top)
+		)
+		(uuid "5c89c561-48dc-5482-86a9-fb05d3958aaf")
+	)
+	(text "Power: USB-C, ESD, polyfuse, 3.3 V buck, LED"
+		(exclude_from_sim no)
+		(at 35.56 147.32 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left top)
+		)
+		(uuid "81a52b1e-812b-5e25-beb2-0ce6113c43a3")
+	)
+	(text "GND, +3V3 and VBUS are power symbols on every sheet (not routed here). Open a sheet: double-click it."
+		(exclude_from_sim no)
+		(at 35.56 40.64 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left top)
+		)
+		(uuid "8c826df2-97f7-5b6e-96ce-9bd7edd07004")
+	)
+	(text "USB-C connector, CC, ESD\npolyfuse, 3.3 V buck, LED\n\nout: +3V3, VBUS (symbols)"
+		(exclude_from_sim no)
+		(at 38.1 81.28 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left top)
+		)
+		(uuid "94dceb7c-3203-585c-883e-ed5563d77eaf")
+	)
+	(text "MCU: module, EN/BOOT/RESET, buttons, debug pads"
+		(exclude_from_sim no)
+		(at 35.56 154.94 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left top)
+		)
+		(uuid "9d411f70-9fac-5353-91b6-71b38379b769")
+	)
+	(text "ESP32-S3-WROOM-1 module\nEN / BOOT / RESET, user button\ndecoupling, UART debug pads"
+		(exclude_from_sim no)
+		(at 165.1 71.12 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left top)
+		)
+		(uuid "aa6cb8f2-2ec5-5c44-8c03-04714bfc454e")
+	)
+	(text "Signal flow left to right: power entry (USB-C), MCU in the middle, sensors and display on the right."
+		(exclude_from_sim no)
+		(at 35.56 30.48 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left top)
+		)
+		(uuid "ab971b5f-5d8e-5fb1-9d97-f5e1023e4912")
+	)
+	(text "- 3.3 V from a buck, not an LDO: 0.6 W would heat the sensors."
+		(exclude_from_sim no)
+		(at 35.56 195.58 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left top)
+		)
+		(uuid "b8d1e8b6-9743-5fed-b53d-146d19d42491")
+	)
+	(text "desk notifier v1: ESP32-S3 desk notifier, USB-C powered"
+		(exclude_from_sim no)
+		(at 35.56 20.32 0)
+		(effects
+			(font
+				(size 2 2)
+			)
+			(justify left top)
+		)
+		(uuid "e83a9e1e-cab7-5f4f-9fee-ea4dce681dbc")
+	)
+	(text "Design intent"
+		(exclude_from_sim no)
+		(at 35.56 187.96 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left top)
+		)
+		(uuid "ec9d0424-665e-5efa-a4fe-031469ddb716")
+	)
+	(text "- I2C: BME688 0x77, SHT40 0x44. JP1: 3V3 by default; cut and bridge for 5 V modules."
+		(exclude_from_sim no)
+		(at 35.56 218.44 0)
+		(effects
+			(font
+				(size 1.5 1.5)
+			)
+			(justify left top)
+		)
+		(uuid "fe849d2b-cb77-59e4-962c-2dc726b9fdea")
+	)
+	(wire
+		(pts
+			(xy 111.76 96.52) (xy 162.56 96.52)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "0ec9d3cd-a73b-5e06-be06-8c1fca29df2b")
+	)
+	(wire
+		(pts
+			(xy 254 132.08) (xy 304.8 132.08)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2cee073c-e4de-5c6c-ab56-7e492ee86e78")
+	)
+	(wire
+		(pts
+			(xy 254 127) (xy 304.8 127)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "41adb716-2db4-598c-8f09-c9fb21f56631")
+	)
+	(wire
+		(pts
+			(xy 254 116.84) (xy 304.8 116.84)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4ef3bdc2-cb35-56d4-9258-be1d41626ace")
+	)
+	(wire
+		(pts
+			(xy 254 121.92) (xy 304.8 121.92)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "6d1007a0-ee1d-5a40-98b6-51a2b5b5cb56")
+	)
+	(wire
+		(pts
+			(xy 111.76 101.6) (xy 162.56 101.6)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7243e6cb-63d6-5639-b2b6-8b05b1163495")
+	)
+	(wire
+		(pts
+			(xy 254 137.16) (xy 304.8 137.16)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "759a4cf0-111d-5ba1-9040-02f9d7cf3a11")
+	)
+	(wire
+		(pts
+			(xy 254 76.2) (xy 304.8 76.2)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7f71ca23-030b-555a-a887-f7b53a2b29fd")
+	)
+	(wire
+		(pts
+			(xy 254 81.28) (xy 304.8 81.28)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "af3e9568-affe-5cf0-8b89-5acd24c127d3")
+	)
+	(label "LCD_RST"
+		(at 269.24 137.16 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "016446ce-1326-533d-b9c4-d21af789e9f7")
+	)
+	(label "USB_DN"
+		(at 127 101.6 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "370643e9-56d4-5add-b4df-c058f947c77b")
+	)
+	(label "I2C_SDA"
+		(at 269.24 76.2 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "5554b8e2-6f99-5301-b7eb-1fc9f4f70fe5")
+	)
+	(label "LCD_MOSI"
+		(at 269.24 121.92 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "d281a3ad-13e8-532c-8bf0-fa5d1f02786e")
+	)
+	(label "LCD_SCLK"
+		(at 269.24 116.84 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "d581bf68-d294-5f45-bc31-c0e886063e4d")
+	)
+	(label "USB_DP"
+		(at 127 96.52 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "def6e0f7-6ca3-5825-aa37-a2c7406da1b2")
+	)
+	(label "LCD_DC"
+		(at 269.24 127 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "e3325b23-b90a-57b8-af3f-2edca9aa6b45")
+	)
+	(label "LCD_CS"
+		(at 269.24 132.08 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "ea89699b-ddb1-5f13-94ae-41622ba632e1")
+	)
+	(label "I2C_SCL"
+		(at 269.24 81.28 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "f1342a3b-46da-5d6a-a810-6c83df2356b1")
+	)
+	(sheet
+		(at 35.56 76.2)
+		(size 76.2 55.88)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(fill
+			(color 255 255 200 0.5)
+		)
 		(uuid "8981c1c3-ff50-5488-808f-726a0ebb5885")
-		(property "Sheetname" "Power" (at 35.56 75.2 0) (effects (font (size 2 2) bold) (justify left bottom)))
-		(property "Sheetfile" "power.kicad_sch" (at 35.56 133.08 0) (effects (font (size 1.27 1.27)) (justify left top)))
-		(pin "USB_DP" bidirectional (at 111.76 96.52 0) (uuid "4bc43249-d1e0-5eac-b9aa-db2720a4c70e") (effects (font (size 1.27 1.27)) (justify right)))
-		(pin "USB_DN" bidirectional (at 111.76 101.6 0) (uuid "2a228d06-94d5-5ace-af6b-2709902cc561") (effects (font (size 1.27 1.27)) (justify right)))
-		(instances (project "notifier-v1" (path "/85cf2753-6181-5f74-b525-c66aecc4c100" (page "2"))))
+		(property "Sheetname" "Power"
+			(at 35.56 75.2 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 2 2)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "power.kicad_sch"
+			(at 35.56 133.08 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "USB_DP" bidirectional
+			(at 111.76 96.52 0)
+			(uuid "4bc43249-d1e0-5eac-b9aa-db2720a4c70e")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "USB_DN" bidirectional
+			(at 111.76 101.6 0)
+			(uuid "2a228d06-94d5-5ace-af6b-2709902cc561")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(instances
+			(project "notifier-v1"
+				(path "/85cf2753-6181-5f74-b525-c66aecc4c100"
+					(page "2")
+				)
+			)
+		)
 	)
-	(sheet (at 162.56 66.04) (size 91.44 111.76) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced yes)
-		(stroke (width 0.2) (type solid)) (fill (color 255 255 200 0.5))
-		(uuid "8ee93a8b-7827-5c2b-aac9-b7bd720c2d76")
-		(property "Sheetname" "MCU" (at 162.56 65.04 0) (effects (font (size 2 2) bold) (justify left bottom)))
-		(property "Sheetfile" "mcu.kicad_sch" (at 162.56 178.8 0) (effects (font (size 1.27 1.27)) (justify left top)))
-		(pin "USB_DP" bidirectional (at 162.56 96.52 180) (uuid "31ae91a8-cb22-5767-912f-c15655cc8600") (effects (font (size 1.27 1.27)) (justify left)))
-		(pin "USB_DN" bidirectional (at 162.56 101.6 180) (uuid "951f3c1e-8bea-5f5c-9323-a0d5b94125da") (effects (font (size 1.27 1.27)) (justify left)))
-		(pin "I2C_SDA" bidirectional (at 254.0 76.2 0) (uuid "c64d43e8-2995-59c9-8fc6-a2fa23aceaab") (effects (font (size 1.27 1.27)) (justify right)))
-		(pin "I2C_SCL" bidirectional (at 254.0 81.28 0) (uuid "c9689c95-db9c-5f36-9228-5102051c87e2") (effects (font (size 1.27 1.27)) (justify right)))
-		(pin "LCD_SCLK" bidirectional (at 254.0 116.84 0) (uuid "6c8ba7b0-00e5-5763-b3c3-d556fe9cedac") (effects (font (size 1.27 1.27)) (justify right)))
-		(pin "LCD_MOSI" bidirectional (at 254.0 121.92 0) (uuid "8b8d6f01-64a9-5210-a522-a40afe9c0231") (effects (font (size 1.27 1.27)) (justify right)))
-		(pin "LCD_DC" bidirectional (at 254.0 127.0 0) (uuid "1b3d6f83-c329-5b0e-a543-9b5f38dd524e") (effects (font (size 1.27 1.27)) (justify right)))
-		(pin "LCD_CS" bidirectional (at 254.0 132.08 0) (uuid "90c9e3fa-1ec6-5df6-ada9-e0702cebebfe") (effects (font (size 1.27 1.27)) (justify right)))
-		(pin "LCD_RST" bidirectional (at 254.0 137.16 0) (uuid "01f928f0-01cd-5419-9194-8df05b07272a") (effects (font (size 1.27 1.27)) (justify right)))
-		(instances (project "notifier-v1" (path "/85cf2753-6181-5f74-b525-c66aecc4c100" (page "3"))))
-	)
-	(sheet (at 304.8 55.88) (size 76.2 40.64) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced yes)
-		(stroke (width 0.2) (type solid)) (fill (color 255 255 200 0.5))
-		(uuid "c59d7228-2371-53d1-b452-1c754c2b4233")
-		(property "Sheetname" "Sensors" (at 304.8 54.88 0) (effects (font (size 2 2) bold) (justify left bottom)))
-		(property "Sheetfile" "sensors.kicad_sch" (at 304.8 97.52000000000001 0) (effects (font (size 1.27 1.27)) (justify left top)))
-		(pin "I2C_SDA" bidirectional (at 304.8 76.2 180) (uuid "c514ff9d-0775-5cd5-8fcd-cc838522946e") (effects (font (size 1.27 1.27)) (justify left)))
-		(pin "I2C_SCL" bidirectional (at 304.8 81.28 180) (uuid "8b9ea5da-091c-5f90-80d3-a213da397957") (effects (font (size 1.27 1.27)) (justify left)))
-		(instances (project "notifier-v1" (path "/85cf2753-6181-5f74-b525-c66aecc4c100" (page "4"))))
-	)
-	(sheet (at 304.8 106.68) (size 76.2 55.88) (exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no) (fields_autoplaced yes)
-		(stroke (width 0.2) (type solid)) (fill (color 255 255 200 0.5))
+	(sheet
+		(at 304.8 106.68)
+		(size 76.2 55.88)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(fill
+			(color 255 255 200 0.5)
+		)
 		(uuid "8a2bb1b3-013f-50c9-a102-f283f433baba")
-		(property "Sheetname" "Display" (at 304.8 105.68 0) (effects (font (size 2 2) bold) (justify left bottom)))
-		(property "Sheetfile" "display.kicad_sch" (at 304.8 163.56 0) (effects (font (size 1.27 1.27)) (justify left top)))
-		(pin "LCD_SCLK" bidirectional (at 304.8 116.84 180) (uuid "d8df454b-7f9e-58f3-9b47-19c012796b95") (effects (font (size 1.27 1.27)) (justify left)))
-		(pin "LCD_MOSI" bidirectional (at 304.8 121.92 180) (uuid "af542fd9-58d4-5e09-90b2-1f908f3d8ca3") (effects (font (size 1.27 1.27)) (justify left)))
-		(pin "LCD_DC" bidirectional (at 304.8 127.0 180) (uuid "6c0ac49b-b4f9-52bc-95e8-f9d51a6e51d3") (effects (font (size 1.27 1.27)) (justify left)))
-		(pin "LCD_CS" bidirectional (at 304.8 132.08 180) (uuid "3bd16f88-4650-5752-8672-0e55a04d996b") (effects (font (size 1.27 1.27)) (justify left)))
-		(pin "LCD_RST" bidirectional (at 304.8 137.16 180) (uuid "d37da6f4-9b31-5443-80e3-d18d19d655a4") (effects (font (size 1.27 1.27)) (justify left)))
-		(instances (project "notifier-v1" (path "/85cf2753-6181-5f74-b525-c66aecc4c100" (page "5"))))
+		(property "Sheetname" "Display"
+			(at 304.8 105.68 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 2 2)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "display.kicad_sch"
+			(at 304.8 163.56 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "LCD_SCLK" bidirectional
+			(at 304.8 116.84 180)
+			(uuid "d8df454b-7f9e-58f3-9b47-19c012796b95")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "LCD_MOSI" bidirectional
+			(at 304.8 121.92 180)
+			(uuid "af542fd9-58d4-5e09-90b2-1f908f3d8ca3")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "LCD_DC" bidirectional
+			(at 304.8 127 180)
+			(uuid "6c0ac49b-b4f9-52bc-95e8-f9d51a6e51d3")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "LCD_CS" bidirectional
+			(at 304.8 132.08 180)
+			(uuid "3bd16f88-4650-5752-8672-0e55a04d996b")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "LCD_RST" bidirectional
+			(at 304.8 137.16 180)
+			(uuid "d37da6f4-9b31-5443-80e3-d18d19d655a4")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(instances
+			(project "notifier-v1"
+				(path "/85cf2753-6181-5f74-b525-c66aecc4c100"
+					(page "5")
+				)
+			)
+		)
 	)
-	(text "USB-C connector, CC, ESD\npolyfuse, 3.3 V buck, LED\n\nout: +3V3, VBUS (symbols)" (exclude_from_sim no) (at 38.1 81.28 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid "94dceb7c-3203-585c-883e-ed5563d77eaf"))
-	(text "ESP32-S3-WROOM-1 module\nEN / BOOT / RESET, user button\ndecoupling, UART debug pads" (exclude_from_sim no) (at 165.1 71.12 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid "aa6cb8f2-2ec5-5c44-8c03-04714bfc454e"))
-	(text "BME688 (gas, 0x77)\nSHT40 (T/RH, 0x44)\nI2C pull-ups" (exclude_from_sim no) (at 307.34 60.96 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid "049b7d75-7686-5afb-9794-e0fd8c27b402"))
-	(text "GC9A01 round display\nheader J2, LCD_VCC jumper JP1" (exclude_from_sim no) (at 307.34 111.76 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid "4b54298a-fd20-5338-baa1-999a561f0ea2"))
-	(text "desk notifier v1: ESP32-S3 desk notifier, USB-C powered" (exclude_from_sim no) (at 35.56 20.32 0) (effects (font (size 2.0 2.0)) (justify left top)) (uuid "e83a9e1e-cab7-5f4f-9fee-ea4dce681dbc"))
-	(text "Signal flow left to right: power entry (USB-C), MCU in the middle, sensors and display on the right." (exclude_from_sim no) (at 35.56 30.48 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid "ab971b5f-5d8e-5fb1-9d97-f5e1023e4912"))
-	(text "GND, +3V3 and VBUS are power symbols on every sheet (not routed here). Open a sheet: double-click it." (exclude_from_sim no) (at 35.56 40.64 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid "8c826df2-97f7-5b6e-96ce-9bd7edd07004"))
-	(text "Power: USB-C, ESD, polyfuse, 3.3 V buck, LED" (exclude_from_sim no) (at 35.56 147.32 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid "81a52b1e-812b-5e25-beb2-0ce6113c43a3"))
-	(text "MCU: module, EN/BOOT/RESET, buttons, debug pads" (exclude_from_sim no) (at 35.56 154.94 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid "9d411f70-9fac-5353-91b6-71b38379b769"))
-	(text "Sensors: BME688 (gas), SHT40 (T/RH), I2C pull-ups" (exclude_from_sim no) (at 35.56 162.56 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid "5c89c561-48dc-5482-86a9-fb05d3958aaf"))
-	(text "Display: GC9A01 header, LCD_VCC jumper JP1" (exclude_from_sim no) (at 35.56 170.18 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid "5b831c5e-d3da-593c-b6b9-2a8399e14cde"))
-	(text "Design intent" (exclude_from_sim no) (at 35.56 187.96 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid "ec9d0424-665e-5efa-a4fe-031469ddb716"))
-	(text "- 3.3 V from a buck, not an LDO: 0.6 W would heat the sensors." (exclude_from_sim no) (at 35.56 195.58 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid "b8d1e8b6-9743-5fed-b53d-146d19d42491"))
-	(text "- SHT40 for temperature/humidity: the BME688 gas heater self-heats." (exclude_from_sim no) (at 35.56 203.2 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid "5610656e-8ffc-5090-b8bb-35665646e798"))
-	(text "- USB D+/D- are a 90 ohm pair: keep short. Antenna keepout under the module's antenna." (exclude_from_sim no) (at 35.56 210.82 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid "57be42c2-6910-5818-86b1-14af7e8482f9"))
-	(text "- I2C: BME688 0x77, SHT40 0x44. JP1: 3V3 by default; cut and bridge for 5 V modules." (exclude_from_sim no) (at 35.56 218.44 0) (effects (font (size 1.5 1.5)) (justify left top)) (uuid "fe849d2b-cb77-59e4-962c-2dc726b9fdea"))
-	(sheet_instances (path "/" (page "1")))
-	(embedded_fonts no)
+	(sheet
+		(at 162.56 66.04)
+		(size 91.44 111.76)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(fill
+			(color 255 255 200 0.5)
+		)
+		(uuid "8ee93a8b-7827-5c2b-aac9-b7bd720c2d76")
+		(property "Sheetname" "MCU"
+			(at 162.56 65.04 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 2 2)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "mcu.kicad_sch"
+			(at 162.56 178.8 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "USB_DP" bidirectional
+			(at 162.56 96.52 180)
+			(uuid "31ae91a8-cb22-5767-912f-c15655cc8600")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "USB_DN" bidirectional
+			(at 162.56 101.6 180)
+			(uuid "951f3c1e-8bea-5f5c-9323-a0d5b94125da")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "I2C_SDA" bidirectional
+			(at 254 76.2 0)
+			(uuid "c64d43e8-2995-59c9-8fc6-a2fa23aceaab")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "I2C_SCL" bidirectional
+			(at 254 81.28 0)
+			(uuid "c9689c95-db9c-5f36-9228-5102051c87e2")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "LCD_SCLK" bidirectional
+			(at 254 116.84 0)
+			(uuid "6c8ba7b0-00e5-5763-b3c3-d556fe9cedac")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "LCD_MOSI" bidirectional
+			(at 254 121.92 0)
+			(uuid "8b8d6f01-64a9-5210-a522-a40afe9c0231")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "LCD_DC" bidirectional
+			(at 254 127 0)
+			(uuid "1b3d6f83-c329-5b0e-a543-9b5f38dd524e")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "LCD_CS" bidirectional
+			(at 254 132.08 0)
+			(uuid "90c9e3fa-1ec6-5df6-ada9-e0702cebebfe")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(pin "LCD_RST" bidirectional
+			(at 254 137.16 0)
+			(uuid "01f928f0-01cd-5419-9194-8df05b07272a")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(instances
+			(project "notifier-v1"
+				(path "/85cf2753-6181-5f74-b525-c66aecc4c100"
+					(page "3")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 304.8 55.88)
+		(size 76.2 40.64)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.2)
+			(type solid)
+		)
+		(fill
+			(color 255 255 200 0.5)
+		)
+		(uuid "c59d7228-2371-53d1-b452-1c754c2b4233")
+		(property "Sheetname" "Sensors"
+			(at 304.8 54.88 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 2 2)
+					(bold yes)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "sensors.kicad_sch"
+			(at 304.8 97.52 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "I2C_SDA" bidirectional
+			(at 304.8 76.2 180)
+			(uuid "c514ff9d-0775-5cd5-8fcd-cc838522946e")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(pin "I2C_SCL" bidirectional
+			(at 304.8 81.28 180)
+			(uuid "8b9ea5da-091c-5f90-80d3-a213da397957")
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(instances
+			(project "notifier-v1"
+				(path "/85cf2753-6181-5f74-b525-c66aecc4c100"
+					(page "4")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
 )

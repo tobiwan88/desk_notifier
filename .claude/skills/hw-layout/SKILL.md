@@ -43,6 +43,8 @@ description: Use for PCB placement and routing in hardware/ (notifier-v1): editi
 - Ground reference rule (every signal): each signal needs a continuous GND reference, either a solid plane or an adjacent GND track, including across the island neck and slots. A signal that crosses a plane split or void is a fail: move it or add a GND track beside it. Sensor island/neck: In1 GND is a hatched zone (0.3 mm lines, 1.2 mm gap, ~35 % copper) under island and neck, added in `finish.py` (KRT's plane router drops zones made in the layout); outer and In2 pours stay forbidden there.
 - Stitching vias: 2-3 mm apart between top and bottom GND pours, and at high-current layer transitions. Place them outside the antenna strip and island.
 - After routing, run `finish.py`: removes dangling stubs and vias, DRC-driven, one at a time, reverting any that open a connection. Keep SWIG references (`keep` list) or the second iteration crashes.
+- Hand-draw what the router keeps failing (short, critical, geometric): draw it in `layout_v1.py` with `trk(..., locked=True)` / `via()`, complete the net so `route.py` skips it, keep `--keep-input-copper`. Coordinates from `at(ref, pad)` after placement, not hard-coded; assert the orientation you rely on. USB pair made the pipeline pass 4/4 instead of ~1/3.
+- Check a pair after routing: per-net length, layers and widths with `$KICAD_PYTHON` + `pcbnew.LoadBoard` (all `F.Cu`, `USB_W`, no vias; D+/D- skew here 1.8 mm = the connector join stub, fine at full speed).
 - Non-determinism: router output differs run to run. After experiments run `git checkout hardware/notifier-v1/` to restore the committed board. Pipeline output is not byte-stable.
 
 ## Verification (phase 4)
@@ -62,6 +64,8 @@ description: Use for PCB placement and routing in hardware/ (notifier-v1): editi
 | KRT changed project fab rules | no `--no-fix-drc-settings` | rerun with `--no-fix-drc-settings --fab-overrides rules/krt-fab.txt` |
 | Dangling stubs and vias after routing | KRT leftovers | `finish.py` (DRC-driven cleanup) |
 | `finish.py` breaks on second iteration | SWIG frees board when last Python ref goes | keep references in a `keep` list |
+| Diff pair partial, then snaked over B.Cu with vias | USB-C D+/D- pads interleaved (A6 B6 / A7 B7) | hand-draw: D+ joined above the pad row, D- below; ESD rotated for flow-through |
+| ESD middle pins (VBUS/GND) trapped between D+ and D- | flow-through orientation | via straight off the pin (drawn with the pair) |
 | Router results differ between runs | non-deterministic routing | `git checkout hardware/notifier-v1/` after experiments |
 | Fine-pitch DFN (SHT4x) won't route | 0.3 mm pad gap, straight exits only | hand-drawn escape stubs in `layout_v1.py` |
 | Island nets unconnected | no pours there, nets must go through the neck | allow tracks in the island keepout, route through the neck |
