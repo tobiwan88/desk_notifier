@@ -3,7 +3,8 @@
 Parts without an LCSC field (holes, test pads, solder jumper) are left out of BOM and CPL.
 Rotation corrections follow the JLCKicadTools cpl_rotations_db (via kicad-jlcpcb-tools); they
 date from older KiCad libraries, so always confirm orientation in JLC's placement preview.
-Usage: uv run --package desk-hardware python hardware/tools/fab_package.py hardware/notifier-v1/notifier-v1.kicad_pcb
+Usage: uv run --package desk-hardware python hardware/tools/fab_package.py [--require-clean] hardware/notifier-v1/notifier-v1.kicad_pcb
+Only gitignored files are written (hardware/out/, the .net next to the board); the board itself is only read.
 """
 
 import csv
@@ -19,7 +20,28 @@ ROTATION = [  # (regex on footprint name, degrees added)
     (r"^USB_C_Receptacle_HRO_TYPE-C-31-M-12", 180),
     (r"^SOT-223", 180),
     (r"^SOT-23", -90),
+    # Same pin layout as the community entry for the Bosch 2 x 2.5 mm LGA (pin 1 top left at 0 deg, clockwise,
+    # rows along x): applied to the 3 x 3 mm BME688 footprint. Confirm in JLC's preview.
+    (r"^Bosch_LGA-8_3x3mm_P0.8mm_ClockwisePinNumbering", 90),
+    # Sensirion_DFN-4 (SHT40): pin columns left/right, pin 1 top left, 1-2 down the left column, 3-4 up the right one:
+    # the same topology as the KiCad DFN-* footprints that the community entry `^DFN-` (270) corrects.
+    (r"^Sensirion_DFN-4", 270),
 ]
+
+
+def git_sha(require_clean: bool = False) -> str:
+    """Short HEAD SHA for the silkscreen; '-dirty' (and a warning) when hardware/ has uncommitted changes.
+
+    With require_clean (the ORDER step) a dirty tree is an error instead.
+    """
+    git = lambda *a: subprocess.run(["git", *a], check=True, capture_output=True, text=True).stdout.strip()
+    sha = git("rev-parse", "--short", "HEAD")
+    if git("status", "--porcelain", "--", "hardware"):
+        if require_clean:
+            sys.exit("uncommitted changes under hardware/: commit them before building the order package")
+        print(f"WARNING: uncommitted changes under hardware/: silk shows {sha}-dirty. Commit, then rerun before ordering.")
+        sha += "-dirty"
+    return sha
 
 
 def run(*args):
@@ -39,22 +61,31 @@ def lcsc_fields(net_file: Path) -> dict[str, dict]:
 
 
 def main():
-    pcb = Path(sys.argv[1])
+    args = [a for a in sys.argv[1:] if a != "--require-clean"]
+    pcb = Path(args[0])
     out = Path("hardware/out/fab") / pcb.stem
     gerbers = out / "gerbers"
     gerbers.mkdir(parents=True, exist_ok=True)
     for f in gerbers.iterdir():
         f.unlink()
+    sha = git_sha("--require-clean" in sys.argv)
+    # JLC's KiCad guide: Protel extensions (default), subtract mask from silk, no X2, no netlist attributes;
+    # drill Excellon in mm, decimal zeros, PTH and NPTH in separate files, no map file.
     run("kicad-cli", "pcb", "export", "gerbers", "--layers", LAYERS, "--subtract-soldermask", "--check-zones",
-        "-o", str(gerbers) + "/", str(pcb))
-    run("kicad-cli", "pcb", "export", "drill", "--format", "excellon", "--excellon-separate-th", "--generate-map",
-        "--map-format", "gerberx2", "-o", str(gerbers) + "/", str(pcb))
-    zpath = out / f"{pcb.stem}-gerbers.zip"
+        "--no-x2", "--no-netlist", "-D", f"GIT_SHA={sha}", "-o", str(gerbers) + "/", str(pcb))
+    run("kicad-cli", "pcb", "export", "drill", "--format", "excellon", "--excellon-separate-th", "--excellon-units", "mm",
+        "--excellon-zeros-format", "decimal", "--drill-origin", "absolute", "-o", str(gerbers) + "/", str(pcb))
+    for f in gerbers.glob("*.gbrjob"):
+        f.unlink()
+    (out / "VERSION.txt").write_text(f"{pcb.stem} {sha}\n")
+    zpath = out / f"{pcb.stem}-{sha}-gerbers.zip"
+    for old in out.glob(f"{pcb.stem}-*gerbers.zip"):
+        old.unlink()
     with zipfile.ZipFile(zpath, "w", zipfile.ZIP_DEFLATED) as z:
         for f in sorted(gerbers.iterdir()):
             z.write(f, f.name)
 
-    net = pcb.with_suffix(".net")
+    net = pcb.with_suffix(".net")  # gitignored (hardware/notifier-v1/*.net): writing it keeps the tree clean
     run("kicad-cli", "sch", "export", "netlist", "-o", str(net), str(pcb.with_suffix(".kicad_sch")))
     parts = lcsc_fields(net)
 

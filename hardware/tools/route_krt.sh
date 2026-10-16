@@ -4,6 +4,9 @@
 # Usage: route_krt.sh placed.kicad_pcb routed.kicad_pcb
 # Stage boards live in a temp dir (no stray KiCad projects in the repo); logs go to hardware/out/route/.
 set -e
+# Pin Python's hash order (KRT_SEED, default 1) so a given board always routes the same way. The route also depends on the
+# random object ids of the input board: pipeline_v1.sh re-places the board and routes again until the gate passes.
+export PYTHONHASHSEED="${KRT_SEED:-1}"
 here="$(cd "$(dirname "$0")/.." && pwd)"
 K="$here/.tools/KiCadRoutingTools"; P="$K/.venv/bin/python"; F="$here/rules/krt-fab.txt"
 [ -x "$P" ] || { echo "KiCadRoutingTools missing: run hardware/tools/setup_tools.sh" >&2; exit 1; }

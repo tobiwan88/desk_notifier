@@ -39,7 +39,7 @@ for layer in (pcbnew.F_Cu, pcbnew.B_Cu):
 # In1 GND: KRT's plane router makes one full-board zone. Replace it with a solid zone that leaves out the sensor
 # island and the neck (thermal isolation; the neck bus carries its own GND guards).
 # Geometry mirrors layout_v1.py (S, SM, IH); mm relative to the board's top-left corner.
-S, SM, IH = 1.2, 1.8, 11.8
+S, SM, IH = 1.2, 1.8, 14.8
 x0, y0, x1, y1 = (v / 1e6 for v in (edge.GetLeft(), edge.GetTop(), edge.GetRight(), edge.GetBottom()))
 for z in list(board.Zones()):
     if not z.GetIsRuleArea() and z.GetLayer() == pcbnew.In1_Cu:
@@ -61,6 +61,68 @@ for z in board.Zones():  # KRT's In2 plane keeps unconnected slivers between the
     if not z.GetIsRuleArea() and z.GetLayer() == pcbnew.In2_Cu:
         z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
 
+
+# Router vias too close to same-net SMD pads (rule "via to same-net SMD pad", >= 0.2 mm copper to pad: solder wicks into
+# vias beside a pad). The router sometimes drops them into the pad or at 0.1 mm; nudge each such via to the nearest
+# free spot (other copper 0.2 mm, other vias 0.6 mm apart, edge) and drag the track ends with it. Locked (hand-drawn)
+# vias are left alone: layout_v1.py places them right. checks.py's DRC has the last word.
+SAME_NET_GAP = 0.2
+
+
+def too_close(v, pos):
+    c = pcbnew.SHAPE_CIRCLE(pos, v.GetWidth() // 2)
+    return any(q.GetNetCode() == v.GetNetCode() and q.GetAttribute() == pcbnew.PAD_ATTRIB_SMD
+               and q.GetEffectiveShape(pcbnew.F_Cu).Collide(c, mm(SAME_NET_GAP + 0.01))
+               for f in board.GetFootprints() for q in f.Pads() if q.IsOnLayer(pcbnew.F_Cu))
+
+
+def spot_ok(v, p):
+    rx, ry = p.x / 1e6 - x0, p.y / 1e6 - y0
+    if not (0.45 < rx < W - 0.45 and 0.45 < ry < H - 0.45) or (rx < 10.4 + SM + 0.45 and ry < IH + S + 0.45):
+        return False
+    if any(z.GetIsRuleArea() and z.GetDoNotAllowVias() and z.Outline().Contains(p) for z in board.Zones()):
+        return False
+    circle = pcbnew.SHAPE_CIRCLE(p, v.GetWidth() // 2)
+    if too_close(v, p):
+        return False
+    if any(o is not v and (o.GetPosition() - p).EuclideanNorm() < mm(0.6) for o in board.GetTracks() if o.GetClass() == "PCB_VIA"):
+        return False
+    if any(t.GetNetCode() != v.GetNetCode() and t.GetEffectiveShape(t.GetLayer()).Collide(circle, mm(0.2))
+           for t in board.GetTracks() if t.GetClass() != "PCB_VIA"):
+        return False
+    return not any(q.GetNetCode() != v.GetNetCode() and q.GetEffectiveShape(layer).Collide(circle, mm(0.2))
+                   for f in board.GetFootprints() for q in f.Pads() for layer in (pcbnew.F_Cu, pcbnew.B_Cu) if q.IsOnLayer(layer))
+
+
+for v in [t for t in board.GetTracks() if t.GetClass() == "PCB_VIA" and not t.IsLocked()]:
+    old = v.GetPosition()
+    if not too_close(v, old):
+        continue
+    spot = None
+    for r in (0.15, 0.25, 0.35, 0.45, 0.6, 0.8, 1.0):
+        cands = [pcbnew.VECTOR2I(old.x + mm(r * math.cos(k * math.pi / 12)), old.y + mm(r * math.sin(k * math.pi / 12))) for k in range(24)]
+        cands = [p for p in cands if spot_ok(v, p)]
+        if cands:
+            spot = cands[0]
+            break
+    if spot is None:
+        print(f"no spot for the {v.GetNetname()} via near a same-net pad")
+        continue
+    pad_hit = next((q for f in board.GetFootprints() for q in f.Pads() if q.GetNetCode() == v.GetNetCode()
+                    and q.IsOnLayer(pcbnew.F_Cu) and q.HitTest(old)), None)
+    for t in board.GetTracks():
+        if t.GetClass() == "PCB_VIA" or t.GetNetCode() != v.GetNetCode():
+            continue
+        if t.GetStart() == old:
+            t.SetStart(spot)
+        if t.GetEnd() == old:
+            t.SetEnd(spot)
+    v.SetPosition(spot)
+    if pad_hit is not None:  # the via sat in the pad: connect pad and via with a short F.Cu track
+        t = pcbnew.PCB_TRACK(board)
+        t.SetStart(pad_hit.GetPosition()), t.SetEnd(spot), t.SetWidth(mm(0.2)), t.SetLayer(pcbnew.F_Cu), t.SetNet(v.GetNet())
+        board.Add(t)
+    print(f"moved a {v.GetNetname()} via away from a same-net pad")
 
 # GND via beside every layer change of the display SPI lines (40-80 MHz): F.Cu references In1 (GND), B.Cu In2
 # (3V3), so the return current needs a nearby path between the GND layers. First free spot 0.9-1.5 mm from the

@@ -3,3 +3,32 @@
 (rule "no via in SMD pad"
   (constraint physical_clearance (min 0.1mm))
   (condition "A.Type == 'Via' && B.Type == 'Pad' && B.Pad_Type == 'SMD'"))
+# A via on the SAME net as an SMD pad (the one that wicks solder away from the joint) keeps >= 0.15 mm copper-to-pad:
+# a 0.1 mm mask web between via and pad does not hold. physical_clearance also applies to same-net items, which the
+# normal clearance constraint skips. Hand-placed vias (layout_v1.py) keep >= 0.2 mm, the router is asked for 0.2 and
+# finish.py nudges its vias to 0.2 where there is room; the crowded corner left of the module only allows 0.15.
+(rule "via to same-net SMD pad"
+  (constraint physical_clearance (min 0.15mm))
+  (condition "A.Type == 'Via' && B.Type == 'Pad' && B.Pad_Type == 'SMD' && A.NetName == B.NetName"))
+
+# --- JLC capability notes and common practice (checked by hardware/tools/checks.py through kicad-cli DRC) ---
+# Vias keep 0.35 mm from the board edge (JLC copper-to-edge minimum is 0.2 mm; the project rules use 0.3 for copper).
+(rule "via to board edge"
+  (constraint edge_clearance (min 0.35mm))
+  (condition "A.Type == 'Via'"))
+# Plated through-hole annular ring >= 0.15 mm (JLC minimum 0.15 for PTH pads).
+(rule "THT pad annular ring"
+  (constraint annular_width (min 0.15mm))
+  (condition "A.Type == 'Pad' && A.Pad_Type == 'Through-hole'"))
+# Silkscreen text at least 0.8 mm high with 0.15 mm stroke (JLC minimum; 1.0 mm is used where it fits).
+(rule "silk text height"
+  (constraint text_height (min 0.8mm))
+  (condition "A.Type == 'Text' && (A.Layer == 'F.Silkscreen' || A.Layer == 'B.Silkscreen')"))
+# Supply tracks that carry the USB current (500 mA polyfuse): at least 0.3 mm.
+(rule "VBUS and SW tracks"
+  (constraint track_width (min 0.3mm))
+  (condition "A.Type == 'Track' && (A.NetName == 'VBUS_IN' || A.NetName == 'VBUS' || A.NetName == 'SW')"))
+# The USB-C shell is metal and grounded: no signal copper under it (rule area "j1_shell" in layout_v1.py).
+(rule "no signal copper under the J1 shell"
+  (constraint disallow track via)
+  (condition "A.NetName != 'GND' && A.intersectsArea('j1_shell')"))

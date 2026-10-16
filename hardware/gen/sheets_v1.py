@@ -124,7 +124,7 @@ def draw_power(parts) -> Sheet:
     s.power("GND", 112 + b, 52)
     s.text(14, 62, "Notes\n"
            "- Buck instead of LDO: from 5 V an LDO would burn about 0.6 W and warm the sensors.\n"
-           "- USB D+/D- are a 90 ohm pair (0.27 mm / 0.15 mm gap, top layer over In1 GND): keep short, ESD diode U2 right at J1.\n"
+           "- USB D+/D-: 0.27 mm tracks sized for 90 ohm where coupled (0.15 mm gap, top layer over In1 GND); a short (about 13 mm) full-speed pair, coupling is not critical. Keep it short, ESD diode U2 right at J1.\n"
            "- CC1/CC2 5.1k to GND: the host offers 5 V. VBUS_IN is before the polyfuse, VBUS after it.\n"
            "- Layout: buck bottom centre, far from the BME688; input cap C1 at VIN, output caps at L1.\n"
            "- Output caps: C2 + C11 22 uF 0805 derate to about 11 uF each at 3.3 V; TLV62569 wants 10-47 uF effective.", 1.27)
@@ -132,8 +132,8 @@ def draw_power(parts) -> Sheet:
 
 
 def draw_mcu(parts, no_connect) -> Sheet:
-    s = Sheet("MCU", SHEET_FILES["MCU"], parts, "A3", "ESP32-S3 module, reset/boot/user buttons, debug pads")
-    s.frame(58, 26, 142, 72, "ESP32-S3-WROOM-1-N8R2")
+    s = Sheet("MCU", SHEET_FILES["MCU"], parts, "A3", "ESP32-S3 module, EN/BOOT, debug pads")
+    s.frame(58, 26, 142, 74.5, "ESP32-S3-WROOM-1-N8R2")
     s.part("U1", 80, 55, 0, mirror=True)                      # mirrored: USB/UART left, GPIOs right
     s.tag("U1", (3, 27.5), (3, 30))
     s.no_connect("U1", no_connect["U1"])
@@ -167,10 +167,11 @@ def draw_mcu(parts, no_connect) -> Sheet:
         s.wire((ref, "2"), (73, y), ("U1", pin))
         s.wire((73, y), (73, y - 1 if up else y + 1))
         s.label("MCU_" + net, 73, y - 1 if up else y + 1, 180)
-        s.tag(ref, (0, -5.2 if up else 5.2), (0, -3.9 if up else 3.9), just="center")
+        s.tags[ref] = {"Reference": (0, -5.8 if up else 5.8, "center"), "Value": "hide"}  # between the net labels and the UART wires; value (22) is in the BOM
     s.wire(("U1", "37"), (70, 46), (70, 43))
     s.label("TXD0", 70, 45, 0)
     s.part("TP1", 70, 43)
+    s.tag("TP1", (-1.5, 0.4), (-1.5, 2.2), just="right")   # left of the pad: right side runs into the C6 GND label
     s.wire(("U1", "36"), (62, 47), (62, 43))
     s.label("RXD0", 62, 45, 180)
     s.part("TP2", 62, 43)
@@ -178,19 +179,20 @@ def draw_mcu(parts, no_connect) -> Sheet:
     for pin, net, y in (("4", "I2C_SDA", 52), ("5", "I2C_SCL", 53)):
         s.wire(("U1", pin), (89, y))
         s.label(net, 89, y, 0, "hier")
-    s.part("R13", 86.5, 60, 90)                               # 33 ohm series termination on the display clock
+    s.part("R13", 104.5, 60, 90)                              # 33 ohm series termination on the display clock
     assert s.at("R13", "1")[0] < s.at("R13", "2")[0], "R13 pin 1 must face the module"
     s.wire(("U1", "20"), ("R13", "1"))
     s.label("MCU_LCD_SCLK", *(v / 2.54 for v in s.at("R13", "1")), 180)  # at() is in mm, labels in cells
-    s.wire(("R13", "2"), (89, 60))
-    s.label("LCD_SCLK", 89, 60, 0, "hier")
+    xr = s.at("R13", "2")[0] / 2.54 + 2
+    s.wire(("R13", "2"), (xr, 60))
+    s.label("LCD_SCLK", xr, 60, 0, "hier")
     s.tag("R13", (0, 2.6), (0, 3.9), just="center")
     for pin, net, y in (("19", "LCD_MOSI", 59), ("17", "LCD_DC", 57), ("18", "LCD_CS", 58), ("22", "LCD_RST", 62)):
         s.wire(("U1", pin), (89, y))
         s.label(net, 89, y, 0, "hier")
     # EN: pull-up, RC delay cap, reset button, test pad
-    s.frame(88, 28, 134, 50, "Reset, boot and user button")
-    s.wire((89, 36), (120, 36))                                # +3V3 rail for the three pull-ups
+    s.frame(88, 28, 134, 50, "EN reset RC and BOOT pull-up")
+    s.wire((89, 36), (104, 36))                                # +3V3 rail for the two pull-ups
     s.wire((80, 36), (89, 36))
     s.part("R4", 89, 37.5)
     s.wire(("U1", "3"), (89, 46), ("R4", "2"))
@@ -199,35 +201,23 @@ def draw_mcu(parts, no_connect) -> Sheet:
     s.part("C4", 93, 42.5)
     s.wire(("C4", "2"), (93, 45))
     s.power("GND", 93, 45)
-    s.part("SW1", 97, 43, 270, value="RESET")
-    s.wire(("SW1", "2"), (97, 46))
-    s.power("GND", 97, 46)
     s.part("TP5", 101, 41)
-    # BOOT (IO0): pull-up, button, test pad
+    # BOOT (IO0): pull-up, test pad (bridge to GND = download mode)
     s.part("R5", 104, 37.5)
     s.wire(("U1", "27"), (104, 48), (104, 41), ("R5", "2"))
     s.label("BOOT", 104, 46, 0)
     s.wire((104, 41), (116, 41))
-    s.part("SW2", 108, 43, 270, value="BOOT")
-    s.wire(("SW2", "2"), (108, 46))
-    s.power("GND", 108, 46)
     s.part("TP6", 116, 41)
-    # user button (IO6)
-    s.part("R6", 120, 37.5)
-    s.wire(("U1", "6"), (120, 54), (120, 41), ("R6", "2"))
-    s.label("BTN", 120, 46, 0)
-    s.wire((120, 41), (126, 41))
-    s.part("SW3", 126, 43, 270, value="BUTTON")
-    s.wire(("SW3", "2"), (126, 46))
-    s.power("GND", 126, 46)
     s.part("H1", 130, 68)
     s.part("H2", 134, 68)
+    s.part("H3", 138, 68)
+    s.part("H4", 142, 68)
     s.text(60, 78, "Notes\n"
            "- Module antenna end at the board edge: no copper, no vias in the antenna strip.\n"
-           "- EN: 10k + 1u gives the reset delay; RESET pulls it low. BOOT = IO0 (strapping), 10k pull-up, button to GND.\n"
-           "- UART0 pads TXD0/RXD0 + GND + 3V3 + EN + IO0 are the programming header (ESP auto-program order).\n"
+           "- EN: 10k + 1u gives the reset delay; Tweezers across the EN and GND pads = reset.\n  BOOT = IO0 (strapping), 10k pull-up; tweezers across GND and IO0 = download mode. No buttons on this board.\n"
+           "- UART0 pads TX RX 3V3 EN GND IO0 pads (2.54 mm pitch): GND sits between EN and IO0, so one tweezer bridges EN-GND (reset) or GND-IO0 (boot).\n"
            "- GPIO map matches firmware Kconfig DESK_BOARD_NOTIFIER_V1 (checked by hardware/tools/checks.py).\n"
-           "- USB D+/D- (IO20/IO19) come from the Power sheet: 90 ohm pair, keep short. Unused pins carry no-connect flags.", 1.27)
+           "- USB D+/D- (IO20/IO19) come from the Power sheet: coupled pair, keep short. Unused pins carry no-connect flags.", 1.27)
     return s
 
 
@@ -247,7 +237,7 @@ def draw_sensors(parts) -> Sheet:
     s.wire((22, 21), (22, 19))
     s.power("+3V3", 22, 19)
     # BME688
-    s.frame(42, 14, 82, 42, "BME688 (0x77)")
+    s.frame(42, 14, 82, 43.5, "BME688 (0x77)")
     s.part("U4", 60, 30, 0, mirror=True)
     s.tag("U4", (14, -2), (14, 1))
     s.wire(("U4", "8"), (59, 21), (72, 21))
@@ -270,9 +260,9 @@ def draw_sensors(parts) -> Sheet:
     s.wire(("U4", "2"), (52, 33))
     s.power("+3V3", 52, 33, flip=True)
     # SHT40
-    s.frame(42, 44, 72, 64, "SHT40 (0x44), 6 mm from the BME688")
+    s.frame(42, 44.8, 72, 64, "SHT40 (0x44), 8.9 mm from the BME688")
     s.part("U5", 60, 56)
-    s.tag("U5", (-10, 9), (-10, 11.5))
+    s.tag("U5", (-9, 9), (-9, 11.5), just="right")
     s.wire((47, 29), (47, 55), ("U5", "2"))
     s.wire((45, 31), (45, 57), ("U5", "1"))
     s.wire(("U5", "3"), (61, 51), (66, 51))
@@ -300,21 +290,25 @@ def draw_display(parts) -> Sheet:
     s.power("+3V3", 28, 19)
     s.wire(("JP1", "3"), (32, 19))
     s.power("VBUS", 32, 19)
-    s.wire(("JP1", "2"), (30, 33), ("J2", "1"))
-    s.label("LCD_VCC", 40, 33, 0)
+    s.wire(("JP1", "2"), (30, 33), (36, 33))
+    s.label("LCD_VCC", 36, 33, 0)
     s.frame(10, 30, 72, 46, "GC9A01 module (SPI, write only)")
     s.part("J2", 60, 36)
+    y7 = s.at("J2", "7")[1] / 2.54
+    s.wire(("J2", "7"), (49, y7))
+    s.label("LCD_VCC", 49, y7, 180)
     s.tag("J2", (-2, -12), (-2, -9.5))
-    s.wire(("J2", "2"), (47, 34), (47, 36))
-    s.power("GND", 47, 36)
-    for pin, net in zip("34567", LCD):
+    y6 = s.at("J2", "6")[1] / 2.54
+    s.wire(("J2", "6"), (51, y6))
+    s.power("GND", 51, y6)
+    for pin, net in zip("12345", ("LCD_RST", "LCD_CS", "LCD_DC", "LCD_MOSI", "LCD_SCLK")):
         y = s.at("J2", pin)[1] / 2.54
         s.wire(("J2", pin), (55, y))
         s.label(net, 55, y, 180, "hier")
     s.text(10, 50, "Notes\n"
            "- JP1: 1-2 bridged = LCD_VCC from 3V3 (default, 3.3 V modules).\n"
            "  For 5 V modules cut the 1-2 bridge and bridge 2-3 (VBUS).\n"
-           "- J2 pin order = module header: VCC, GND, SCL, SDA, DC, CS, RST\n  (no MISO, no backlight pin).\n"
+           "- J2 pin order (mirrored for the right-edge socket): RST, CS, DC, SDA, SCL, GND, VCC\n  (no MISO, no backlight pin).\n"
            "- Display plugs in from the side; its face sits past the board edge.", 1.27)
     return s
 
@@ -345,20 +339,20 @@ def build(out: Path, parts, no_connect) -> Path:
         labels.append((n, 106, y))
     texts = [
         (15, 32, "USB-C connector, CC, ESD\npolyfuse, 3.3 V buck, LED\n\nout: +3V3, VBUS (symbols)"),
-        (65, 28, "ESP32-S3-WROOM-1 module\nEN / BOOT / RESET, user button\ndecoupling, UART debug pads"),
+        (65, 28, "ESP32-S3-WROOM-1 module\nEN / BOOT pads, decoupling,\nUART debug pads"),
         (121, 24, "BME688 (gas, 0x77)\nSHT40 (T/RH, 0x44)\nI2C pull-ups"),
         (121, 44, "GC9A01 round display\nheader J2, LCD_VCC jumper JP1"),
         (14, 8, "#desk notifier v1: ESP32-S3 desk notifier, USB-C powered"),
         (14, 12, "Signal flow left to right: power entry (USB-C), MCU in the middle, sensors and display on the right."),
         (14, 16, "GND, +3V3 and VBUS are power symbols on every sheet (not routed here). Open a sheet: double-click it."),
         (14, 58, "Power: USB-C, ESD, polyfuse, 3.3 V buck, LED"),
-        (14, 61, "MCU: module, EN/BOOT/RESET, buttons, debug pads"),
+        (14, 61, "MCU: module, EN/BOOT, debug pads"),
         (14, 64, "Sensors: BME688 (gas), SHT40 (T/RH), I2C pull-ups"),
         (14, 67, "Display: GC9A01 header, LCD_VCC jumper JP1"),
         (14, 74, "Design intent"),
         (14, 77, "- 3.3 V from a buck, not an LDO: 0.6 W would heat the sensors."),
         (14, 80, "- SHT40 for temperature/humidity: the BME688 gas heater self-heats."),
-        (14, 83, "- USB D+/D- are a 90 ohm pair: keep short. Antenna keepout under the module's antenna."),
+        (14, 83, "- USB D+/D- are a coupled pair: keep short. Antenna keepout under the module's antenna."),
         (14, 86, "- I2C: BME688 0x77, SHT40 0x44. JP1: 3V3 by default; cut and bridge for 5 V modules."),
     ]
     path, _ = root_sheet(out, "root", sd, texts, wires, labels)

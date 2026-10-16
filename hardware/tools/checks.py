@@ -27,7 +27,7 @@ NEVER_WAIVE = {"clearance", "shorting_items", "hole_clearance", "hole_to_hole", 
                "tracks_crossing", "zones_intersect", "starved_thermal"}
 KCONFIG_NET = {"DESK_LCD_PIN_SCLK": "MCU_LCD_SCLK", "DESK_LCD_PIN_MOSI": "LCD_MOSI", "DESK_LCD_PIN_DC": "LCD_DC",
                "DESK_LCD_PIN_RST": "LCD_RST", "DESK_LCD_PIN_CS": "LCD_CS", "DESK_I2C_SDA": "I2C_SDA",
-               "DESK_I2C_SCL": "I2C_SCL", "DESK_BTN": "BTN"}
+               "DESK_I2C_SCL": "I2C_SCL"}
 # GPIO -> the only net allowed on it
 RESERVED = {0: "BOOT", 3: None, 45: None, 46: None, 19: "MCU_USB_DN", 20: "MCU_USB_DP", 43: "TXD0", 44: "RXD0",
             **{g: None for g in range(26, 38)}}

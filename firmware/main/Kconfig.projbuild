@@ -68,7 +68,7 @@ menu "Desk notifier"
             default 0x77
         config DESK_BTN
             int "Acknowledge button GPIO (to GND, -1 = none)"
-            default 6 if DESK_BOARD_NOTIFIER_V1
+            default -1 if DESK_BOARD_NOTIFIER_V1  # notifier-v1 has no button: GPIO6 is not connected (ack/next via the web UI)
             default 24
     endmenu
     menu "Pages"

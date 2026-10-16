@@ -34,7 +34,7 @@ PARTS = {
     "C3": ("Device:C", "100n", C0402, "C1525", "Power", 0),
     "R3": ("Device:R", "4.7k", R0402, "C25900", "Power", 0),
     "D1": ("Device:LED", "red", "LED_SMD:LED_0603_1608Metric", "C2286", "Power", 90),
-    # ESP32-S3 module, reset, boot, user button
+    # ESP32-S3 module, reset RC, boot pull-up (no buttons on this board: debug pads)
     "U1": ("RF_Module:ESP32-S3-WROOM-1", "ESP32-S3-WROOM-1-N8R2", "RF_Module:ESP32-S3-WROOM-1", "C2913204", "MCU", 0),
     # 3V3 decoupling per Espressif ESP32-S3 Hardware Design Guidelines, schematic checklist "Power Supply"
     # (https://docs.espressif.com/projects/esp-hardware-design-guidelines/en/latest/esp32s3/schematic-checklist.html):
@@ -49,11 +49,7 @@ PARTS = {
     "R13": ("Device:R", "33", R0402, "C25105", "MCU", 0),   # LCD SCLK series termination at module pin 20
     "R4": ("Device:R", "10k", R0402, "C25744", "MCU", 0),
     "C4": ("Device:C", "1u", C0402, "C52923", "MCU", 0),
-    "SW1": ("Switch:SW_Push", "RESET", "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A", "C318884", "MCU", 90),
     "R5": ("Device:R", "10k", R0402, "C25744", "MCU", 0),
-    "SW2": ("Switch:SW_Push", "BOOT", "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A", "C318884", "MCU", 90),
-    "R6": ("Device:R", "10k", R0402, "C25744", "MCU", 0),
-    "SW3": ("Switch:SW_Push", "BUTTON", "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A", "C318884", "MCU", 90),
     # BME688 (BME680 symbol: same LGA-8 pinout)
     "U4": ("Sensor:BME680", "BME688", "Package_LGA:Bosch_LGA-8_3x3mm_P0.8mm_ClockwisePinNumbering", "C3664478", "Sensors", 0),
     "C7": ("Device:C", "100n", C0402, "C1525", "Sensors", 0),
@@ -68,23 +64,25 @@ PARTS = {
     "J2": ("Connector_Generic:Conn_01x07", "GC9A01 DISPLAY", "Connector_PinSocket_2.54mm:PinSocket_1x07_P2.54mm_Horizontal", "C22436148", "Display", 0),
     "JP1": ("Jumper:SolderJumper_3_Bridged12", "LCD_VCC", "Jumper:SolderJumper-3_P1.3mm_Bridged12_RoundedPad1.0x1.5mm", None, "Display", 0),
     # debug UART pads, mounting holes
-    "TP1": ("Connector:TestPoint", "TXD0", "TestPoint:TestPoint_Pad_D1.0mm", None, "MCU", 0),
-    "TP2": ("Connector:TestPoint", "RXD0", "TestPoint:TestPoint_Pad_D1.0mm", None, "MCU", 0),
-    "TP3": ("Connector:TestPoint", "GND", "TestPoint:TestPoint_Pad_D1.0mm", None, "MCU", 0),
-    "TP4": ("Connector:TestPoint", "3V3", "TestPoint:TestPoint_Pad_D1.0mm", None, "MCU", 0),
-    "TP5": ("Connector:TestPoint", "EN", "TestPoint:TestPoint_Pad_D1.0mm", None, "MCU", 0),
-    "TP6": ("Connector:TestPoint", "IO0", "TestPoint:TestPoint_Pad_D1.0mm", None, "MCU", 0),
+    "TP1": ("Connector:TestPoint", "TXD0", "TestPoint:TestPoint_Pad_D1.5mm", None, "MCU", 0),
+    "TP2": ("Connector:TestPoint", "RXD0", "TestPoint:TestPoint_Pad_D1.5mm", None, "MCU", 0),
+    "TP3": ("Connector:TestPoint", "GND", "TestPoint:TestPoint_Pad_D1.5mm", None, "MCU", 0),
+    "TP4": ("Connector:TestPoint", "3V3", "TestPoint:TestPoint_Pad_D1.5mm", None, "MCU", 0),
+    "TP5": ("Connector:TestPoint", "EN", "TestPoint:TestPoint_Pad_D1.5mm", None, "MCU", 0),
+    "TP6": ("Connector:TestPoint", "IO0", "TestPoint:TestPoint_Pad_D1.5mm", None, "MCU", 0),
     "TP7": ("Connector:TestPoint", "VBUS", "TestPoint:TestPoint_Pad_D1.0mm", None, "Power", 0),
     "H1": ("Mechanical:MountingHole", "M2", "MountingHole:MountingHole_2.2mm_M2", None, "MCU", 0),
     "H2": ("Mechanical:MountingHole", "M2", "MountingHole:MountingHole_2.2mm_M2", None, "MCU", 0),
+    "H3": ("Mechanical:MountingHole", "M2", "MountingHole:MountingHole_2.2mm_M2", None, "MCU", 0),
+    "H4": ("Mechanical:MountingHole", "M2", "MountingHole:MountingHole_2.2mm_M2", None, "MCU", 0),
     "#FLG01": ("power:PWR_FLAG", "PWR_FLAG", None, None, "Power", 0),
     "#FLG02": ("power:PWR_FLAG", "PWR_FLAG", None, None, "Power", 0),
     "#FLG03": ("power:PWR_FLAG", "PWR_FLAG", None, None, "Power", 0),
 }
 
 # module pin -> GPIO, for the pin map check against firmware Kconfig
-U1_GPIO = {"4": 4, "5": 5, "6": 6, "17": 9, "18": 10, "19": 11, "20": 12, "22": 14, "27": 0, "13": 19, "14": 20, "37": 43, "36": 44}
-U1_UNUSED = ["7", "8", "9", "10", "11", "12", "15", "16", "21", "23", "24", "25", "26", "28", "29", "30", "31", "32", "33", "34", "35", "38", "39"]
+U1_GPIO = {"4": 4, "5": 5, "17": 9, "18": 10, "19": 11, "20": 12, "22": 14, "27": 0, "13": 19, "14": 20, "37": 43, "36": 44}
+U1_UNUSED = ["6", "7", "8", "9", "10", "11", "12", "15", "16", "21", "23", "24", "25", "26", "28", "29", "30", "31", "32", "33", "34", "35", "38", "39"]
 
 NETS = {
     "VBUS_IN": [("J1", "A4"), ("J1", "A9"), ("J1", "B4"), ("J1", "B9"), ("U2", "5"), ("F1", "1")],
@@ -93,10 +91,10 @@ NETS = {
     "FB": [("U3", "5"), ("R9", "2"), ("R10", "1")],
     "GND": [("J1", "A1"), ("J1", "A12"), ("J1", "B1"), ("J1", "B12"), ("J1", "SH"), ("R1", "2"), ("R2", "2"), ("U2", "2"),
             ("U3", "2"), ("R10", "2"), ("C1", "2"), ("C2", "2"), ("C3", "2"), ("C11", "2"), ("D1", "1"), ("U1", "1"), ("U1", "40"), ("U1", "41"),
-            ("C5", "2"), ("C6", "2"), ("C10", "2"), ("C4", "2"), ("SW1", "2"), ("SW2", "2"), ("SW3", "2"), ("U4", "1"), ("U4", "7"),
-            ("C7", "2"), ("C8", "2"), ("U5", "4"), ("C9", "2"), ("C12", "2"), ("J2", "2"), ("TP3", "1"), ("#FLG02", "1")],
+            ("C5", "2"), ("C6", "2"), ("C10", "2"), ("C4", "2"), ("U4", "1"), ("U4", "7"),
+            ("C7", "2"), ("C8", "2"), ("U5", "4"), ("C9", "2"), ("C12", "2"), ("J2", "6"), ("TP3", "1"), ("#FLG02", "1")],
     "+3V3": [("L1", "2"), ("R9", "1"), ("TP4", "1"), ("#FLG03", "1"), ("C2", "1"), ("C3", "1"), ("C11", "1"), ("C10", "1"), ("R3", "1"), ("U1", "2"), ("C5", "1"), ("C6", "1"), ("R4", "1"),
-             ("R5", "1"), ("R6", "1"), ("U4", "8"), ("U4", "6"), ("U4", "2"), ("U4", "5"), ("C7", "1"), ("C8", "1"), ("U5", "3"), ("C9", "1"), ("C12", "1"),
+             ("R5", "1"), ("U4", "8"), ("U4", "6"), ("U4", "2"), ("U4", "5"), ("C7", "1"), ("C8", "1"), ("U5", "3"), ("C9", "1"), ("C12", "1"),
              ("R7", "1"), ("R8", "1"), ("JP1", "1")],
     "CC1": [("J1", "A5"), ("R1", "1")],
     "CC2": [("J1", "B5"), ("R2", "1")],
@@ -105,18 +103,17 @@ NETS = {
     "USB_DN": [("J1", "A7"), ("J1", "B7"), ("U2", "3"), ("U2", "4"), ("R11", "1")],
     "MCU_USB_DN": [("R11", "2"), ("U1", "13")],
     "LED_A": [("R3", "2"), ("D1", "2")],
-    "EN": [("U1", "3"), ("R4", "2"), ("C4", "1"), ("SW1", "1"), ("TP5", "1")],
-    "BOOT": [("U1", "27"), ("R5", "2"), ("SW2", "1"), ("TP6", "1")],
-    "BTN": [("U1", "6"), ("R6", "2"), ("SW3", "1")],
+    "EN": [("U1", "3"), ("R4", "2"), ("C4", "1"), ("TP5", "1")],
+    "BOOT": [("U1", "27"), ("R5", "2"), ("TP6", "1")],
     "I2C_SDA": [("U1", "4"), ("U4", "3"), ("U5", "1"), ("R7", "2")],
     "I2C_SCL": [("U1", "5"), ("U4", "4"), ("U5", "2"), ("R8", "2")],
-    "LCD_VCC": [("JP1", "2"), ("J2", "1")],
+    "LCD_VCC": [("JP1", "2"), ("J2", "7")],
     "MCU_LCD_SCLK": [("U1", "20"), ("R13", "1")],
-    "LCD_SCLK": [("R13", "2"), ("J2", "3")],
+    "LCD_SCLK": [("R13", "2"), ("J2", "5")],
     "LCD_MOSI": [("U1", "19"), ("J2", "4")],
-    "LCD_DC": [("U1", "17"), ("J2", "5")],
-    "LCD_CS": [("U1", "18"), ("J2", "6")],
-    "LCD_RST": [("U1", "22"), ("J2", "7")],
+    "LCD_DC": [("U1", "17"), ("J2", "3")],
+    "LCD_CS": [("U1", "18"), ("J2", "2")],
+    "LCD_RST": [("U1", "22"), ("J2", "1")],
     "TXD0": [("U1", "37"), ("TP1", "1")],
     "RXD0": [("U1", "36"), ("TP2", "1")],
 }

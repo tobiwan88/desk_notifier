@@ -3,9 +3,9 @@
 Goal: a small board for the desk notifier, fully assembled at JLCPCB, designed by agents
 (schematic, placement, routing, checks, fab files, order checklist) with human checkpoints.
 
-**Status (2026-10-13):** notifier-v1 is generated, routed, checked and has a fab package.
-Open before ordering: human review in KiCad, JLC placement preview (rotations), display pinout
-check against the real module. See `notifier-v1/ORDER.md`.
+**Status (2026-10-16, after the review fixes):** notifier-v1 is generated, routed, checked and has a fab package.
+Open before ordering: human review in KiCad, JLC placement preview (rotations; J1 and U2 were rotated in the
+2026-10-16 rework), display pinout check against the real module (now mirrored, see Display). See `notifier-v1/ORDER.md`.
 
 See `README.md` for where to look during a review.
 
@@ -13,6 +13,7 @@ See `README.md` for where to look during a review.
 ```
 hardware/tools/setup_tools.sh             # once: routers into hardware/.tools (KRT 0.23.0, Freerouting 2.5.0 JAR)
 hardware/tools/pipeline_v1.sh [--bom]   # schematic -> placement -> routing -> pours -> checks -> review pack -> fab package
+hardware/tools/pipeline_v1.sh --fab-only [--bom]  # ORDER step: gate + fab package on the committed board, no regeneration/routing
 scripts/hw-check.sh [--bom --qty N]      # the gate alone (also part of scripts/check.sh)
 ```
 
@@ -22,16 +23,44 @@ scripts/hw-check.sh [--bom --qty N]      # the gate alone (also part of scripts/
   `CONFIG_SPIRAM_MODE_OCT=y`, GPIO35-37 are unused anyway). Antenna overhangs the top edge.
   Firmware: `DESK_BOARD_NOTIFIER_V1` (Kconfig choice, default on S3) sets the pin map;
   `sdkconfig.defaults.esp32s3`; build with `idf.py -B build-s3 -DIDF_TARGET=esp32s3 -DSDKCONFIG=build-s3/sdkconfig build`.
+  Silkscreen: the board carries no reference designators (no space; only user labels, pin names and the order number). Refs live on F.Fab/B.Fab; the review pack's `layer_top.png` plots `F.Cu,F.SilkS,F.Fab,Edge.Cuts`, so the small refs in it come from F.Fab. The assembly drawing for debugging is the review pack or the KiCad file. The title is `v1 ${GIT_SHA}`; the project text variable is the worst case `0000000-dirty` so DRC (`silk_overlap`, `silk_over_copper`) gates the widest title (16 chars, ends at x about 28.8, JP1 `5V` starts at 33.0); `fab_package.py` plots with the real SHA. The review pack therefore shows `0000000-dirty`.
   Datasheet fixes: 22 ohm series R11/R12 (C25092) on USB D+/D- at the module (nets `MCU_USB_DP`/`MCU_USB_DN`), 1 uF C10 at 3V3, second 22 uF C11 on the buck output (Espressif checklist, TLV62569 sec 8.2.2.5).
+- **Enclosure orientation**: the board lies flat. The round GC9A01 plugs into the right-angle socket J2 on the RIGHT edge
+  (front of the case). The LEFT edge (x = 0) is the back of the case and its only opening: USB-C J1 (receptacle
+  opening out of the left edge, centre y 24, front (fab outline) at x = -0.25, 0.25 mm past the edge) next to the sensor vent.
+  The module antenna overhangs the top edge. See "Enclosure" below for all positions.
+- **Enclosure** (mm from the board's top-left corner, x right, y down; measured on the fab layer, not the courtyard):
+  - Outline 50 x 36 mm, 1.6 mm FR-4, sensor slot cut into the top-left (island x 0..10.4, y 0..14.8, slot 1.2/1.8 mm).
+  - M2 mounting holes (2.2 mm, unplated), centres (3, 3) H3, (47, 3) H4, (3, 33) H2, (47, 33) H1; each has a 2.7 mm
+    copper keepout radius, a M2 screw head is about 3.8 mm in diameter (silkscreen must stay clear of it).
+  - USB-C J1: opening out of the LEFT edge, centre line y = 24.0 (shell fab outline y 19.48..28.52, 9.04 mm wide), connector front
+    at x = -0.25 (0.25 mm past the edge), metal shell body to x = 7.1. This is the back of the case: **the back wall in front of
+    J1 should be thin (<= 1.2 mm) or recessed** so bulky plugs seat (a USB-C plug overmould is wider than the receptacle opening).
+  - Display socket J2: on the RIGHT edge, pin column at x = 40.0, socket face (fab outline) at x = 50.03 (0.03 mm past the
+    edge), body y 9.4..27.3, pins at y 10.76..26.0 (2.54 pitch, pin 1 at the bottom). The display plugs in from the right.
+  - Antenna: the module (x 16..34) has its antenna end at y -6.0..0, overhanging the TOP edge by 6.0 mm. Keep metal, batteries
+    and the case's conductive parts away from it; no rail, V-cut or screw there.
+  - Debug pads TP1..TP6 at y = 6.8, x 36.2..48.9 (2.54 pitch), TP7 (VBUS) at (24.5, 27.0): reachable with tweezers; leave an opening
+    or a service hole in the case if they are needed after assembly.
+- **Mounting**: four M2 holes (unplated, MountingHole_2.2mm_M2, H1..H4), one per corner, centre 3 mm from both edges,
+  each with a 2.7 mm radius keepout on all copper layers (no tracks, vias or pours). H3 sits in the sensor island's
+  top-left corner: the screw braces the thin neck mechanically.
 - **Power**: USB-C (HRO TYPE-C-31-M-12), 5.1k CC, USBLC6-2SC6 ESD, 500 mA polyfuse, TLV62569 buck
-  (2 A, 3.33 V via 100k/22k) with a 2.2 uH Cenker CKCS4030. A linear regulator would burn ~0.6 W
+  (2 A, 3.33 V via 100k/22k) with a 2.2 uH Cenker CKCS4030. ESD U2, CC resistors R1/R2 and polyfuse F1 sit next to
+  J1 on the left; VBUS runs from F1 along the bottom to the buck (bottom middle). A linear regulator would burn ~0.6 W
   and warm the sensor; the design review caught it.
+- **USB pair**: hand-drawn in `gen/layout_v1.py` for the left-edge connector: D+ pads joined on the interior side, D-
+  pads on the outer side, straight through U2 (flow-through), D- straight up to R11, D+ around the U2 GND via,
+  coupled to D- for only about 0.5 mm (0.27 mm tracks / 0.15 mm gap are sized for about 91 ohm differential with mask on JLC04161H-7628, prepreg 0.2104 mm, field solver `tools/impedance.py`; elsewhere the tracks are about 2 mm apart; measured minimum same-layer copper gap I2C_SCL / I2C_SDA to USB_DN is 1.65 mm (pcbnew, 2026-10-16); no impedance control ordered; a short (about 13 mm) full-speed pair, coupling is not critical, see ORDER.md) before it hooks to R12. Nothing but GND runs under J1's metal shell (x < 7.1; DRC rule `no signal copper under the J1 shell`). The 0.5 mm pad pitch (B7 D-, A6 D+, A7 D-, B6 D+) forbids two planar joins, so the D- A7/B7 join takes two 0.45/0.2 vias right of the pads and a 1.4 mm B.Cu jumper (over In2/In1, harmless at 12 Mbit/s); the D+ A6/B6 join is an F.Cu loop of 0.2 mm stubs around the A7 via. J1's VBUS_IN pads (top and bottom) go through vias just right of the pads and join on B.Cu to the ESD pin.
 - **Sensor**: BME688 at 0x77 on a peninsula: milled slot 1.8 mm on the module side (TI SNOAA01: a wider gap reads
   closer to ambient), 1.2 mm below, neck 3.6 x 1.2 mm at the left edge, far from the module and the buck. No copper
   pour or plane under the island or the neck on any layer (Bosch BME68x HSMI 7.3, Sensirion SHTxx design guide,
   TI HDC302x: thin interconnects, no copper under the sensor). The island is routed by hand in `gen/layout_v1.py`
-  (3V3/I2C on F.Cu, GND as a B.Cu tree), so it is identical on every run; C12 4.7 uF bulk sits where 3V3 enters.
-  The neck carries one F.Cu bus at 0.15 mm (`BUS_X`): 3V3 | GND | SDA | SCL | GND. The two GND guards are the
+  (3V3/I2C on F.Cu, GND as a B.Cu tree), so it is identical on every run. The island is 10.4 x 14.8 mm (grown 3 mm to make
+  room for the M2 hole in its top-left corner): BME688 top-right, SHT40 bottom-left, 8.9 mm apart; 3V3 climbs the left
+  edge and passes under the hole keepout; SCL/SDA drop from the BME688 to two horizontals along the island bottom
+  (SDA reaches the SHT40 over a B.Cu jumper); C12 4.7 uF bulk sits on the 3V3 line next to the bus.
+  The neck carries one F.Cu bus at 0.15 mm (`BUS_X`): 3V3 | GND | SCL | SDA | GND. The two GND guards are the
   return path for SDA/SCL (at 400 kHz a guard is enough); they are joined on B.Cu inside the neck and stitched to
   In1 just below it. A B.Cu keepout band keeps other tracks out of the neck. The bus starts at island pads and ends
   in 0.3 mm pieces on the main board: the router extends free ends and reroutes stubs that touch no pad, and
@@ -42,24 +71,30 @@ scripts/hw-check.sh [--bom --qty N]      # the gate alone (also part of scripts/
 - **Temperature/humidity**: SHT40-AD1B (C2909890, 0x44, ±1.8 %RH / ±0.2 °C) on the same island, in the
   corner away from the BME688: its gas heater warms the BME688, so T/RH come from the SHT40 and the
   BME688 is used for gas/air quality (and pressure).
-- **Display**: 7-pin GC9A01 module (VCC GND SCL SDA DC CS RST) on a right-angle 1x7 female socket
-  (C22436148) whose face sits 0.4 mm past the right edge; pin names on the bottom silkscreen.
+- **Display**: 7-pin GC9A01 module on a right-angle 1x7 female socket, pinout mirrored for the right-edge socket:
+  J2 pin 1 LCD_RST, 2 LCD_CS, 3 LCD_DC, 4 LCD_MOSI (SDA), 5 LCD_SCLK (SCL), 6 GND, 7 LCD_VCC (the module's own
+  header order is VCC GND SCL SDA DC CS RST; it plugs in rotated), the socket
+  (C22436148) whose face (fab outline) sits at x = 50.03, 0.03 mm past the right edge (moved 0.2 mm right so the module seats at the
+  edge); pin names on the bottom silkscreen.
   JP1 selects LCD VCC: 3V3 (default, bridged) or 5V.
 - **Pins** (S3): LCD SCLK 12, MOSI 11, DC 9, CS 10, RST 14 (FSPI pins); I2C SDA 4, SCL 5;
-  button 6; BOOT 0; USB 19/20; UART0 43/44. Checked against Kconfig by `tools/checks.py`.
-- **Debug**: pads TX RX GND 3V3 EN IO0 (ESP auto-program order) + VBUS; RESET/BOOT/user buttons.
+  BOOT 0; USB 19/20; UART0 43/44. GPIO6 is unused: the notifier-v1 board has no user button (`DESK_BTN` defaults to -1 = none on this board; the
+  firmware skips the button when it is negative); ack / next page go through the web UI / API (`POST /api/ack`, `/api/page`). Checked against Kconfig by `tools/checks.py`.
+- **Debug**: no buttons. Six 1.5 mm round pads at 2.54 mm pitch, top right, in the order TX RX 3V3 EN GND IO0 (GND
+  between EN and IO0): tweezers across EN-GND = reset, across GND-IO0 = boot mode; the ESP auto-program order is not
+  needed with the USB-Serial/JTAG port. VBUS pad TP7 stays. (Refs: TP1 TX, TP2 RX, TP4 3V3, TP5 EN, TP3 GND, TP6 IO0.)
 
 ## Toolchain (what is actually used)
 | Step | Tool |
 |---|---|
 | Schematic | `gen/notifier_v1.py` (PARTS + NETS = source of truth) on kicad-sch-api via `gen/schkit.py` (own pin math, label justification, net-intent check against KiCad's netlist) |
 | Placement | `gen/layout_v1.py` (pcbnew SWIG in KiCad's Python): outline, positions, planes, keepouts, rules, silk; writes `.kicad_pro` + `.kicad_dru` |
-| Routing | KiCadRoutingTools 0.23 (`tools/route_krt.sh`): planes on In1/In2, rest on F/B only (USB pair hand-drawn in `gen/layout_v1.py`, 0.27/0.15 = 90 ohm), `--ordering inside_out`, `--same-net-pad-clearance`, fab floors pinned (`rules/krt-fab.txt`, `--no-fix-drc-settings`) |
+| Routing | KiCadRoutingTools 0.23 (`tools/route_krt.sh`): planes on In1/In2, rest on F/B only (USB pair hand-drawn in `gen/layout_v1.py`, 0.27/0.15, about 90 ohm differential), `--ordering inside_out`, `--same-net-pad-clearance`, fab floors pinned (`rules/krt-fab.txt`, `--no-fix-drc-settings`) |
 | Routing alt | Freerouting 2.5 JAR (`tools/autoroute.py`, `tools/freerouting`): fine on simple boards, left 12 nets open here (planes, island) |
 | Finish | `tools/finish.py`: outer GND pours, refill, DRC-driven removal of dangling router leftovers (undone if it opens a connection) |
-| Checks | `tools/checks.py`: ERC + DRC + schematic parity (JSON), `waivers.yaml`, pin map vs Kconfig, reserved S3 pins, live JLC BOM (`tools/jlcparts.py`) |
+| Checks | `tools/checks.py`: ERC + DRC + schematic parity (kicad-cli JSON), `waivers.yaml`, pin map vs Kconfig, reserved S3 pins, live JLC BOM (`tools/jlcparts.py`). DRC rules: project floors from `rules/jlc-4layer.json` (JLC 4-layer capabilities with margin) plus `rules/notifier.kicad_dru`: no via in SMD pad (0.1 mm physical clearance), via to same-net SMD pad >= 0.15 mm (`physical_clearance` also sees same-net copper; hand-placed vias keep >= 0.2, `finish.py` nudges router vias toward 0.2, the crowded corner left of the module only allows 0.15), via to edge >= 0.35, PTH annular ring >= 0.15, silk text >= 0.8 mm, VBUS/SW tracks >= 0.3, no signal copper under the J1 shell |
 | Review | `tools/review_pack.py` (schematic tiles, layer plots, 3D renders) + `tools/render_review.py` (annotated: no pours, nets named and coloured, mm grid) |
-| Fab | `tools/fab_package.py`: gerbers + drill zip, JLC BOM (grouped by LCSC) and CPL with rotation corrections |
+| Fab | `tools/fab_package.py`: gerbers + drill zip, JLC BOM (grouped by LCSC) and CPL with rotation corrections; only gitignored files are written (`pipeline_v1.sh --fab-only` verifies that and refuses a dirty tree) |
 
 ## Review loop and agent roles
 1. Change the generator, run the pipeline. 2. Gate: `checks.py` must be OK (errors are never waivable

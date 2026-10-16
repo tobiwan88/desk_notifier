@@ -19,6 +19,6 @@
   "classes": [
     {"name": "Default", "clearance": 0.15, "track_width": 0.2, "via_diameter": 0.6, "via_drill": 0.3, "diff_pair_width": 0.2, "diff_pair_gap": 0.15},
     {"name": "Power", "clearance": 0.15, "track_width": 0.4, "via_diameter": 0.6, "via_drill": 0.3, "diff_pair_width": 0.2, "diff_pair_gap": 0.15},
-    {"name": "USB", "clearance": 0.15, "track_width": 0.25, "via_diameter": 0.6, "via_drill": 0.3, "diff_pair_width": 0.25, "diff_pair_gap": 0.15}
+    {"name": "USB", "clearance": 0.15, "track_width": 0.27, "via_diameter": 0.6, "via_drill": 0.3, "diff_pair_width": 0.27, "diff_pair_gap": 0.15}
   ]
 }
