@@ -46,6 +46,7 @@ PARTS = {
     # (same URL): "series resistors of 22 to 33 ohm" on D+/D-. UNI-ROYAL 0402WGF220JTCE, 1 %, Basic.
     "R11": ("Device:R", "22", R0402, "C25092", "MCU", 0),   # USB_DN -> MCU_USB_DN (module pin 13)
     "R12": ("Device:R", "22", R0402, "C25092", "MCU", 0),   # USB_DP -> MCU_USB_DP (module pin 14)
+    "R13": ("Device:R", "33", R0402, "C25105", "MCU", 0),   # LCD SCLK series termination at module pin 20
     "R4": ("Device:R", "10k", R0402, "C25744", "MCU", 0),
     "C4": ("Device:C", "1u", C0402, "C52923", "MCU", 0),
     "SW1": ("Switch:SW_Push", "RESET", "Button_Switch_SMD:SW_Push_1P1T_XKB_TS-1187A", "C318884", "MCU", 90),
@@ -60,6 +61,7 @@ PARTS = {
     # SHT40 (0x44): temperature/humidity away from the BME688's gas heater
     "U5": ("Sensor_Humidity:SHT4x", "SHT40-AD1B", "Sensor_Humidity:Sensirion_DFN-4_1.5x1.5mm_P0.8mm_SHT4x_NoCentralPad", "C2909890", "Sensors", 0),
     "C9": ("Device:C", "100n", C0402, "C1525", "Sensors", 0),
+    "C12": ("Device:C", "4.7u", C0603, "C19666", "Sensors", 0),   # bulk where 3V3 enters the island (gas heater pulses)
     "R7": ("Device:R", "4.7k", R0402, "C25900", "Sensors", 0),
     "R8": ("Device:R", "4.7k", R0402, "C25900", "Sensors", 0),
     # GC9A01 display header and its supply selector (default 3V3, cut and bridge 2-3 for 5 V)
@@ -92,9 +94,9 @@ NETS = {
     "GND": [("J1", "A1"), ("J1", "A12"), ("J1", "B1"), ("J1", "B12"), ("J1", "SH"), ("R1", "2"), ("R2", "2"), ("U2", "2"),
             ("U3", "2"), ("R10", "2"), ("C1", "2"), ("C2", "2"), ("C3", "2"), ("C11", "2"), ("D1", "1"), ("U1", "1"), ("U1", "40"), ("U1", "41"),
             ("C5", "2"), ("C6", "2"), ("C10", "2"), ("C4", "2"), ("SW1", "2"), ("SW2", "2"), ("SW3", "2"), ("U4", "1"), ("U4", "7"),
-            ("C7", "2"), ("C8", "2"), ("U5", "4"), ("C9", "2"), ("J2", "2"), ("TP3", "1"), ("#FLG02", "1")],
+            ("C7", "2"), ("C8", "2"), ("U5", "4"), ("C9", "2"), ("C12", "2"), ("J2", "2"), ("TP3", "1"), ("#FLG02", "1")],
     "+3V3": [("L1", "2"), ("R9", "1"), ("TP4", "1"), ("#FLG03", "1"), ("C2", "1"), ("C3", "1"), ("C11", "1"), ("C10", "1"), ("R3", "1"), ("U1", "2"), ("C5", "1"), ("C6", "1"), ("R4", "1"),
-             ("R5", "1"), ("R6", "1"), ("U4", "8"), ("U4", "6"), ("U4", "2"), ("U4", "5"), ("C7", "1"), ("C8", "1"), ("U5", "3"), ("C9", "1"),
+             ("R5", "1"), ("R6", "1"), ("U4", "8"), ("U4", "6"), ("U4", "2"), ("U4", "5"), ("C7", "1"), ("C8", "1"), ("U5", "3"), ("C9", "1"), ("C12", "1"),
              ("R7", "1"), ("R8", "1"), ("JP1", "1")],
     "CC1": [("J1", "A5"), ("R1", "1")],
     "CC2": [("J1", "B5"), ("R2", "1")],
@@ -109,7 +111,8 @@ NETS = {
     "I2C_SDA": [("U1", "4"), ("U4", "3"), ("U5", "1"), ("R7", "2")],
     "I2C_SCL": [("U1", "5"), ("U4", "4"), ("U5", "2"), ("R8", "2")],
     "LCD_VCC": [("JP1", "2"), ("J2", "1")],
-    "LCD_SCLK": [("U1", "20"), ("J2", "3")],
+    "MCU_LCD_SCLK": [("U1", "20"), ("R13", "1")],
+    "LCD_SCLK": [("R13", "2"), ("J2", "3")],
     "LCD_MOSI": [("U1", "19"), ("J2", "4")],
     "LCD_DC": [("U1", "17"), ("J2", "5")],
     "LCD_CS": [("U1", "18"), ("J2", "6")],

@@ -178,7 +178,14 @@ def draw_mcu(parts, no_connect) -> Sheet:
     for pin, net, y in (("4", "I2C_SDA", 52), ("5", "I2C_SCL", 53)):
         s.wire(("U1", pin), (89, y))
         s.label(net, 89, y, 0, "hier")
-    for pin, net, y in (("20", "LCD_SCLK", 60), ("19", "LCD_MOSI", 59), ("17", "LCD_DC", 57), ("18", "LCD_CS", 58), ("22", "LCD_RST", 62)):
+    s.part("R13", 86.5, 60, 90)                               # 33 ohm series termination on the display clock
+    assert s.at("R13", "1")[0] < s.at("R13", "2")[0], "R13 pin 1 must face the module"
+    s.wire(("U1", "20"), ("R13", "1"))
+    s.label("MCU_LCD_SCLK", *(v / 2.54 for v in s.at("R13", "1")), 180)  # at() is in mm, labels in cells
+    s.wire(("R13", "2"), (89, 60))
+    s.label("LCD_SCLK", 89, 60, 0, "hier")
+    s.tag("R13", (0, 2.6), (0, 3.9), just="center")
+    for pin, net, y in (("19", "LCD_MOSI", 59), ("17", "LCD_DC", 57), ("18", "LCD_CS", 58), ("22", "LCD_RST", 62)):
         s.wire(("U1", pin), (89, y))
         s.label(net, 89, y, 0, "hier")
     # EN: pull-up, RC delay cap, reset button, test pad
@@ -249,7 +256,9 @@ def draw_sensors(parts) -> Sheet:
     s.power("+3V3", 60, 19)
     s.part("C7", 68, 22.5)
     s.part("C8", 72, 22.5)
-    for r, x in (("C7", 68), ("C8", 72)):
+    s.part("C12", 76, 22.5)                                   # 4.7u bulk for the gas heater pulses
+    s.wire((72, 21), (76, 21), ("C12", "1"))
+    for r, x in (("C7", 68), ("C8", 72), ("C12", 76)):
         s.wire((r, "2"), (x, 26))
         s.power("GND", x, 26)
     s.wire(("U4", "7"), (59, 38), (61, 38))
@@ -277,7 +286,8 @@ def draw_sensors(parts) -> Sheet:
     s.text(8, 48, "Notes\n"
            "- BME688: gas and pressure only. Its\n  gas heater self-heats, so T/RH come\n  from the SHT40 away from it.\n"
            "- I2C addresses: BME688 0x77 (SDO high),\n  SHT40 0x44. CSB high selects I2C.\n"
-           "- 4.7k pull-ups sit at the bus entry;\n  no pours on the sensor island.", 1.27)
+           "- 4.7k pull-ups sit at the bus entry;\n  no pours on the sensor island.\n"
+           "- C12 4.7u bulk where 3V3 enters\n  the island.", 1.27)
     return s
 
 

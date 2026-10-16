@@ -17,20 +17,26 @@ W, H = 50.0, 36.0
 OX, OY = 100.0, 100.0  # board origin on the page
 mm = pcbnew.FromMM
 
+S, SM = 1.2, 1.8  # slot below the island / on the module side (wider where it faces the heat: TI SNOAA01)
+IH = 11.8  # island height
+
 # ref: (x, y, rotation, side)  side "F" or "B"
 PLACE = {
     # module: antenna (local y < -6.75) overhangs the top edge
     "U1": (25.0, 6.75, 0, "F"),
     "C5": (13.8, 2.4, 90, "F"), "C6": (13.7, 4.6, 0, "F"),         # 3V3 pin 2 at (16.25, 2.76)
     "C10": (13.7, 10.6, 0, "F"),                                   # 1 uF for 3V3 pin 2 (no room beside C5/C6; plane vias carry 3V3)
+    "R13": (24.36, 21.3, 0, "F"),                                  # LCD SCLK 33 ohm right below module pin 20
     "R11": (13.5, 16.45, 0, "F"), "R12": (13.5, 17.72, 0, "F"),    # USB 22 ohm at module pins 13/14 (x 16.25)
     "R4": (13.7, 5.9, 0, "F"), "C4": (13.7, 7.2, 0, "F"),          # EN pin 3 at (16.25, 4.03)
     "R6": (13.7, 8.6, 0, "F"),                                     # IO6 pin 6 at (16.25, 7.84)
-    "R7": (13.7, 12.6, 0, "F"), "R8": (13.7, 13.9, 0, "F"),        # I2C pull-ups
+    # I2C pull-ups just below the sensor neck: the neck bus ends on their pads (pad 2 under SDA/SCL, see BUS_X)
+    "R7": (13.7, 12.6, 0, "F"), "R8": (13.7, 13.9, 0, "F"),        # I2C pull-ups next to the module
     # BME688 peninsula (top-left): notch on the module side and below, neck at the left edge
     "U4": (4.5, 4.6, 0, "F"), "C7": (3.3, 7.9, 0, "F"), "C8": (5.3, 7.9, 0, "F"),
     # SHT40 in the island's bottom-right corner, 6 mm from the BME688 (no pour between them)
     "U5": (8.8, 8.8, 90, "F"), "C9": (8.8, 6.9, 180, "F"),
+    "C12": (1.2, 6.6, 90, "F"),                                    # bulk next to C7, where 3V3 enters the island
     # buttons on the left under the island
     "SW1": (4.8, 17.8, 0, "F"), "SW2": (4.8, 25.6, 0, "F"),
     # USB-C at the bottom edge, ESD and CC resistors next to it, then the polyfuse
@@ -56,20 +62,28 @@ PLACE = {
 
 # BME688 peninsula: notch (slot width 1.2 mm) along the module side and below, open to the top edge;
 # the island hangs on a 2.6 mm neck at the left board edge, away from the module and the buck
-S = 1.2
-IH = 11.8  # island height
-OUTLINE = [(0, 0), (10.4, 0), (10.4, IH), (3.6, IH), (3.6, IH + S), (10.4 + S, IH + S), (10.4 + S, 0),
+OUTLINE = [(0, 0), (10.4, 0), (10.4, IH), (3.6, IH), (3.6, IH + S), (10.4 + SM, IH + S), (10.4 + SM, 0),
            (W, 0), (W, H), (0, H)]
 ISLAND = [(0, 0), (10.4, 0), (10.4, IH), (0, IH)]
 NECK = [(0, IH), (4.5, IH), (4.5, IH + 2.8), (0, IH + 2.8)]          # no pours here: keep plane heat off the neck
-ANTENNA_STRIP = [(10.4 + S, 0), (W, 0), (W, 1.8), (10.4 + S, 1.8)]  # no pours/vias beside the antenna
+# Neck bus, hand-drawn on F.Cu, left to right: 3V3 | GND | SDA | SCL | GND, 0.15 mm (thin copper = less heat into
+# the island; Bosch BME68x HSMI 7.3). The GND guards beside the I2C pair are its return path (no plane under the
+# neck or island); each guard is stitched to In1 by a via just below the neck. SDA/SCL/3V3 start at island
+# pads (U5, C7): the router keeps copper that ends on a pad, extends the free main-board ends, and reroutes free
+# stubs. Only F.Cu crosses the neck.
+BUS_X = {"+3V3": 0.6, "GND_L": 1.15, "I2C_SDA": 1.7, "I2C_SCL": 2.25, "GND_R": 2.8}
+BUS_W = 0.15
+STITCH_Y = IH + S + 0.3                                           # guard vias to In1, just below the neck
+BUS_Y1 = IH + 2.8                                                 # free main-board ends of 3V3/SDA/SCL
+LOOP_Y = IH + 0.25                                                # guards joined on B.Cu under SDA/SCL, in the neck
+ANTENNA_STRIP = [(10.4 + SM, 0), (W, 0), (W, 1.8), (10.4 + SM, 1.8)]  # no pours/vias beside the antenna
 
 SILK = [  # (text, x, y, size, layer)
     ("RST", 4.8, 14.2, 1.0, "F"), ("BOOT", 4.8, 21.9, 1.0, "F"), ("BTN", 36.4, 35.0, 0.8, "F"),
     ("TX", 36.3, 4.4, 0.8, "F"), ("RX", 38.6, 4.4, 0.8, "F"), ("GND", 40.9, 4.4, 0.8, "F"),
     ("3V3", 43.2, 4.4, 0.8, "F"), ("EN", 45.5, 4.4, 0.8, "F"), ("IO0", 47.8, 4.4, 0.8, "F"),
     ("5V", 33.6, 21.4, 0.8, "F"), ("3V3", 33.4, 25.0, 0.8, "F"), ("BME688", 4.9, 10.3, 0.8, "F"),
-    ("desk notifier v1", 25.0, 21.8, 1.0, "F"), ("LCD", 44.5, 7.5, 1.0, "F"), ("1", 39.8, 28.6, 0.8, "F"),
+    ("desk notifier v1", 25.0, 22.8, 1.0, "F"), ("LCD", 44.5, 7.5, 1.0, "F"), ("1", 39.8, 28.6, 0.8, "F"),
 ] + [(name, 37.4, 26.0 - 2.54 * i, 0.8, "B") for i, name in enumerate(("VCC", "GND", "SCL", "SDA", "DC", "CS", "RST"))]
 
 USB_W, USB_GAP = 0.27, 0.15  # 90 ohm differential, see the USB block in main()
@@ -205,28 +219,25 @@ def main():
     def pad(ref, num):
         return next(q for q in board.FindFootprintByReference(ref).Pads() if q.GetNumber() == num)
 
-    def trk(a, pts, width=0.2, locked=False):
+    def trk(a, pts, width=0.2, locked=False, layer=pcbnew.F_Cu):
         for p0, p1 in zip(pts, pts[1:]):
             t = pcbnew.PCB_TRACK(board)
-            t.SetStart(p0), t.SetEnd(p1), t.SetWidth(mm(width)), t.SetLayer(pcbnew.F_Cu), t.SetNet(a.GetNet())
+            t.SetStart(p0), t.SetEnd(p1), t.SetWidth(mm(width)), t.SetLayer(layer), t.SetNet(a.GetNet())
             t.SetLocked(locked)
             board.Add(t)
 
     # SHT40 pads are 0.3 mm apart and its footprint keepout only lets tracks leave a pad straight:
-    # hand-draw C9 -> VDD/VSS and short stubs off SDA/SCL, which the router then extends
+    # hand-draw C9 -> VDD/VSS (SDA/SCL leave through the neck bus, see BUS_X)
     for n9, n5 in (("1", "3"), ("2", "4")):
         q = pad("U5", n5).GetPosition()
         trk(pad("U5", n5), [q, pcbnew.VECTOR2I(q.x, q.y - mm(0.6)), pad("C9", n9).GetPosition()])
-    for n5 in ("1", "2"):
-        q = pad("U5", n5).GetPosition()
-        trk(pad("U5", n5), [q, pcbnew.VECTOR2I(q.x, q.y + mm(0.8))])
 
     # USB D+/D- by hand (the router left them partial with ~8 vias): 0.27 mm / 0.15 mm gap on F.Cu over
     # the In1 GND plane = 90 ohm differential on JLC04161H-7628 (prepreg 0.2104 mm, er 4.4, 1 oz, mask).
     # Connector D+ (A6/B6) joined above the pad row, D- (A7/B7) below it; straight through the ESD
     # (flow-through), coupled up to R11/R12, short stubs to module pins 13/14. Locked: the router keeps it.
-    def path(net_pad, pts, width=USB_W):
-        trk(net_pad, [v(x, y) for x, y in pts], width, locked=True)
+    def path(net_pad, pts, width=USB_W, layer=pcbnew.F_Cu):
+        trk(net_pad, [v(x, y) for x, y in pts], width, locked=True, layer=layer)
 
     def via(net_pad, x, y):
         t = pcbnew.PCB_VIA(board)
@@ -265,16 +276,76 @@ def main():
     path(pad("U2", "2"), [u2, (u2[0], u2[1] - 1.2)], 0.4)
     via(pad("U2", "2"), u2[0], u2[1] - 1.2)
 
+    # neck bus (see BUS_X): 3V3 and the left guard come down from C7 at 45 deg, SDA/SCL run along the island's
+    # bottom edge from U5, the right guard starts below SCL
+    bx, c7v, c7g, sda, scl = BUS_X, at("C7", "1"), at("C7", "2"), at("U5", "1"), at("U5", "2")
+    turn = c7v[1] + 0.3
+    # the main-board tails come in 0.3 mm pieces: where the router joins one mid-way, finish.py drops the leftover
+    tail = [IH + S + 0.3 * i for i in range(int((BUS_Y1 - IH - S) / 0.3) + 1)]
+    path(pad("C7", "1"), [c7v, (c7v[0], turn), (bx["+3V3"], turn + c7v[0] - bx["+3V3"])] + [(bx["+3V3"], y) for y in tail], BUS_W)
+    path(pad("C7", "2"), [c7g, (c7g[0], turn), (bx["GND_L"], turn + c7g[0] - bx["GND_L"]), (bx["GND_L"], STITCH_Y)], BUS_W)
+    ys, yc = IH - 0.9, IH - 0.45                                  # SDA / SCL along the island edge (0.35 mm to it)
+    path(pad("U5", "1"), [sda, (sda[0], ys), (bx["I2C_SDA"] + 0.3, ys), (bx["I2C_SDA"], ys + 0.3)] + [(bx["I2C_SDA"], y) for y in tail], BUS_W)
+    path(pad("U5", "2"), [scl, (scl[0], yc), (bx["I2C_SCL"] + 0.3, yc), (bx["I2C_SCL"], yc + 0.3)] + [(bx["I2C_SCL"], y) for y in tail], BUS_W)
+    path(pad("C7", "2"), [(bx["GND_R"], IH - 0.05), (bx["GND_R"], STITCH_Y)], BUS_W)
+    # island by hand (the router kept boxing in SCL or cutting the SHT40 keepout): 3V3 and I2C on F.Cu,
+    # GND as a B.Cu tree between four layer-change vias (no plane on the island)
+    def b_path(net_pad, pts):
+        path(net_pad, pts, BUS_W, pcbnew.B_Cu)
+    u = {n: at("U4", n) for n in "12345678"}
+    gnd, vdd = pad("C7", "2"), pad("C7", "1")
+    # 3V3: U4 pin 2 over the top, down the left to C12; one rung at y 6.8 to pins 8 and 6 (pin 5 joins 6), C7, C8
+    path(vdd, [u["2"], (u["2"][0], 2.6), (2.1, 2.6), (2.1, 7.375), at("C12", "1")], BUS_W)
+    path(vdd, [(2.1, 6.8), (u["6"][0], 6.8)], BUS_W)
+    path(vdd, [u["8"], (u["8"][0], 7.4), at("C7", "1")], BUS_W)
+    path(vdd, [u["6"], (u["6"][0], 7.5), at("C8", "1")], BUS_W)
+    path(vdd, [u["5"], (u["5"][0], 6.2), (u["6"][0] + 0.4, 6.6), (u["6"][0], 6.6)], BUS_W)
+    # SHT40 3V3 (C9) to U4 pin 5 under the SDA line: via, B.Cu at y 5.0, via
+    path(vdd, [at("C9", "1"), (9.4, 6.0)], BUS_W)
+    via(vdd, 9.4, 6.0)
+    b_path(vdd, [(9.4, 6.0), (9.4, 5.0), (6.3, 5.0)])
+    via(vdd, 6.3, 5.0)
+    path(vdd, [(6.3, 5.0), (u["5"][0], 5.6), u["5"]], BUS_W)
+    # SDA: U4 pin 3 over the top, down at x 7.6 onto the SDA line from U5
+    path(pad("U4", "3"), [u["3"], (u["3"][0], 2.6), (7.6, 2.6), (7.6, ys)], BUS_W)
+    # SCL: U4 pin 4 right to a via, B.Cu along the top and down the right edge, via onto the U5 SCL stub
+    path(pad("U4", "4"), [u["4"], (6.6, u["4"][1])], BUS_W)
+    via(pad("U4", "4"), 6.6, u["4"][1])
+    b_path(pad("U4", "4"), [(6.6, u["4"][1]), (9.95, u["4"][1]), (9.95, 10.3), (scl[0], 10.3)])
+    via(pad("U4", "4"), scl[0], 10.3)
+    # GND: U4 pins 1 and 7 joined under the package, vias V1 (left of U4), V2 (C12), V3 (C7/C8), V4 (C9/U5)
+    v1, v2, v3, v4 = (2.75, 4.25), (1.2, 4.75), (4.33, 8.75), (8.3, 6.0)
+    path(gnd, [u["1"], (u["1"][0], v1[1]), v1], BUS_W)
+    path(gnd, [(u["1"][0], v1[1]), (u["7"][0], v1[1]), u["7"]], BUS_W)
+    path(gnd, [at("C12", "2"), v2], BUS_W)
+    path(gnd, [(c7g[0], turn), v3], BUS_W)
+    path(gnd, [at("C8", "2"), (at("C8", "2")[0], v3[1]), v3], BUS_W)
+    path(gnd, [at("C9", "2"), v4], BUS_W)
+    for x, y in (v1, v2, v3, v4):
+        via(gnd, x, y)
+    b_path(gnd, [v2, (v2[0] + 0.5, v1[1]), v1, (v1[0], 6.0), v4])
+    b_path(gnd, [(v3[0], 6.0), v3])
+
+    for name in ("GND_L", "GND_R"):
+        via(pad("C7", "2"), bx[name], STITCH_Y)
+        via(pad("C7", "2"), bx[name], LOOP_Y)
+    # the right guard cannot reach island GND on F.Cu (SDA/SCL run between), so the guards join on B.Cu: a GND loop
+    # around the pair, grounded at both ends
+    path(pad("C7", "2"), [(bx["GND_L"], LOOP_Y), (bx["GND_R"], LOOP_Y)], BUS_W, pcbnew.B_Cu)
+
     full = [(0, 0), (W, 0), (W, H), (0, H)]
     zone(board, pcbnew.In1_Cu, "GND", full)
     zone(board, pcbnew.In2_Cu, "+3V3", full)
     # outer GND pours are added after routing (tools/finish.py), so the router sees free layers
     # no pours on the sensor island: keep the module's and regulator's heat out (tracks still allowed)
     copper = [pcbnew.F_Cu, pcbnew.In1_Cu, pcbnew.In2_Cu, pcbnew.B_Cu]
-    # In1 stays pourable there: tools/finish.py adds a hatched GND plane under island + neck as the
-    # return path for SDA/SCL/3V3 (KRT's plane router replaces the zones made here, so it lives in finish.py)
+    # no In1 GND under the island or the neck either (tools/finish.py redraws In1; KRT's plane router replaces the
+    # zones made here): sensor GND reaches the main board by the bus guards
     outer = [pcbnew.F_Cu, pcbnew.In2_Cu, pcbnew.B_Cu]
     keepout(board, outer, ISLAND)
+    keepout(board, [pcbnew.In1_Cu], [(0, 0), (10.4, 0), (10.4, IH), (3.6, IH), (3.6, IH + S), (0, IH + S)])
+    # no other B.Cu track across the neck: a band below the guards' B.Cu link (every crossing passes through it)
+    keepout(board, [pcbnew.B_Cu], [(0, LOOP_Y + 0.35), (3.6, LOOP_Y + 0.35), (3.6, IH + S), (0, IH + S)], tracks=True, pours=False)
     keepout(board, outer, NECK)
     keepout(board, copper, ANTENNA_STRIP, vias=True)
 

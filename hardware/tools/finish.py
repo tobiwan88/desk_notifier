@@ -3,6 +3,7 @@ Usage: finish.py board.kicad_pcb
 """
 
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -35,42 +36,68 @@ for layer in (pcbnew.F_Cu, pcbnew.B_Cu):
         o.Append(x, y)
     board.Add(z)
 
-# In1 GND under the sensor island + neck: KRT's plane router makes one solid full-board zone, which the old
-# keepout left with a hole. Replace it with a solid zone minus island/neck plus a HATCHED zone there
-# (thermal isolation: ~35% copper; return path for the I2C tracks that leave through the neck).
-# Geometry mirrors layout_v1.py (S, IH, neck 4.5 x 2.8); mm relative to the board's top-left corner.
-S, IH, NW, NH = 1.2, 11.8, 4.5, 2.8
+# In1 GND: KRT's plane router makes one full-board zone. Replace it with a solid zone that leaves out the sensor
+# island and the neck (thermal isolation; the neck bus carries its own GND guards).
+# Geometry mirrors layout_v1.py (S, SM, IH); mm relative to the board's top-left corner.
+S, SM, IH = 1.2, 1.8, 11.8
 x0, y0, x1, y1 = (v / 1e6 for v in (edge.GetLeft(), edge.GetTop(), edge.GetRight(), edge.GetBottom()))
 for z in list(board.Zones()):
     if not z.GetIsRuleArea() and z.GetLayer() == pcbnew.In1_Cu:
         board.Remove(z)
-
-
-def in1(pts, hatch):
-    z = pcbnew.ZONE(board)
-    z.SetLayer(pcbnew.In1_Cu)
-    z.SetNet(gnd)
-    z.SetLocalClearance(mm(0.2))
-    z.SetMinThickness(mm(0.2))
-    z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
-    z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
-    if hatch:
-        z.SetAssignedPriority(1)
-        z.SetFillMode(pcbnew.ZONE_FILL_MODE_HATCH_PATTERN)
-        z.SetHatchThickness(mm(0.3))
-        z.SetHatchGap(mm(1.2))
-        z.SetHatchOrientation(pcbnew.EDA_ANGLE(45, pcbnew.DEGREES_T))
-    o = z.Outline()
-    o.NewOutline()
-    for x, y in pts:
-        o.Append(mm(x0 + x), mm(y0 + y))
-    board.Add(z)
-
-
 W, H = x1 - x0, y1 - y0
-ov = 0.6  # hatch overlaps the solid plane so it is connected
-in1([(10.4 + S, 0), (W, 0), (W, H), (0, H), (0, IH + NH), (NW, IH + NH), (NW, IH + S + ov), (10.4 + S, IH + S + ov)], False)
-in1([(0, 0), (10.4 + S, 0), (10.4 + S, IH), (NW, IH), (NW, IH + NH + ov), (0, IH + NH + ov)], True)
+z = pcbnew.ZONE(board)
+z.SetLayer(pcbnew.In1_Cu)
+z.SetNet(gnd)
+z.SetLocalClearance(mm(0.2))
+z.SetMinThickness(mm(0.2))
+z.SetPadConnection(pcbnew.ZONE_CONNECTION_FULL)
+z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
+o = z.Outline()
+o.NewOutline()
+for x, y in ((10.4 + SM, 0), (W, 0), (W, H), (0, H), (0, IH + S), (10.4 + SM, IH + S)):
+    o.Append(mm(x0 + x), mm(y0 + y))
+board.Add(z)
+for z in board.Zones():  # KRT's In2 plane keeps unconnected slivers between the module's thermal vias
+    if not z.GetIsRuleArea() and z.GetLayer() == pcbnew.In2_Cu:
+        z.SetIslandRemovalMode(pcbnew.ISLAND_REMOVAL_MODE_ALWAYS)
+
+
+# GND via beside every layer change of the display SPI lines (40-80 MHz): F.Cu references In1 (GND), B.Cu In2
+# (3V3), so the return current needs a nearby path between the GND layers. First free spot 0.9-1.5 mm from the
+# signal via, checked against other copper (0.2 mm), SMD pads (no via in pad), vias (hole spacing) and the edge;
+# checks.py's DRC has the last word.
+def free_spot(pos):
+    for r in (0.9, 1.1, 1.3, 1.5):
+        for k in range(16):
+            a = k * math.pi / 8
+            p = pcbnew.VECTOR2I(pos.x + mm(r * math.cos(a)), pos.y + mm(r * math.sin(a)))
+            rx, ry = p.x / 1e6 - x0, p.y / 1e6 - y0
+            if not (0.6 < rx < W - 0.6 and 0.6 < ry < H - 0.6) or (rx < 10.4 + SM + 0.6 and ry < IH + S + 0.6):
+                continue  # board edge, sensor island/neck/slot
+            if any(z.GetIsRuleArea() and z.GetDoNotAllowVias() and z.Outline().Contains(p) for z in board.Zones()):
+                continue
+            circle = pcbnew.SHAPE_CIRCLE(p, mm(0.3))
+            if any((v.GetPosition() - p).EuclideanNorm() < mm(0.9) for v in board.GetTracks() if v.GetClass() == "PCB_VIA"):
+                continue
+            if any(t.GetNetCode() != gnd.GetNetCode() and t.GetEffectiveShape(t.GetLayer()).Collide(circle, mm(0.2))
+                   for t in board.GetTracks() if t.GetClass() != "PCB_VIA"):
+                continue
+            if any(q.GetEffectiveShape(layer).Collide(circle, mm(0.2) if q.GetNetCode() != gnd.GetNetCode() else mm(0.1))
+                   for f in board.GetFootprints() for q in f.Pads() for layer in (pcbnew.F_Cu, pcbnew.B_Cu) if q.IsOnLayer(layer)):
+                continue
+            return p
+    return None
+
+
+for sig in [t for t in board.GetTracks() if t.GetClass() == "PCB_VIA" and t.GetNetname().split("/")[-1] in ("LCD_SCLK", "MCU_LCD_SCLK", "LCD_MOSI")]:
+    p = free_spot(sig.GetPosition())
+    if p is None:
+        print(f"no room for a GND via next to the {sig.GetNetname()} via")
+        continue
+    v = pcbnew.PCB_VIA(board)
+    v.SetPosition(p), v.SetWidth(mm(0.6)), v.SetDrill(mm(0.3)), v.SetNet(gnd)
+    board.Add(v)
+    print(f"GND return via next to the {sig.GetNetname()} via")
 pcbnew.ZONE_FILLER(board).Fill(board.Zones())
 pcbnew.SaveBoard(sys.argv[1], board)
 

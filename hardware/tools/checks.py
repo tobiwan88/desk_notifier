@@ -25,7 +25,7 @@ BOARD = ROOT / "hardware/notifier-v1/notifier-v1"
 NEVER_WAIVE = {"clearance", "shorting_items", "hole_clearance", "hole_to_hole", "unconnected", "drill_out_of_range",
                "track_width", "courtyards_overlap", "copper_edge_clearance", "annular_width", "via_diameter",
                "tracks_crossing", "zones_intersect", "starved_thermal"}
-KCONFIG_NET = {"DESK_LCD_PIN_SCLK": "LCD_SCLK", "DESK_LCD_PIN_MOSI": "LCD_MOSI", "DESK_LCD_PIN_DC": "LCD_DC",
+KCONFIG_NET = {"DESK_LCD_PIN_SCLK": "MCU_LCD_SCLK", "DESK_LCD_PIN_MOSI": "LCD_MOSI", "DESK_LCD_PIN_DC": "LCD_DC",
                "DESK_LCD_PIN_RST": "LCD_RST", "DESK_LCD_PIN_CS": "LCD_CS", "DESK_I2C_SDA": "I2C_SDA",
                "DESK_I2C_SCL": "I2C_SCL", "DESK_BTN": "BTN"}
 # GPIO -> the only net allowed on it

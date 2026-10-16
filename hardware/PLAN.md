@@ -26,11 +26,19 @@ scripts/hw-check.sh [--bom --qty N]      # the gate alone (also part of scripts/
 - **Power**: USB-C (HRO TYPE-C-31-M-12), 5.1k CC, USBLC6-2SC6 ESD, 500 mA polyfuse, TLV62569 buck
   (2 A, 3.33 V via 100k/22k) with a 2.2 uH Cenker CKCS4030. A linear regulator would burn ~0.6 W
   and warm the sensor; the design review caught it.
-- **Sensor**: BME688 at 0x77 on a peninsula (1.2 mm notch facing the module and below, neck at the
-  left edge), no pours on the island or neck, far from the module and the buck.
-  I2C/3V3 tracks cross the neck with a return path: In1 GND is a HATCHED zone (0.3 mm lines, 1.2 mm gap, ~35 % copper,
-  `tools/finish.py`) under island + neck, stitched to the solid plane at the neck; F/B/In2 stay empty there, so thermal
-  isolation is nearly unchanged (neck is 2.8 mm wide, tracks already conduct).
+- **Sensor**: BME688 at 0x77 on a peninsula: milled slot 1.8 mm on the module side (TI SNOAA01: a wider gap reads
+  closer to ambient), 1.2 mm below, neck 3.6 x 1.2 mm at the left edge, far from the module and the buck. No copper
+  pour or plane under the island or the neck on any layer (Bosch BME68x HSMI 7.3, Sensirion SHTxx design guide,
+  TI HDC302x: thin interconnects, no copper under the sensor). The island is routed by hand in `gen/layout_v1.py`
+  (3V3/I2C on F.Cu, GND as a B.Cu tree), so it is identical on every run; C12 4.7 uF bulk sits where 3V3 enters.
+  The neck carries one F.Cu bus at 0.15 mm (`BUS_X`): 3V3 | GND | SDA | SCL | GND. The two GND guards are the
+  return path for SDA/SCL (at 400 kHz a guard is enough); they are joined on B.Cu inside the neck and stitched to
+  In1 just below it. A B.Cu keepout band keeps other tracks out of the neck. The bus starts at island pads and ends
+  in 0.3 mm pieces on the main board: the router extends free ends and reroutes stubs that touch no pad, and
+  `finish.py` drops the unused pieces. Replaced an earlier hatched In1 zone under the whole island.
+- **Display SPI**: 33 ohm R13 in series with SCLK at module pin 20 (net `MCU_LCD_SCLK` -> `LCD_SCLK`).
+  `finish.py` adds a GND via beside each SPI layer-change via where there is room: on B.Cu the lines reference the
+  3V3 plane, on F.Cu the GND plane.
 - **Temperature/humidity**: SHT40-AD1B (C2909890, 0x44, ±1.8 %RH / ±0.2 °C) on the same island, in the
   corner away from the BME688: its gas heater warms the BME688, so T/RH come from the SHT40 and the
   BME688 is used for gas/air quality (and pressure).
