@@ -58,10 +58,17 @@ char g_name[12] = "";
 Reaction g_react{};
 std::uint32_t g_react_at = 0, g_react_id = 0;
 
-std::optional<int> today() {
+struct Today { int day, y, m, d, hour; };
+std::optional<Today> today_full() {
     std::tm tm{};
     if (!clock_sync::local(tm)) return std::nullopt;
-    return cal::day_number(tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
+    const int y = tm.tm_year + 1900, m = tm.tm_mon + 1, d = tm.tm_mday;
+    return Today{cal::day_number(y, m, d), y, m, d, tm.tm_hour};
+}
+std::optional<int> today() {
+    const auto t = today_full();
+    if (!t) return std::nullopt;
+    return t->day;
 }
 
 void save_bond(const Bond& b) {
@@ -126,7 +133,7 @@ void task(void*) {
     RainWatch rain;
     Plant plant = plant_load(settings::get("plant").value_or("").c_str());
     int golden_count = std::atoi(settings::get("golden").value_or("0").c_str());
-    bool golden_seen = false;
+    bool golden_seen = false, coin_seen = false;
     std::uint32_t plant_tick = 0;
     int plant_saves = 0;
     std::uint32_t snooze_until = 0, next_frame = 0, sum_us = 0, max_us = 0, n = 0;
@@ -175,6 +182,10 @@ void task(void*) {
             if (in.time_valid && now - plant_tick >= 60000u) {  // the window-sill plant counts the minutes of good air
                 plant_tick = now;
                 const bool closed = plant_minute(plant, in.year * 10000 + in.month * 100 + in.day, snap.ok, snap.quality.level);
+                if (closed && plant.grew) {  // a good-air day: a couple of coins (from five hearts)
+                    const std::lock_guard<std::mutex> lock(g_pet_mx);
+                    if (level(g_bond) >= kLevels - 1) { earn(g_bond, kCoinsLeaf); save_bond(g_bond); }
+                }
                 if (closed || ++plant_saves >= 30) {  // save at the end of a day, and every half hour
                     plant_saves = 0;
                     char buf[64];
@@ -207,10 +218,22 @@ void task(void*) {
             const bool golden = fun::golden(now, seed, level(in.bond) >= 3) >= 0;  // the golden acorn: counted once, shown on the air page
             if (golden && !golden_seen) {
                 ++golden_count;
+                {
+                    const std::lock_guard<std::mutex> lock(g_pet_mx);
+                    earn(g_bond, level(g_bond) >= kLevels - 1 ? kCoinsGolden : kCoinsGoldenEarly);
+                    save_bond(g_bond);
+                }
                 settings::set("golden", std::to_string(golden_count));
                 ESP_LOGI(kTag, "golden acorn #%d", golden_count);
             }
             golden_seen = golden;
+            const bool coin = level(in.bond) >= kLevels - 1 && fun::coin_found(now, seed) >= 0;  // found in the grass
+            if (coin && !coin_seen) {
+                const std::lock_guard<std::mutex> lock(g_pet_mx);
+                earn(g_bond, kCoinsFound);
+                save_bond(g_bond);
+            }
+            coin_seen = coin;
             in.golden_count = golden_count;
             in.schedule = schedule;
             in.seed = seed;
@@ -254,12 +277,16 @@ void show_page(Page p) noexcept { g_show = static_cast<int>(p); }
 void next_page() noexcept { g_show = kPageCount; }
 
 std::optional<PetResult> pet(Action a, int item) noexcept {
-    const auto day = today();
-    if (!day) return std::nullopt;
+    const auto now = today_full();
+    if (!now) return std::nullopt;
+    const auto day = std::optional<int>(now->day);
+    Schedule sched;
+    sched.birthday = CONFIG_DESK_DAY_BIRTHDAY; sched.anniversary = CONFIG_DESK_DAY_ANNIVERSARY;
+    const bool special = occasion_for(now->y, now->m, now->d, sched) != Occasion::None;
     PetResult res;
     {
         const std::lock_guard<std::mutex> lock(g_pet_mx);
-        res.reaction = interact(g_bond, *day, a, item);
+        res.reaction = interact(g_bond, *day, a, item, special);
         res.bond = g_bond;
         g_react = res.reaction;
         g_react_at = now_ms();
@@ -288,6 +315,45 @@ PetStatus pet_status() noexcept {
     if (day && s.bond.today != *day) { s.bond.done = 0; s.bond.treats = 0; s.bond.gained = 0; }  // a new day, nothing done yet
     s.time_valid = day.has_value();
     return s;
+}
+
+ShopStatus shop_status() noexcept {
+    ShopStatus s;
+    const auto now = today_full();
+    const std::lock_guard<std::mutex> lock(g_pet_mx);
+    s.bond = g_bond;
+    if (now) {
+        s.time_valid = true;
+        s.offer_count = daily_offer(g_bond, now->day, now->y, now->m, now->d, s.offer);
+        s.look = look_for(g_bond, now->day, now->hour >= 14 ? 1 : 0, now->y, now->m, now->d);
+    }
+    return s;
+}
+
+std::optional<BuyResult> shop_buy(int item) noexcept {
+    const auto now = today_full();
+    if (!now) return std::nullopt;
+    BuyResult r;
+    Bond copy;
+    {
+        const std::lock_guard<std::mutex> lock(g_pet_mx);
+        r = buy(g_bond, item, now->day, now->y, now->m, now->d);
+        copy = g_bond;
+        if (r.error == BuyError::None) {  // unwrap it on screen
+            g_react = Reaction{};
+            g_react.unbox = true;
+            g_react.item = item;
+            g_react.action = Action::Gift;
+            g_react.level = level(g_bond);
+            g_react_at = now_ms();
+            ++g_react_id;
+        }
+    }
+    if (r.error == BuyError::None) {
+        save_bond(copy);
+        ESP_LOGI(kTag, "shop: bought %s, %d coins left", shop_item(item).id, copy.coins);
+    }
+    return r;
 }
 
 void set_pet_name(std::string_view name) noexcept {

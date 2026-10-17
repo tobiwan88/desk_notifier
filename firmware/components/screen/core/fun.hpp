@@ -56,6 +56,9 @@ inline constexpr std::uint32_t kGoldenMs = 20000;
 [[nodiscard]] float hello(std::uint32_t t_ms, std::uint32_t seed) noexcept;
 // At friendship level 5 it now and then has a present for you (on the day page): progress 0..1, or -1.
 [[nodiscard]] float present_for_you(std::uint32_t t_ms, std::uint32_t seed) noexcept;
+// From five hearts the squirrel now and then finds a coin in the grass (air page): progress 0..1, or -1.
+inline constexpr std::uint32_t kCoinFindMs = 6000;
+[[nodiscard]] float coin_found(std::uint32_t t_ms, std::uint32_t seed) noexcept;
 // On a howling night (full moon, Halloween) the squirrel howls now and then: mouth 0..1, 0 when quiet.
 [[nodiscard]] float howl(std::uint32_t t_ms, std::uint32_t seed) noexcept;
 
