@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "screen/core/draw.hpp"
+#include "screen/core/shop.hpp"
 #include "screen/core/squirrel.hpp"
 #include "screen/core/view.hpp"
 
@@ -59,7 +60,7 @@ void render_clock(const Canvas& cv, const Inputs& in) noexcept {
         draw::label(cv, 162, 2, draw::hex(0xDDF0FF), buf);
     }
     // the squirrel sits at the bottom, bigger than a peek
-    Outfit o = outfit_for(in.weather_ok, in.weather);
+    Outfit o = dress(outfit_for(in.weather_ok, in.weather), look_now(in));
     o.umbrella = o.windy = false;  // too tall for the peeking squirrel
     fun::Quirks q = fun::quirks(in.t_ms, in.seed);
     // on the full hour it pops up and waves for ten seconds
@@ -89,6 +90,17 @@ void render_page(const Canvas& cv, Page p, const Inputs& in) noexcept {
             a.rainbow = fun::rainbow_alpha(in);
             a.golden = fun::golden(in.t_ms, in.seed, level(in.bond) >= 3);
             a.golden_count = in.golden_count;
+            Look look = look_now(in);
+            if (in.react.active && in.react.r.unbox && in.react.k < 0.4f && in.time_valid) {  // still in its box
+                Bond before = in.bond;
+                const int it = in.react.r.item;
+                if (it >= 0 && it < 32) before.owned_lo &= ~(1u << it);
+                else if (it >= 32) before.owned_hi &= ~(1u << (it - 32));
+                before.bought = -1;
+                look = look_for(before, cal::day_number(in.year, in.month, in.day), in.hour >= 14 ? 1 : 0, in.year, in.month, in.day);
+            }
+            a.look = &look;
+            a.coin = level(in.bond) >= kLevels - 1 ? fun::coin_found(in.t_ms, in.seed) : -1.0f;
             a.react = in.react;
             a.level = level(in.bond);
             if (a.level >= 1) a.quirks.wave = std::max(a.quirks.wave, fun::hello(in.t_ms, in.seed));

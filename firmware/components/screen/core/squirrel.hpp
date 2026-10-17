@@ -13,6 +13,8 @@
 
 namespace screen {
 
+struct Look;  // screen/core/shop
+
 // Sleepy: sensor warming up or missing. The other four follow the air-quality levels.
 enum class Mood : std::uint8_t { Sleepy, VeryGood, Good, Okay, Bad };
 
@@ -30,6 +32,10 @@ struct Outfit {
     bool windy = false;
     bool paws_free = false;  // no arms, acorn, ice cream or umbrella: the caller draws what the paws hold
     bool wolf = false;       // Halloween night: grey wolf ears
+    // bought in the shop (screen/core/shop): the drawing index, -1 = none. A bought hat replaces the knitted one;
+    // `scarf` keeps the scarf on cold days.
+    int wear_hat = -1, wear_face = -1, wear_body = -1;
+    bool scarf = false;
 };
 inline constexpr float kColdC = 8.0f, kHotC = 25.0f, kWindyKmh = 30.0f;
 [[nodiscard]] Outfit outfit_for(bool weather_ok, const weather::Forecast& w) noexcept;
@@ -53,11 +59,16 @@ struct AirData {
     int level = 0;           // friendship level 0..4
     char pet_name[12] = "";
     Plant plant{};           // shown when it is watered
+    const Look* look = nullptr;  // shop items it has around today (nullptr = none)
+    float coin = -1;         // a coin found in the grass: progress 0..1, or -1
 };
 
 // Draws the squirrel. (cx, cy) is the centre of its body, `scale` 1.0 is about 120 px tall.
 void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, std::uint32_t t_ms, Outfit o = {},
                    const fun::Quirks& q = {}) noexcept;
+
+// Puts on what the squirrel picked from its shop items today (screen/core/shop Look).
+[[nodiscard]] Outfit dress(Outfit o, const Look& look) noexcept;
 
 // Where draw_squirrel moves the body this frame (the bob of the mood animation), in design units (multiply by
 // scale), so that props drawn by the caller move with it.

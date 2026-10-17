@@ -97,4 +97,40 @@ void treat(const Canvas& cv, float x, float y, float s, int i, float angle) noex
 void nightcap(const Canvas& cv, float cx, float brim_y, float width) noexcept;  // a floppy blue sleeping cap with a white brim and a pom-pom drooping to the right
 void bow(const Canvas& cv, float x, float y, float s) noexcept;                 // a pink hair bow centred at (x, y), ~12 px wide
 
+// ---- shop items: things to wear (props_wear.cpp) -----------------------------------------------------------
+// Bought hats, sitting on the squirrel's head: (cx, brim_y) is the middle of the brim, `width` the brim width.
+enum ShopHat : int { kHatTop, kHatFlowerCrown, kHatBeret, kHatPirate, kHatCowboy, kHatChef, kHatViking, kHatAcornCrown,
+                     kHatPumpkin, kHatBunnyEars, kHatTracht };
+inline constexpr int kShopHatCount = 11;
+void shop_hat(const Canvas& cv, int which, float cx, float brim_y, float width, std::uint32_t t) noexcept;
+// Big star-shaped New Year's party glasses over the eyes at (lx, ly) and (rx, ry), lens radius r, a glint.
+void party_glasses(const Canvas& cv, float lx, float ly, float rx, float ry, float r, std::uint32_t t) noexcept;
+// A knitted red Christmas jumper over the squirrel's body (ellipse centre cx, cy, radii rx, ry): white zigzag band, a
+// small tree on the front. Drawn over the belly, under the arms.
+void xmas_sweater(const Canvas& cv, float cx, float cy, float rx, float ry, std::uint32_t t) noexcept;
+// An inflatable swim ring around the waist: centre (cx, cy), half-width rx, red and white segments, a highlight.
+void swim_ring(const Canvas& cv, float cx, float cy, float rx, std::uint32_t t) noexcept;
+
+// ---- shop items: places behind the air page's hills (props_places.cpp) -------------------------------------
+// Drawn after the sky and before the hills. The hills then cover everything below about y = 170 in the middle and
+// y = 190 on the right, so put the scenery between about y = 90 and the hill line. The squirrel stands right of
+// the middle; keep the most important shapes on the left half. `day` false = night colours.
+enum ShopPlace : int { kPlaceAlps, kPlaceBeach, kPlaceForest, kPlaceBlossom, kPlaceSkyline };
+inline constexpr int kShopPlaceCount = 5;
+void place_scenery(const Canvas& cv, int which, std::uint32_t t, bool day) noexcept;
+
+// ---- shop items: the home (props_home.cpp) -----------------------------------------------------------------
+void fairy_lights(const Canvas& cv, float x0, float x1, float y, std::uint32_t t) noexcept;  // a sagging string of tiny warm bulbs from x0 to x1 around y, twinkling
+void curtains(const Canvas& cv, const Win& w, std::uint32_t t) noexcept;  // two tied-back curtains framing the window (outside the glass), soft folds, a slight sway
+void photo_frame(const Canvas& cv, float x, float y, float s) noexcept;   // a framed photo centred at (x, y): two little squirrels and a heart; ~22 x 18 px
+void poster(const Canvas& cv, float x, float y, float s) noexcept;        // a poster pinned to the wall: mountains and a sun; ~20 x 26 px
+void aquarium(const Canvas& cv, float x, float base_y, float s, std::uint32_t t) noexcept;       // round fish bowl, one orange fish swimming, bubbles; ~22 px tall
+void lava_lamp(const Canvas& cv, float x, float base_y, float s, std::uint32_t t) noexcept;      // lava lamp with slowly rising blobs and a glow; ~26 px tall
+void record_player(const Canvas& cv, float x, float base_y, float s, std::uint32_t t) noexcept;  // turntable, spinning record, music notes floating up; ~14 px tall, 24 wide
+void cactus(const Canvas& cv, float x, float base_y, float s, std::uint32_t t) noexcept;         // small potted cactus with a pink flower; ~18 px tall
+// friends who live on the air page's hill
+void hamster_wheel(const Canvas& cv, float x, float base_y, float s, std::uint32_t t) noexcept;  // a hamster running in a wheel on a stand; ~26 px tall
+void hedgehog_sleep(const Canvas& cv, float x, float base_y, float s, std::uint32_t t) noexcept; // a curled-up sleeping hedgehog, breathing, a small Zzz; ~14 px tall
+void nest(const Canvas& cv, float x, float base_y, float s, std::uint32_t t) noexcept;           // a twig nest with two chicks opening their beaks now and then; ~16 px tall
+
 }  // namespace screen::props
