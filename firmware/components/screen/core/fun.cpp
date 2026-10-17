@@ -115,6 +115,8 @@ float hello(std::uint32_t t, std::uint32_t seed) noexcept {
     return k < 0 ? 0.0f : pulse(k, 0, 1, 0.2f);
 }
 
+float coin_found(std::uint32_t t, std::uint32_t seed) noexcept { return event(t, seed, 16, 5400000, 50, kCoinFindMs); }
+
 float present_for_you(std::uint32_t t, std::uint32_t seed) noexcept { return event(t, seed, 15, 3600000, 40, 20000); }
 
 float howl(std::uint32_t t, std::uint32_t seed) noexcept {

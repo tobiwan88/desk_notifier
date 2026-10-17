@@ -43,7 +43,7 @@ void settle(Bond& b, int day) noexcept {
     b.settled = day;
 }
 
-Reaction interact(Bond& b, int day, Action a, int item) noexcept {
+Reaction interact(Bond& b, int day, Action a, int item, bool special) noexcept {
     settle(b, day);
     Reaction r;
     r.action = a;
@@ -79,20 +79,38 @@ Reaction interact(Bond& b, int day, Action a, int item) noexcept {
     r.gain = gain;
     r.level = level(b);
     r.level_up = r.level > before;
+    if (r.first_today) {  // coins: a trickle at first, more once the shop is open
+        const bool family = r.level >= kLevels - 1;
+        int c = family ? kCoinsDaily : kCoinsTrickle;
+        if (family && b.streak % 7 == 0) c += kCoinsWeek;
+        if (family && special) c += kCoinsSpecial;
+        earn(b, c);
+        r.coins = c;
+    }
     return r;
 }
 
 std::size_t bond_save(const Bond& b, char* buf, std::size_t n) noexcept {
-    const int k = std::snprintf(buf, n, "b1 %d %d %d %d %d %d %d %u %d %d %u %d", b.score, b.best, b.streak, b.best_streak,
-                                b.last_day, b.settled, b.today, b.done, b.treats, b.gained, b.gifts, b.total);
+    const int k = std::snprintf(buf, n, "b2 %d %d %d %d %d %d %d %u %d %d %u %d %d %d %lu %lu %d %d", b.score, b.best, b.streak,
+                                b.best_streak, b.last_day, b.settled, b.today, b.done, b.treats, b.gained, b.gifts, b.total,
+                                b.coins, b.coins_total, static_cast<unsigned long>(b.owned_lo),
+                                static_cast<unsigned long>(b.owned_hi), b.bought, b.bought_day);
     return k > 0 ? static_cast<std::size_t>(k) : 0;
 }
 
 Bond bond_load(const char* s) noexcept {
     Bond b, fresh;
-    if (!s || std::sscanf(s, "b1 %d %d %d %d %d %d %d %u %d %d %u %d", &b.score, &b.best, &b.streak, &b.best_streak,
-                          &b.last_day, &b.settled, &b.today, &b.done, &b.treats, &b.gained, &b.gifts, &b.total) != 12)
-        return fresh;
+    if (!s) return fresh;
+    unsigned long lo = 0, hi = 0;
+    const int got = std::sscanf(s, "b%*1[12] %d %d %d %d %d %d %d %u %d %d %u %d %d %d %lu %lu %d %d", &b.score, &b.best,
+                                &b.streak, &b.best_streak, &b.last_day, &b.settled, &b.today, &b.done, &b.treats, &b.gained,
+                                &b.gifts, &b.total, &b.coins, &b.coins_total, &lo, &hi, &b.bought, &b.bought_day);
+    const bool v1 = s[0] == 'b' && s[1] == '1' && got == 12, v2 = s[0] == 'b' && s[1] == '2' && got == 18;
+    if (!v1 && !v2) return fresh;
+    if (v1) { b.coins = b.coins_total = 0; lo = hi = 0; b.bought = -1; b.bought_day = 0; }  // saved before the shop
+    b.owned_lo = static_cast<std::uint32_t>(lo);
+    b.owned_hi = static_cast<std::uint32_t>(hi);
+    if (b.coins < 0 || b.coins_total < b.coins) return fresh;
     if (b.score < 0 || b.score > 100 || b.best < 0 || b.best >= kLevels || b.streak < 0 || b.total < 0 ||
         b.done >= (1u << kActionCount) || b.gifts >= (1u << kGiftCount))
         return fresh;

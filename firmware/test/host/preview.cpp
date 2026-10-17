@@ -10,6 +10,7 @@
 #include "screen/core/draw.hpp"
 #include "screen/core/fun.hpp"
 #include "screen/core/pages.hpp"
+#include "screen/core/shop.hpp"
 
 namespace {
 
@@ -38,6 +39,16 @@ void react(screen::Inputs& i, screen::Action a, int lvl, int item = 0) {
     i.react.r.level = lvl;
     i.bond.score = lvl * 20 + 5;
     i.bond.best = lvl;
+}
+
+// Owns shop item `id` and shows it off today (as if just bought), on the given date.
+void wear(screen::Inputs& i, const char* id, int y = 2026, int m = 10, int d = 17, int h = 11) {
+    at(i, y, m, d, h, 0);
+    const int it = screen::shop_find(id);
+    if (it < 32) i.bond.owned_lo |= 1u << it; else i.bond.owned_hi |= 1u << (it - 32);
+    i.bond.bought = it;
+    i.bond.bought_day = screen::cal::day_number(y, m, d);
+    i.bond.score = 90; i.bond.best = 4;
 }
 
 screen::Inputs base_inputs() {
@@ -148,6 +159,43 @@ int main(int argc, char** argv) {
          [](std::uint32_t t, const screen::Inputs& in) { return screen::fun::present_for_you(t, in.seed) > 0.05f; }},
         {"perk_name", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 10, 14, 10, 0); i.bond.score = 45; i.bond.best = 2; i.bond.gifts = 0x05; std::strcpy(i.pet_name, "NUTTY"); }, V::None, 0, false,
          [](std::uint32_t t, const screen::Inputs& in) { return screen::fun::pun(t, in.seed, 2) != nullptr && (t / 6000u) % 2 == 0 && screen::fun::gag(t, in.seed, screen::allowed_gags(screen::scene_for(in), in)).gag == screen::fun::Gag::None; }},
+        // the shop: every item, the unboxing, a found coin
+        {"shop_tophat", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "tophat"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_flowercrown", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "flowercrown"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_beret", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "beret"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_pirate", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "pirate"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_cowboy", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "cowboy"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_chef", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "chef"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_viking", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "viking"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_acorncrown", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "acorncrown"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_pumpkin", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "pumpkin"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_tracht", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "tracht", 2026, 9, 25); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_bunnyears", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "bunnyears", 2027, 3, 25); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_glasses", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "glasses", 2026, 12, 30); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_jumper", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "jumper", 2026, 12, 15); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_swimring", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "swimring", 2027, 7, 15); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_alps", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "alps"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_beach", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "beach"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_forest", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "forest"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_blossom", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "blossom"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_skyline", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "skyline", 2026, 10, 17, 22); i.weather = {8.0f, false, 0, weather::Sky::Clear, 12, 4, 0}; }},
+        {"shop_hamster", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "hamster"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_hedgehog", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "hedgehog"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_nest", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "nest"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_owl", screen::Page::Air, 30, [](screen::Inputs& i) { wear(i, "owl", 2026, 10, 17, 22); i.weather = {8.0f, false, 0, weather::Sky::Clear, 12, 4, 0}; }},
+        {"shop_fairylights", screen::Page::Day, 30, [](screen::Inputs& i) { wear(i, "fairylights"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_curtains", screen::Page::Day, 30, [](screen::Inputs& i) { wear(i, "curtains"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_photo", screen::Page::Day, 30, [](screen::Inputs& i) { wear(i, "photo"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_poster", screen::Page::Day, 30, [](screen::Inputs& i) { wear(i, "poster"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_aquarium", screen::Page::Day, 30, [](screen::Inputs& i) { wear(i, "aquarium"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_lavalamp", screen::Page::Day, 30, [](screen::Inputs& i) { wear(i, "lavalamp"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_record", screen::Page::Day, 30, [](screen::Inputs& i) { wear(i, "record"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_cactus", screen::Page::Day, 30, [](screen::Inputs& i) { wear(i, "cactus"); i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }},
+        {"shop_unbox_hat", screen::Page::Air, 120, [](screen::Inputs& i) { wear(i, "cowboy"); react(i, screen::Action::Gift, 4); i.react.r.unbox = true; i.react.r.item = screen::shop_find("cowboy"); }},
+        {"shop_unbox_decor", screen::Page::Air, 120, [](screen::Inputs& i) { wear(i, "aquarium"); react(i, screen::Action::Gift, 4); i.react.r.unbox = true; i.react.r.item = screen::shop_find("aquarium"); }},
+        {"shop_coin", screen::Page::Air, 60, [](screen::Inputs& i) { at(i, 2026, 10, 17, 11, 0); i.bond.score = 90; i.bond.best = 4; i.weather = {15.0f, true, 2, weather::Sky::PartlyCloudy, 17, 8, 10}; }, V::None, 0, false,
+         [](std::uint32_t t, const screen::Inputs& in) { return screen::fun::coin_found(t, in.seed) >= 0; }},
+        {"shop_everything", screen::Page::Day, 40, [](screen::Inputs& i) { wear(i, "viking"); i.bond.owned_lo |= (1u << screen::shop_find("fairylights")) | (1u << screen::shop_find("photo")) | (1u << screen::shop_find("lavalamp")); }},
         // situations: the indoor climate and the weather change what the squirrel does
         {"sit_party", screen::Page::Day, 60, [](screen::Inputs& i) { at(i, 2026, 12, 31, 23, 40); i.weather = {-1.0f, false, 0, weather::Sky::Clear, 2, -4, 0}; }},
         {"sit_smell", screen::Page::Day, 40, [](screen::Inputs& i) { at(i, 2026, 10, 12, 10, 0); i.air_drop = true; i.quality = {50, sensor::Level::Fair}; }},
