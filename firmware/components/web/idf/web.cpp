@@ -304,6 +304,76 @@ esp_err_t post_ota(httpd_req_t* r) {
     return ESP_OK;
 }
 
+// ---- the pet page: open to everyone on the local network, no token ------------------------------------------
+
+void pet_json(std::string& out, const screen::Bond& b, const char* name, bool time_valid) {
+    const int lvl = screen::level(b);
+    char buf[400];
+    std::string done = "[", gifts = "[";
+    for (int i = 0; i < screen::kActionCount; ++i)
+        if ((b.done >> i) & 1u) { done += done.size() > 1 ? ",\"" : "\""; done += screen::action_name(static_cast<screen::Action>(i)); done += '"'; }
+    for (int i = 0; i < screen::kGiftCount; ++i)
+        if ((b.gifts >> i) & 1u) { gifts += gifts.size() > 1 ? ",\"" : "\""; gifts += screen::gift_name(i); gifts += '"'; }
+    done += ']'; gifts += ']';
+    std::snprintf(buf, sizeof buf,
+                  R"("level":%d,"hearts":%d,"level_name":"%s","score":%d,"next":%d,"streak":%d,"best_streak":%d,"visits":%d,"name":"%s","time_valid":%s,)",
+                  lvl, lvl + 1, screen::level_name(lvl), b.score, lvl >= screen::kLevels - 1 ? 100 : (lvl + 1) * 20, b.streak,
+                  b.best_streak, b.total, name, time_valid ? "true" : "false");
+    out += buf;
+    out += R"("done_today":)" + done + R"(,"gifts":)" + gifts;
+}
+
+extern const char pet_html_start[] asm("_binary_pet_html_start");
+extern const char pet_html_end[] asm("_binary_pet_html_end");
+
+esp_err_t get_pet_page(httpd_req_t* r) {
+    httpd_resp_set_type(r, "text/html; charset=utf-8");
+    httpd_resp_set_hdr(r, "Cache-Control", "no-cache");
+    httpd_resp_send(r, pet_html_start, pet_html_end - pet_html_start - 1);
+    return ESP_OK;
+}
+
+esp_err_t get_pet(httpd_req_t* r) {
+    const auto s = screen::pet_status();
+    std::string out = "{";
+    pet_json(out, s.bond, s.name, s.time_valid);
+    out += "}";
+    send_json(r, "200 OK", out.c_str());
+    return ESP_OK;
+}
+
+// {"action":"feed","item":"hazelnut"} | {"action":"gift","item":"shell"} | {"action":"party"} | {"name":"Nutty"}
+esp_err_t post_pet(httpd_req_t* r) {
+    char body[128]{};
+    const int n = r->content_len > 0 ? httpd_req_recv(r, body, std::min<std::size_t>(r->content_len, sizeof body - 1)) : 0;
+    const std::string_view b(body, static_cast<std::size_t>(std::max(n, 0)));
+    if (b.find("\"name\"") != std::string_view::npos) {
+        screen::set_pet_name(json_value(b, "name"));
+        return get_pet(r);
+    }
+    const auto action = screen::action_from_name(json_value(b, "action"));
+    if (!action) { send_error(r, engine::Err::BadJson, "action: feed, coffee, party, pet, play, water, goodnight or gift"); return ESP_OK; }
+    const std::string item = json_value(b, "item");
+    int index = 0;
+    for (int i = 0; i < (*action == screen::Action::Gift ? screen::kGiftCount : screen::kTreatCount); ++i)
+        if (item == (*action == screen::Action::Gift ? screen::gift_name(i) : screen::treat_name(i))) index = i;
+    const auto res = screen::pet(*action, index);
+    if (!res) { send_json(r, "503 Service Unavailable", R"({"ok":false,"message":"the squirrel is still waking up, try again in a minute"})"); return ESP_OK; }
+    const auto& x = res->reaction;
+    const auto s = screen::pet_status();
+    char head[256];
+    std::snprintf(head, sizeof head,
+                  R"({"ok":true,"action":"%s","item":"%s","gain":%d,"first_today":%s,"too_full":%s,"welcome_back":%s,"level_up":%s,"new_gift":%s,)",
+                  screen::action_name(x.action), x.action == screen::Action::Gift ? screen::gift_name(x.item) : x.action == screen::Action::Feed ? screen::treat_name(x.item) : "",
+                  x.gain, x.first_today ? "true" : "false", x.too_full ? "true" : "false", x.welcome_back ? "true" : "false",
+                  x.level_up ? "true" : "false", x.new_gift ? "true" : "false");
+    std::string out = head;
+    pet_json(out, res->bond, s.name, true);
+    out += "}";
+    send_json(r, "200 OK", out.c_str());
+    return ESP_OK;
+}
+
 extern const char index_html_start[] asm("_binary_index_html_start");
 extern const char index_html_end[] asm("_binary_index_html_end");
 
@@ -331,7 +401,7 @@ std::expected<void, engine::Err> start() noexcept {
     g_token = net::token();
     httpd_config_t c = HTTPD_DEFAULT_CONFIG();
     c.stack_size = 6144;
-    c.max_uri_handlers = 16;
+    c.max_uri_handlers = 20;
     c.recv_wait_timeout = 10;
     c.send_wait_timeout = 10;
     c.max_open_sockets = 4;
@@ -342,6 +412,9 @@ std::expected<void, engine::Err> start() noexcept {
     const httpd_uri_t routes[] = {
         {.uri = "/", .method = HTTP_GET, .handler = get_root, .user_ctx = nullptr},
         {.uri = "/clip_encoder.js", .method = HTTP_GET, .handler = get_encoder, .user_ctx = nullptr},
+        {.uri = "/pet", .method = HTTP_GET, .handler = get_pet_page, .user_ctx = nullptr},
+        {.uri = "/api/pet", .method = HTTP_GET, .handler = get_pet, .user_ctx = nullptr},
+        {.uri = "/api/pet", .method = HTTP_POST, .handler = post_pet, .user_ctx = nullptr},
         {.uri = "/api/status", .method = HTTP_GET, .handler = get_status, .user_ctx = nullptr},
         {.uri = "/api/sensor", .method = HTTP_GET, .handler = get_sensor, .user_ctx = nullptr},
         {.uri = "/api/ack", .method = HTTP_POST, .handler = post_ack, .user_ctx = nullptr},

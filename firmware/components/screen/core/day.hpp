@@ -43,6 +43,7 @@ namespace cal {
 [[nodiscard]] bool public_holiday(int y, int m, int d) noexcept;  // Bavaria (Munich): no work
 [[nodiscard]] bool oktoberfest(int y, int m, int d) noexcept;
 [[nodiscard]] int advent_candles(int y, int m, int d) noexcept; // 0, or 1..4 from the first Sunday of Advent to 23 Dec
+[[nodiscard]] int day_number(int y, int m, int d) noexcept;  // days since 1 January 1970
 [[nodiscard]] int days_until(int y, int m, int d, int mmdd) noexcept;  // 0 on the day itself, up to 365
 [[nodiscard]] float moon_phase(int y, int m, int d, int hour) noexcept;  // 0 new, 0.25 first quarter, 0.5 full, 0.75 last quarter
 [[nodiscard]] bool full_moon(int y, int m, int d, int hour) noexcept;    // within about a day of full

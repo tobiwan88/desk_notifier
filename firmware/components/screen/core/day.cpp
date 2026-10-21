@@ -128,6 +128,8 @@ int advent_candles(int y, int m, int d) noexcept {
     return std::min(4, 1 + (doy - first) / 7);
 }
 
+int day_number(int y, int m, int d) noexcept { return days(y, m, d); }
+
 int days_until(int y, int m, int d, int mmdd) noexcept {
     const int today = days(y, m, d), mm = mmdd / 100, dd = mmdd % 100;
     int next = days(y, mm, dd);

@@ -137,6 +137,43 @@ More surprises:
 
 Preview them with `uv run python tools/preview_pages.py build/preview fun_air_bird fun_day_bird fun_clock_hour` (scenes starting with `fun_`, `more_` and `gag_`); each clip starts at a moment where its surprise happens.
 
+## The squirrel's friend: the pet page
+
+Open `http://desk-xxxxxx.local/pet` on your phone (on the same Wi-Fi; no password) and add it to the home screen. Eight buttons, each makes the air page come up with a reaction for 12 seconds (the party 20):
+
+| Button | On the desk | Text |
+|---|---|---|
+| Feed (acorn, hazelnut, berry) | The treat flies in, it nibbles with full cheeks, hearts | YUM! (a fourth treat a day: round belly, TOO FULL!) |
+| Coffee break | A mug in both paws, a sip now and then | CHEERS! |
+| Party | Party hat, garland, confetti, it hops (best friends get sparkles) | PARTY! |
+| Pet | Happy closed eyes, wiggling ears, hearts | PURRR |
+| Play catch | Throws its acorn up and catches it, four times | CATCH! |
+| Water the plant | Waters the window-sill plant (it perks up one step, once a day) | FRESH WATER! |
+| Good night | Nightcap, eyes close, Zzz | NIGHT NIGHT |
+| Give a gift (flower, pebble, feather, shell, pine cone, heart) | Holds it up, hearts; it goes on the shelf on the wall of the day page | FOR ME? THANKS! |
+
+The second line shows the hearts, and from three hearts on now and then its name ("I'M NUTTY"; tap the name on the page to give one).
+
+**The friendship.** The first visit of a day brings 8 points, each other kind of visit that day 3 more, up to 12 a day. After three days away it fades by one point a day, but a heart level once reached is never lost, and coming back after two days or more starts with "YOU'RE BACK!". Five levels, saved in NVS:
+
+| Hearts | Level | Points | What it adds |
+|---|---|---|---|
+| 1 | Shy | 0 | The reactions |
+| 2 | Friendly | 20 | It waves hello more often |
+| 3 | Friend | 40 | Its name in the captions ("HI, I'M NUTTY") |
+| 4 | Best friend | 60 | Golden acorns twice as often, party sparkles |
+| 5 | Family | 80 | A fox visits the hill, a squirrel friend with a bow on days off, and now and then a present for you on the desk ("A GIFT FOR YOU!") |
+
+API (no token needed):
+
+```sh
+curl http://desk-xxxxxx.local/api/pet                                   # level, hearts, streak, today, gifts, name
+curl -X POST http://desk-xxxxxx.local/api/pet -d '{"action":"feed","item":"hazelnut"}'
+curl -X POST http://desk-xxxxxx.local/api/pet -d '{"action":"gift","item":"shell"}'
+curl -X POST http://desk-xxxxxx.local/api/pet -d '{"action":"party"}'    # coffee, party, pet, play, water, goodnight
+curl -X POST http://desk-xxxxxx.local/api/pet -d '{"name":"Nutty"}'
+```
+
 ## Weather
 
 The board asks [Open-Meteo](https://open-meteo.com/) every 20 minutes. No account or key is needed. The air page shows it as the sky behind the squirrel and as the squirrel's outfit, the day page in the window, the clock page as numbers. There used to be a separate weather page; it showed the same sky and temperature again and was replaced by the day page. If the last good forecast is older than 3 hours, the pages fall back to their own colours.

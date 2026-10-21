@@ -33,8 +33,9 @@ struct Quirks {
 enum class Visitor : std::uint8_t {
     None, Bird, Butterfly, Ladybug, Moth, ShootingStar,
     Owl, Hedgehog, Snail, Bee, Leaves, Petals,  // the seasonal ones
+    Fox, Friend,                                // friendship level 5 (family): a fox, a squirrel friend on days off
 };
-inline constexpr int kVisitorCount = 12;
+inline constexpr int kVisitorCount = 14;
 constexpr unsigned bit(Visitor v) noexcept { return 1u << static_cast<unsigned>(v); }
 
 struct Visit {
@@ -49,7 +50,12 @@ struct Visit {
 
 // The golden acorn: very rare (about once in a day and a half), 20 s long. Progress 0..1, or -1.
 inline constexpr std::uint32_t kGoldenMs = 20000;
-[[nodiscard]] float golden(std::uint32_t t_ms, std::uint32_t seed) noexcept;
+// `lucky` (friendship level 4 and up) makes it twice as likely.
+[[nodiscard]] float golden(std::uint32_t t_ms, std::uint32_t seed, bool lucky = false) noexcept;
+// From friendship level 2 the squirrel waves hello more often: an extra wave 0..1.
+[[nodiscard]] float hello(std::uint32_t t_ms, std::uint32_t seed) noexcept;
+// At friendship level 5 it now and then has a present for you (on the day page): progress 0..1, or -1.
+[[nodiscard]] float present_for_you(std::uint32_t t_ms, std::uint32_t seed) noexcept;
 // On a howling night (full moon, Halloween) the squirrel howls now and then: mouth 0..1, 0 when quiet.
 [[nodiscard]] float howl(std::uint32_t t_ms, std::uint32_t seed) noexcept;
 

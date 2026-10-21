@@ -106,7 +106,16 @@ Visit visit(std::uint32_t t, std::uint32_t seed, unsigned allowed) noexcept {
     return {};
 }
 
-float golden(std::uint32_t t, std::uint32_t seed) noexcept { return event(t, seed, 10, 1200000, 1, kGoldenMs); }
+float golden(std::uint32_t t, std::uint32_t seed, bool lucky) noexcept {
+    return event(t, seed, 10, 1200000, lucky ? 2 : 1, kGoldenMs);
+}
+
+float hello(std::uint32_t t, std::uint32_t seed) noexcept {
+    const float k = event(t, seed, 14, 30000, 30, 2600);
+    return k < 0 ? 0.0f : pulse(k, 0, 1, 0.2f);
+}
+
+float present_for_you(std::uint32_t t, std::uint32_t seed) noexcept { return event(t, seed, 15, 3600000, 40, 20000); }
 
 float howl(std::uint32_t t, std::uint32_t seed) noexcept {
     const float k = event(t, seed, 11, 25000, 40, 3000);
@@ -185,6 +194,11 @@ unsigned allowed_visitors(Page p, const Inputs& in) noexcept {
             if (dry_day && mo >= 6 && mo <= 8 && w.temp_c >= 18) m |= bit(Visitor::Bee);
             if (dry_day && (mo == 10 || mo == 11)) m |= bit(Visitor::Leaves);
             if (dry_day && mo == 4) m |= bit(Visitor::Petals);
+            if (level(in.bond) >= 4 && dry_day) {
+                m |= bit(Visitor::Fox);
+                const bool off = in.time_valid && (in.weekday == 0 || in.weekday == 6 || cal::public_holiday(in.year, in.month, in.day));
+                if (off) m |= bit(Visitor::Friend);
+            }
             break;
         case Page::Day: {
             if (!in.time_valid) break;

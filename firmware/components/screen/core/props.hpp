@@ -85,4 +85,16 @@ void pen(const Canvas& cv, float x, float y, float s, float angle) noexcept;
 // Small, for the window sill: about 24 px tall at s = 1 with 9 leaves.
 void memory_plant(const Canvas& cv, float x, float base_y, float s, std::uint32_t t, int leaves, int droop, bool flower) noexcept;
 
+// ---- the friendship (props_friend.cpp) ---------------------------------------------------------------------
+void fox(const Canvas& cv, float x, float base_y, float s, float face, std::uint32_t t) noexcept;  // a friendly orange fox sitting, white chest and tail tip, tail swishing, blinking; ~34 px tall at s = 1
+void present(const Canvas& cv, float x, float base_y, float s, std::uint32_t t) noexcept;  // a wrapped gift box with ribbon and bow, a little sparkle; ~16 px tall
+// Gifts from the owner, i = 0 flower, 1 pebble (smooth, shiny grey-blue), 2 feather, 3 sea shell, 4 pine cone, 5 heart (red, glossy). Centred at (x, y), ~10 px at s = 1.
+void gift_icon(const Canvas& cv, float x, float y, float s, int i) noexcept;
+// A small wooden wall shelf, its top board centred at (x, y) and `w` wide, with the gifts whose bit is set in `gifts` standing on it in order (bit i = gift_icon i).
+void gift_shelf(const Canvas& cv, float x, float y, float w, unsigned gifts) noexcept;
+// Treats, i = 0 acorn, 1 hazelnut, 2 berry (a red raspberry). Centred at (x, y), ~10 px at s = 1, rotated by angle.
+void treat(const Canvas& cv, float x, float y, float s, int i, float angle) noexcept;
+void nightcap(const Canvas& cv, float cx, float brim_y, float width) noexcept;  // a floppy blue sleeping cap with a white brim and a pom-pom drooping to the right
+void bow(const Canvas& cv, float x, float y, float s) noexcept;                 // a pink hair bow centred at (x, y), ~12 px wide
+
 }  // namespace screen::props

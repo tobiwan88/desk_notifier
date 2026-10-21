@@ -4,7 +4,9 @@
 
 #include <cstdint>
 
+#include "screen/core/bond.hpp"
 #include "screen/core/font.hpp"
+#include "screen/core/memory.hpp"
 #include "screen/core/fun.hpp"
 #include "sensor/core/airq.hpp"
 #include "weather/core/forecast.hpp"
@@ -47,6 +49,10 @@ struct AirData {
     float golden = -1;       // the golden acorn's visit 0..1, or -1
     int golden_count = 0;
     bool wolf = false;       // Halloween night
+    ReactionNow react{};     // a visit from the pet page
+    int level = 0;           // friendship level 0..4
+    char pet_name[12] = "";
+    Plant plant{};           // shown when it is watered
 };
 
 // Draws the squirrel. (cx, cy) is the centre of its body, `scale` 1.0 is about 120 px tall.
