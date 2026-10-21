@@ -8,6 +8,7 @@
 
 #include "engine/core/types.hpp"
 #include "screen/core/pages.hpp"
+#include "screen/core/shop.hpp"
 
 namespace screen {
 
@@ -39,5 +40,16 @@ struct PetStatus {
 };
 PetStatus pet_status() noexcept;
 void set_pet_name(std::string_view name) noexcept;  // up to 11 letters, stored upper case; empty clears it
+
+// The shop: today's six items, and buying one (the air page shows it being unwrapped).
+struct ShopStatus {
+    Bond bond{};
+    int offer[kOfferSize] = {};
+    int offer_count = 0;
+    Look look{};
+    bool time_valid = false;
+};
+ShopStatus shop_status() noexcept;
+std::optional<BuyResult> shop_buy(int item) noexcept;  // nothing while the time is not known
 
 }  // namespace screen

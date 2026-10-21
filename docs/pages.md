@@ -174,6 +174,38 @@ curl -X POST http://desk-xxxxxx.local/api/pet -d '{"action":"party"}'    # coffe
 curl -X POST http://desk-xxxxxx.local/api/pet -d '{"name":"Nutty"}'
 ```
 
+## Squirrel coins and the shop
+
+**Coins.** From the very first visit the squirrel saves a coin a day. At five hearts the shop opens and coins come faster:
+
+| | Before five hearts | From five hearts |
+|---|---|---|
+| First visit of the day | 1 | 3 |
+| Every 7th day in a row | | +10 |
+| First visit on a special day | | +5 |
+| Golden acorn | 5 | 20 |
+| A day of good air (the plant grows a leaf) | | 2 |
+| A coin found in the grass (air page, now and then) | | 1 |
+
+Nothing is ever taken away. With a visit a day that is about 30 coins a week.
+
+**The shop** shows six things a day, mixed by the date, on the pet page. Seasonal things are only in the shop during their season (and come first), and are worn again every year in that season:
+
+| Shelf | Items (coins) |
+|---|---|
+| Hats | top hat 40, flower crown 30, beret 25, pirate hat 45, cowboy hat 45, chef's hat 35, Viking helmet 55, acorn crown 80 |
+| Places (air page) | Alpine meadow 100, beach 110, autumn forest 90, cherry blossom 120, city lights 150 |
+| For the room (day page) | fairy lights 40, curtains 30 (window); photo 35, poster 30 (left wall); aquarium 70, lava lamp 50, record player 60, cactus 25 (desk) |
+| Friends (air page hill) | hamster 90, hedgehog 85, bird nest 80, owl 100 |
+| Seasonal | pumpkin hat 50 (15 Oct to 2 Nov), Tracht hat 50 (Oktoberfest), Christmas jumper 60 (1 to 26 Dec), party glasses 40 (27 Dec to 6 Jan), bunny ears 40 (two weeks before Easter to a week after), swim ring 45 (21 Jun to 31 Aug) |
+
+Buying unwraps it on the air page ("WHAT'S INSIDE?", then "LOOK AT ME!"), and the squirrel wears or uses the new thing for the rest of the day. **It dresses itself**: every morning and every afternoon it picks from what it owns (sometimes nothing, sometimes the hat), the same pick for the whole half day. Special days still win (the Santa hat at Christmas, the party hat on the birthday), and the scarf stays on in the cold.
+
+```sh
+curl http://desk-xxxxxx.local/api/shop                                  # coins, today's six, owned, worn today
+curl -X POST http://desk-xxxxxx.local/api/shop -d '{"buy":"tophat"}'    # result: bought, coins (need: how many more), not_today, owned, closed
+```
+
 ## Weather
 
 The board asks [Open-Meteo](https://open-meteo.com/) every 20 minutes. No account or key is needed. The air page shows it as the sky behind the squirrel and as the squirrel's outfit, the day page in the window, the clock page as numbers. There used to be a separate weather page; it showed the same sky and temperature again and was replaced by the day page. If the last good forecast is older than 3 hours, the pages fall back to their own colours.

@@ -321,6 +321,66 @@ void pet_json(std::string& out, const screen::Bond& b, const char* name, bool ti
                   b.best_streak, b.total, name, time_valid ? "true" : "false");
     out += buf;
     out += R"("done_today":)" + done + R"(,"gifts":)" + gifts;
+    std::snprintf(buf, sizeof buf, R"(,"coins":%d,"shop_open":%s)", b.coins, screen::shop_open(b) ? "true" : "false");
+    out += buf;
+}
+
+// {"open":..,"coins":..,"offer":[{id,name,shelf,price,season}],"owned":[ids],"wearing":[ids]}
+void shop_json(std::string& out, const screen::ShopStatus& s) {
+    char buf[200];
+    std::snprintf(buf, sizeof buf, R"({"open":%s,"coins":%d,"coins_total":%d,"hearts":%d,"time_valid":%s,"offer":[)",
+                  screen::shop_open(s.bond) ? "true" : "false", s.bond.coins, s.bond.coins_total, screen::level(s.bond) + 1,
+                  s.time_valid ? "true" : "false");
+    out += buf;
+    for (int i = 0; i < s.offer_count; ++i) {
+        const auto& it = screen::shop_item(s.offer[i]);
+        std::snprintf(buf, sizeof buf, R"(%s{"id":"%s","name":"%s","shelf":"%s","price":%d,"season":"%s"})", i ? "," : "",
+                      it.id, it.name, screen::shelf_name(it.shelf), it.price, screen::season_name(it.season));
+        out += buf;
+    }
+    out += R"(],"owned":[)";
+    bool first = true;
+    for (int i = 0; i < screen::kShopItemCount; ++i)
+        if (screen::owns(s.bond, i)) { out += first ? "\"" : ",\""; out += screen::shop_item(i).id; out += '"'; first = false; }
+    out += R"(],"wearing":[)";
+    first = true;
+    for (const int i : {s.look.hat, s.look.face, s.look.body, s.look.place, s.look.buddy, s.look.window, s.look.wall, s.look.desk})
+        if (i >= 0) { out += first ? "\"" : ",\""; out += screen::shop_item(i).id; out += '"'; first = false; }
+    out += "]}";
+}
+
+esp_err_t get_shop(httpd_req_t* r) {
+    std::string out;
+    shop_json(out, screen::shop_status());
+    send_json(r, "200 OK", out.c_str());
+    return ESP_OK;
+}
+
+// {"buy":"tophat"}: buys one of today's six. Always answers 200 with a friendly message when it does not work out.
+esp_err_t post_shop(httpd_req_t* r) {
+    char body[96]{};
+    const int n = r->content_len > 0 ? httpd_req_recv(r, body, std::min<std::size_t>(r->content_len, sizeof body - 1)) : 0;
+    const std::string_view b(body, static_cast<std::size_t>(std::max(n, 0)));
+    const int item = screen::shop_find(json_value(b, "buy"));
+    if (item < 0) { send_error(r, engine::Err::BadJson, "buy: the id of one of today's items"); return ESP_OK; }
+    const auto res = screen::shop_buy(item);
+    if (!res) { send_json(r, "503 Service Unavailable", R"({"ok":false,"message":"the squirrel is still waking up, try again in a minute"})"); return ESP_OK; }
+    const char* why = "";
+    switch (res->error) {
+        case screen::BuyError::None: why = "bought"; break;
+        case screen::BuyError::Closed: why = "closed"; break;
+        case screen::BuyError::NotToday: why = "not_today"; break;
+        case screen::BuyError::Owned: why = "owned"; break;
+        case screen::BuyError::Coins: why = "coins"; break;
+    }
+    char head[160];
+    std::snprintf(head, sizeof head, R"({"ok":%s,"result":"%s","item":"%s","need":%d,"shop":)",
+                  res->error == screen::BuyError::None ? "true" : "false", why, screen::shop_item(item).id, res->need);
+    std::string out = head;
+    shop_json(out, screen::shop_status());
+    out += "}";
+    send_json(r, "200 OK", out.c_str());
+    return ESP_OK;
 }
 
 extern const char pet_html_start[] asm("_binary_pet_html_start");
@@ -363,9 +423,9 @@ esp_err_t post_pet(httpd_req_t* r) {
     const auto s = screen::pet_status();
     char head[256];
     std::snprintf(head, sizeof head,
-                  R"({"ok":true,"action":"%s","item":"%s","gain":%d,"first_today":%s,"too_full":%s,"welcome_back":%s,"level_up":%s,"new_gift":%s,)",
+                  R"({"ok":true,"action":"%s","item":"%s","gain":%d,"coins_earned":%d,"first_today":%s,"too_full":%s,"welcome_back":%s,"level_up":%s,"new_gift":%s,)",
                   screen::action_name(x.action), x.action == screen::Action::Gift ? screen::gift_name(x.item) : x.action == screen::Action::Feed ? screen::treat_name(x.item) : "",
-                  x.gain, x.first_today ? "true" : "false", x.too_full ? "true" : "false", x.welcome_back ? "true" : "false",
+                  x.gain, x.coins, x.first_today ? "true" : "false", x.too_full ? "true" : "false", x.welcome_back ? "true" : "false",
                   x.level_up ? "true" : "false", x.new_gift ? "true" : "false");
     std::string out = head;
     pet_json(out, res->bond, s.name, true);
@@ -401,7 +461,7 @@ std::expected<void, engine::Err> start() noexcept {
     g_token = net::token();
     httpd_config_t c = HTTPD_DEFAULT_CONFIG();
     c.stack_size = 6144;
-    c.max_uri_handlers = 20;
+    c.max_uri_handlers = 22;
     c.recv_wait_timeout = 10;
     c.send_wait_timeout = 10;
     c.max_open_sockets = 4;
@@ -415,6 +475,8 @@ std::expected<void, engine::Err> start() noexcept {
         {.uri = "/pet", .method = HTTP_GET, .handler = get_pet_page, .user_ctx = nullptr},
         {.uri = "/api/pet", .method = HTTP_GET, .handler = get_pet, .user_ctx = nullptr},
         {.uri = "/api/pet", .method = HTTP_POST, .handler = post_pet, .user_ctx = nullptr},
+        {.uri = "/api/shop", .method = HTTP_GET, .handler = get_shop, .user_ctx = nullptr},
+        {.uri = "/api/shop", .method = HTTP_POST, .handler = post_shop, .user_ctx = nullptr},
         {.uri = "/api/status", .method = HTTP_GET, .handler = get_status, .user_ctx = nullptr},
         {.uri = "/api/sensor", .method = HTTP_GET, .handler = get_sensor, .user_ctx = nullptr},
         {.uri = "/api/ack", .method = HTTP_POST, .handler = post_ack, .user_ctx = nullptr},

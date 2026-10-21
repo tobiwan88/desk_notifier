@@ -33,7 +33,18 @@ struct Bond {
     int gained = 0;         // points today
     unsigned gifts = 0;     // bits: gifts on the shelf
     int total = 0;          // visits ever
+    // squirrel coins and the shop (screen/core/shop)
+    int coins = 0, coins_total = 0;
+    std::uint32_t owned_lo = 0, owned_hi = 0;  // bits: shop items owned
+    int bought = -1, bought_day = 0;           // the latest purchase: worn for the rest of that day
 };
+// Coins: a small trickle from the first visit on, the real amounts from five hearts (the shop opens).
+inline constexpr int kCoinsTrickle = 1, kCoinsDaily = 3, kCoinsWeek = 10, kCoinsSpecial = 5, kCoinsGolden = 20,
+                     kCoinsGoldenEarly = 5, kCoinsLeaf = 2, kCoinsFound = 1;
+inline void earn(Bond& b, int coins) noexcept { if (coins > 0) { b.coins += coins; b.coins_total += coins; } }
+[[nodiscard]] inline bool owns(const Bond& b, int item) noexcept {
+    return item >= 0 && item < 64 && ((item < 32 ? b.owned_lo >> item : b.owned_hi >> (item - 32)) & 1u);
+}
 inline constexpr int kLevels = 5, kFirstGain = 8, kMoreGain = 3, kDayCap = 12, kFullAfter = 3, kGraceDays = 3;
 [[nodiscard]] constexpr int level_of(int score) noexcept { return score >= 80 ? 4 : score >= 60 ? 3 : score >= 40 ? 2 : score >= 20 ? 1 : 0; }
 [[nodiscard]] inline int level(const Bond& b) noexcept { return level_of(b.score) > b.best ? level_of(b.score) : b.best; }
@@ -49,6 +60,8 @@ struct Reaction {
     bool welcome_back = false;  // the first visit after two or more days
     bool level_up = false;
     bool new_gift = false;      // a gift it did not have yet
+    int coins = 0;              // coins it earned
+    bool unbox = false;         // not a visit: a new shop item being unwrapped (item = shop item)
 };
 
 // A reaction playing on screen: the air page shows it for reaction_ms, k = progress 0..1.
@@ -60,7 +73,8 @@ struct ReactionNow {
 [[nodiscard]] constexpr std::uint32_t reaction_ms(Action a) noexcept { return a == Action::Party ? 20000u : 12000u; }
 
 // A visit on day `day` (days since 1970). Always succeeds; the reaction says how it went.
-Reaction interact(Bond& b, int day, Action a, int item = 0) noexcept;
+// `special`: a special day (birthday, holidays): a few coins extra for the first visit, from five hearts.
+Reaction interact(Bond& b, int day, Action a, int item = 0, bool special = false) noexcept;
 // Applies the gentle decay up to `day`: nothing for kGraceDays after the last visit, then one point a day, never
 // below the start of the best level reached.
 void settle(Bond& b, int day) noexcept;
