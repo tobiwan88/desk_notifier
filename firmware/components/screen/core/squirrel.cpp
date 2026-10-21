@@ -7,6 +7,7 @@
 #include "screen/core/draw.hpp"
 #include "screen/core/friend_view.hpp"
 #include "screen/core/props.hpp"
+#include "screen/core/shop.hpp"
 #include "screen/core/sky.hpp"
 
 namespace screen {
@@ -291,6 +292,17 @@ void wind_streaks(const Pen& p, std::uint32_t t) {
 
 }  // namespace
 
+Outfit dress(Outfit o, const Look& look) noexcept {
+    if (look.hat >= 0) {
+        o.wear_hat = shop_item(look.hat).art;
+        o.scarf = o.hat;  // keeps the scarf when it is cold
+        o.hat = false;
+    }
+    if (look.face >= 0) o.wear_face = shop_item(look.face).art;
+    if (look.body >= 0) o.wear_body = shop_item(look.body).art;
+    return o;
+}
+
 Bob squirrel_bob(Mood m, std::uint32_t t) noexcept {
     const Anim a = animate(m, t, false);
     return {a.dx, a.dy};
@@ -357,6 +369,8 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
     p.ellipse(126, 157, 17, 23, kBelly);
     p.ellipse(104, 182, 13, 6, kFurDark);
     p.ellipse(148, 182, 13, 6, kFurDark);
+    if (o.wear_body == 0) props::xmas_sweater(cv, p.X(125), p.Y(150), 30 * p.s, 35 * p.s, t);
+    if (o.wear_body == 1) props::swim_ring(cv, p.X(125), p.Y(158), 36 * p.s, t);
 
     // arms and paws
     if (o.paws_free) {
@@ -420,6 +434,8 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
         ear(p, 148, 72, 0.45f + a.ear + twitch, o.wolf);
         hat_cuff(p, t);
         scarf(p);
+    } else if (o.scarf) {
+        scarf(p);
     }
     if (m != Mood::Bad || o.hat) {  // rosy cheeks, also from the cold
         p.circle(103, 112, 6, kCheek, m == Mood::VeryGood || o.hat ? 200 : 130);
@@ -427,7 +443,9 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
     }
     eye(p, 112, 99, m, a.blink, q.look);
     eye(p, 138, 99, m, a.blink, q.look);
-    if (o.sunglasses) sunglasses(p);
+    if (o.wear_face == 0) props::party_glasses(cv, p.X(112), p.Y(99), p.X(138), p.Y(99), 9 * p.s, t);
+    else if (o.sunglasses) sunglasses(p);
+    if (o.wear_hat >= 0) props::shop_hat(cv, o.wear_hat, p.X(125), p.Y(80), 50 * p.s, t);
     if (m == Mood::Bad) {  // worried brows (under the hat cuff they sit lower)
         const float by = o.hat ? 4.0f : 0.0f;
         p.line(106, 90 + by, 116, 86 + by, 1.5f, kFurDark);
@@ -488,9 +506,24 @@ void draw_squirrel(const Canvas& cv, float cx, float cy, float scale, Mood m, st
     }
 }
 
+namespace {
+// The hills of a bought place (the scenery behind them is drawn by props::place_scenery).
+void place_hills(int art, std::uint32_t& hill, std::uint32_t& back) {
+    switch (art) {
+        case props::kPlaceBeach: hill = 0xEED3A0; back = 0xF6E2B8; break;     // sand dunes
+        case props::kPlaceForest: hill = 0x8EAA4E; back = 0xB4A54E; break;    // autumn grass
+        case props::kPlaceBlossom: hill = 0x86CC72; back = 0xA9DC92; break;
+        case props::kPlaceAlps: hill = 0x74C25A; back = 0x9CD67E; break;      // a fresh meadow
+        case props::kPlaceSkyline: hill = 0x5E9E5A; back = 0x7DB06E; break;   // a city park
+        default: break;
+    }
+}
+}  // namespace
+
 void render_air(const Canvas& cv, const AirData& d) noexcept {
     const std::uint32_t t = d.t_ms;
     const Mood m = d.sensor_ok ? mood_for(d.quality.level) : Mood::Sleepy;
+    const int place = d.look && d.look->place >= 0 ? shop_item(d.look->place).art : -1;
 
     std::uint32_t top = 0, bottom = 0, hill = 0, hill_back = 0;
     switch (m) {
@@ -513,6 +546,7 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
         if (d.visit.who == fun::Visitor::ShootingStar) fun::shooting_star(cv, 20, 16, 220, 100, d.visit);
         if (d.rainbow > 0) props::rainbow(cv, 40, 250, 196, 7, d.rainbow);
         if (m == Mood::Sleepy) { hill = 0x7DBD66; hill_back = 0xA5CF91; }  // the night colours come from the sky now
+        if (place >= 0) { props::place_scenery(cv, place, t, w.is_day); place_hills(place, hill, hill_back); }
         if (snowy) { hill = 0xC9D8E8; hill_back = 0xE4ECF4; }
         const int gl = sky::gloom(sk);  // grey light under clouds and rain
         hill = draw::lerp_rgb(hill, 0x4A5A55, gl); hill_back = draw::lerp_rgb(hill_back, 0x4A5A55, gl);
@@ -531,6 +565,7 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
             draw::circle(cv, 192, 56, 20, hex(0xFFE27A), 110);
             draw::circle(cv, 192, 56, 14, hex(0xFFD23F));
         }
+        if (place >= 0) { props::place_scenery(cv, place, t, m != Mood::Sleepy); place_hills(place, hill, hill_back); }
     }
 
     draw::circle(cv, 30, 296, 125, hex(hill_back));
@@ -586,6 +621,37 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
         props::bee(cv, x, y, 1.7f, t);
     }
 
+    // a friend from the shop lives on the hill (unless someone else is visiting that spot)
+    const fun::Visitor hv = d.visit.who;
+    const bool hill_busy = hv == fun::Visitor::Fox || hv == fun::Visitor::Friend || hv == fun::Visitor::Hedgehog ||
+                           hv == fun::Visitor::Snail || (d.react.active && d.react.r.action == Action::Water);
+    if (d.look && d.look->buddy >= 0 && !hill_busy) {
+        const float bx = 64, by = 312 - std::sqrt(143.0f * 143.0f - (bx - 125) * (bx - 125)) + 3;
+        switch (shop_item(d.look->buddy).art) {
+            case 0: props::hamster_wheel(cv, bx, by, 1.5f, t); break;
+            case 1: props::hedgehog_sleep(cv, bx, by, 1.8f, t); break;
+            case 2: props::nest(cv, bx, by, 1.7f, t); break;
+            case 3:
+                draw::capsule(cv, bx - 15, by - 2, bx + 15, by - 3, 4.5f, hex(0x7A5230));  // a log to sit on
+                props::owl(cv, bx, by - 5, 1.5f, t);
+                break;
+            default: break;
+        }
+    }
+    if (d.coin >= 0) {  // a coin glints in the grass, then hops into the squirrel's pocket
+        const float k = d.coin, cx0 = 84, cy0 = 312 - std::sqrt(143.0f * 143.0f - 41.0f * 41.0f) - 4;
+        const float e = std::clamp((k - 0.55f) / 0.3f, 0.0f, 1.0f);
+        const float x = cx0 + (140 - cx0) * e, y = cy0 + (130 - cy0) * e - std::sin(kPi * e) * 30;
+        if (k < 0.88f) {
+            draw::circle(cv, x, y, 5.2f, hex(0xB8862A));
+            draw::circle(cv, x, y, 4.3f, hex(0xFFD54A));
+            draw::circle(cv, x - 1.3f, y - 1.3f, 1.4f, hex(0xFFFFFF), 200);
+            if (k < 0.55f) draw::sparkle(cv, x + 4, y - 4, 2 + 3 * std::fabs(std::sin(static_cast<float>(t) / 150.0f)), hex(0xFFFFFF));
+        } else {
+            draw_text(cv, 150, static_cast<int>(100 - (k - 0.88f) * 120), 2, hex(0xFFE27A), "+1");
+        }
+    }
+
     const bool reacting = d.react.active;  // a visit from the pet page
     if (reacting) friends::back(cv, d);
 
@@ -617,7 +683,7 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
         const float y = k < 0.12f ? -12 + 184 * (k / 0.12f) * (k / 0.12f) : 172 - std::fabs(std::sin(std::min(1.0f, (k - 0.12f) / 0.08f) * kPi)) * 14 * (1 - std::min(1.0f, (k - 0.12f) / 0.08f));
         props::golden_acorn(cv, 86, y - 4, 2.0f, t);
     }
-    Outfit look = outfit;
+    Outfit look = d.look ? dress(outfit, *d.look) : outfit;
     look.wolf = d.wolf;
     friends::Pose pose{face, look, q};
     if (reacting) pose = friends::pose(d, face, look, q);
@@ -628,7 +694,8 @@ void render_air(const Canvas& cv, const AirData& d) noexcept {
     if (bird && !reacting) {
         const Bob b = squirrel_bob(m, t);
         constexpr float s = 0.92f;
-        fun::bird_on_head(cv, 146 + (b.dx - 4) * s, 136 + (b.dy + (outfit.hat ? 56 : 76) - 150) * s, 1.2f, d.visit, t);
+        const bool hatted = outfit.hat || (d.look && d.look->hat >= 0);
+        fun::bird_on_head(cv, 146 + (b.dx - 4) * s, 136 + (b.dy + (hatted ? 52 : 76) - 150) * s, 1.2f, d.visit, t);
     }
     if (d.visit.who == fun::Visitor::Butterfly && !reacting) fun::butterfly(cv, 14, 50, 150, 170, d.visit, t);
     if (d.visit.who == fun::Visitor::Leaves) props::falling_leaves(cv, d.visit.k, t, d.visit.r);

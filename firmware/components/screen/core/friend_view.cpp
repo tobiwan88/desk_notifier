@@ -8,6 +8,7 @@
 
 #include "screen/core/draw.hpp"
 #include "screen/core/props.hpp"
+#include "screen/core/shop.hpp"
 
 namespace screen::friends {
 namespace {
@@ -50,6 +51,12 @@ Pose pose(const AirData& d, Mood mood, Outfit outfit, fun::Quirks q) noexcept {
     outfit.umbrella = outfit.windy = outfit.ice_cream = false;  // paws free for the visit
     outfit.paws_free = holds(r.action);
     q.wave = q.toss = q.howl = 0;
+    if (r.unbox) {  // a new thing from the shop: holds the box, then shows it off
+        outfit.paws_free = k < 0.4f;
+        if (k < 0.4f) return {Mood::Good, outfit, q};
+        q.hop = std::fabs(std::sin(static_cast<float>(t) / 230.0f)) * (k < 0.8f ? 1.0f : 0.0f);
+        return {Mood::VeryGood, outfit, q};
+    }
     Mood face = Mood::VeryGood;
     switch (r.action) {
         case Action::Feed:
@@ -94,6 +101,37 @@ void front(const Canvas& cv, const AirData& d, const Pose& p, float cx, float cy
     const std::uint32_t t = d.t_ms;
     const Map m = map_for(d, p, cx, cy, s);
     const float hx = m.X(125), head_top = m.Y(p.outfit.hat ? 60 : 76);
+    if (r.unbox) {
+        if (k < 0.4f) {  // the present, shaken a little, the lid pops off
+            const float shake = k > 0.25f ? std::sin(static_cast<float>(t) / 40.0f) * 2 : 0.0f;
+            props::present(cv, m.X(125) + shake, m.Y(150), 2.0f, t);
+            arm(cv, m, 106, 128, 110, 140);
+            arm(cv, m, 144, 128, 140, 140);
+        } else {
+            const ShopItem& it = shop_item(r.item);
+            if (it.shelf == Shelf::Decor && it.spot == Spot::Desk) {  // holds up the new thing for the room
+                const float iy = m.Y(146);
+                switch (it.art) {
+                    case 4: props::aquarium(cv, m.X(125), iy, 1.3f, t); break;
+                    case 5: props::lava_lamp(cv, m.X(125), iy, 1.2f, t); break;
+                    case 6: props::record_player(cv, m.X(125), iy, 1.2f, t); break;
+                    case 7: props::cactus(cv, m.X(125), iy, 1.4f, t); break;
+                    default: break;
+                }
+            }
+            if (it.shelf == Shelf::Decor && it.spot == Spot::Wall) {
+                if (it.art == 2) props::photo_frame(cv, m.X(125), m.Y(136), 1.3f);
+                else props::poster(cv, m.X(125), m.Y(134), 1.2f);
+            }
+            if (it.shelf == Shelf::Decor && it.spot == Spot::Window && it.art == 0) props::fairy_lights(cv, m.X(95), m.X(155), m.Y(132), t);
+            for (int i = 0; i < 6; ++i) {  // sparkles all around
+                const float a = static_cast<float>(i) * kPi / 3 + static_cast<float>(t) / 500.0f;
+                const float tw = std::fabs(std::sin(static_cast<float>(t) / 180.0f + static_cast<float>(i)));
+                draw::sparkle(cv, hx + std::cos(a) * 52, m.Y(118) + std::sin(a) * 46, 3 + 4 * tw, hex(i & 1 ? 0xFFE27A : kWhite));
+            }
+        }
+        return;
+    }
     switch (r.action) {
         case Action::Feed: {
             if (r.too_full) {  // a round belly, patted happily
@@ -182,6 +220,22 @@ void front(const Canvas& cv, const AirData& d, const Pose& p, float cx, float cy
 void labels(const Canvas& cv, const AirData& d) noexcept {
     const Reaction& r = d.react.r;
     const float k = d.react.k;
+    if (r.unbox) {
+        const ShopItem& it = shop_item(r.item);
+        const char* top = "WHAT'S INSIDE?";
+        if (k >= 0.4f) {
+            switch (it.shelf) {
+                case Shelf::Hat: case Shelf::Face: case Shelf::Body: top = "LOOK AT ME!"; break;
+                case Shelf::Place: top = "A NEW PLACE!"; break;
+                case Shelf::Friend: top = "A NEW FRIEND!"; break;
+                case Shelf::Decor: top = "FOR MY ROOM!"; break;
+            }
+        }
+        const bool big = text_width(top, 3) <= 140;
+        draw::label(cv, big ? 180 : 186, big ? 3 : 2, hex(0xFFF2B8), top);
+        if (k >= 0.4f) draw::label(cv, 208, 2, hex(0xFF8FA8), it.name);
+        return;
+    }
     const char* word = "";
     switch (r.action) {
         case Action::Feed: word = r.too_full ? "TOO FULL!" : "YUM!"; break;

@@ -12,6 +12,7 @@
 #include "screen/core/fun.hpp"
 #include "screen/core/pages.hpp"
 #include "screen/core/props.hpp"
+#include "screen/core/shop.hpp"
 #include "screen/core/sky.hpp"
 #include "screen/core/squirrel.hpp"
 
@@ -368,6 +369,16 @@ void caption(const Canvas& cv, const Scene& sc, const Inputs& in, const char* sa
 }
 
 // What stands on the right of the desk for the special day (and the advent wreath).
+// Does a special day put something on the right of the desk?
+bool desk_taken(const Scene& sc) {
+    switch (sc.occasion) {
+        case Occasion::Halloween: case Occasion::Nikolaus: case Occasion::Christmas: case Occasion::Birthday:
+        case Occasion::SquirrelDay: case Occasion::Easter: case Occasion::Valentine: case Occasion::Anniversary:
+        case Occasion::Oktoberfest: return true;
+        default: return sc.advent > 0;
+    }
+}
+
 void desk_decor(const Canvas& cv, const Scene& sc, const Inputs& in, std::uint32_t t) {
     namespace P = props;
     constexpr float x = 206, y = kDeskTop + 1;
@@ -427,6 +438,12 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
     if (sit == Situation::Humid) P::glass_steam(cv, win, t);
     if (sit == Situation::AirOut || sit == Situation::CoolDown) P::window_open(cv, win, t, room.dark);
     else window_frame(cv, room.dark);
+    const Look look = look_now(in);  // the shop things the squirrel picked for today
+    const bool window_open = sit == Situation::AirOut || sit == Situation::CoolDown;
+    if (look.window >= 0) {
+        if (shop_item(look.window).art == 0) P::fairy_lights(cv, kWinX0 - 8, kWinX1 + 8, kWinY0 - 7, t);
+        else if (!window_open) P::curtains(cv, win, t);
+    }
     P::memory_plant(cv, kWinX0 + 10, kWinY1 + 2, 1.3f, t, in.plant.leaves, in.plant.droop, in.plant.flower);
     if (vis.who == fun::Visitor::Snail) {
         const float k = vis.k - std::sin(2 * kPi * vis.k * 3) / (2 * kPi * 3) * 0.8f;
@@ -441,6 +458,10 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
     if (occ == Occasion::ClockChange) spin = (in.month == 10 ? -1.0f : 1.0f) * smooth(ph(t, 6000) / 0.5f);
     if (occ == Occasion::AprilFool) spin = -ph(t, 4000) * 2;  // runs backwards
     wall_clock(cv, in, room.dark, spin);
+    if (look.wall >= 0 && sit != Situation::HotRoom && sit != Situation::ColdRoom && !reading_lamp(sc, in)) {
+        if (shop_item(look.wall).art == 2) P::photo_frame(cv, 30, 114, 0.9f);  // on the left wall, beside the tail
+        else P::poster(cv, 30, 114, 0.85f);
+    }
     if (sit == Situation::HotRoom || sit == Situation::ColdRoom)
         P::thermometer(cv, 34, 116, 1.3f, sit == Situation::HotRoom ? 0.9f : 0.15f, sit == Situation::HotRoom);
     if (occ == Occasion::Birthday || occ == Occasion::SquirrelDay || occ == Occasion::NewYearsEve || party)
@@ -482,6 +503,15 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
     Outfit o;
     o.paws_free = true;
     o.wolf = occ == Occasion::Halloween && (in.hour >= 17 || in.hour < 5) && !bed;
+    // its own hat, unless a special day or bedtime brings one
+    const bool day_hat = bed || party || occ == Occasion::Birthday || sc.friday_party || occ == Occasion::SquirrelDay ||
+                         occ == Occasion::Christmas || occ == Occasion::Nikolaus;
+    if (!bed) {
+        Look wear = look;
+        if (day_hat) wear.hat = -1;
+        o = dress(o, wear);
+        o.scarf = false;  // indoors
+    }
     if (bed) {  // pillow behind, in bed
         draw::ellipse(cv, kCx, kCy - 30, 50, 28, hex(0xAEB4D8));
         draw::ellipse(cv, kCx, kCy - 32, 47, 25, hex(0xC9CEEA));
@@ -700,6 +730,16 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
     if (sit == Situation::Humid) P::sweat_drop(cv, p.X(150), p.Y(84), 1.2f, t);
     if (plant_left) P::plant(cv, 46, kDeskTop + 1, 1.7f, t, sit == Situation::Watering ? ph(t, 5000) > 0.5f : ph(t, 3000) > 0.3f);
     if (lamp_on) lamp_stand(cv);
+    if (look.desk >= 0 && !desk_taken(sc)) {
+        constexpr float dx = 204, dy = kDeskTop + 1;
+        switch (shop_item(look.desk).art) {
+            case 4: P::aquarium(cv, dx, dy, 1.2f, t); break;
+            case 5: P::lava_lamp(cv, dx, dy, 1.2f, t); break;
+            case 6: P::record_player(cv, dx - 2, dy, 1.2f, t); break;
+            case 7: P::cactus(cv, dx, dy, 1.3f, t); break;
+            default: break;
+        }
+    }
     desk_decor(cv, sc, in, t);
     if (occ == Occasion::NewYear || occ == Occasion::Birthday) P::confetti(cv, t);
     if (occ == Occasion::Valentine || occ == Occasion::Anniversary) P::hearts_rising(cv, p.X(160), p.Y(96), t);
