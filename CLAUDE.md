@@ -17,6 +17,7 @@ Desk notifier on an ESP32-C61: one GC9A01 round display, a BME688 (I2C), SNTP cl
 - `source scripts/kicad-env.sh` for kicad-cli, `$KICAD_PYTHON` (pcbnew SWIG, Python 3.9) and the symbol/footprint dirs. Routing: KiCadRoutingTools in `hardware/.tools/` (gitignored; clone + `build_router.py`).
 - Firmware for the PCB: `DESK_BOARD_NOTIFIER_V1` (default on S3); `idf.py -B build-s3 -DIDF_TARGET=esp32s3 -DSDKCONFIG=build-s3/sdkconfig build`.
 - KiCad's IPC API runs in the KiCad project manager (KiCad.app), not in the standalone PCB Editor app.
+- Housing (3D printed, Fusion): `hardware/mechanics/` (README.md, PLAN.md, STL/3MF/f3d). Display module dimensions there are assumptions until checked with `display_dummy.stl`.
 
 ## Board
 ESP32-C61 MAC xx:xx:xx:xx:xx:xx, host `desk-xxxxxx` (192.168.1.x). Flash over the UART bridge `/dev/cu.usbserial-XXXX`; the native USB-Serial/JTAG port (the console) did not enumerate on the Mac, so logs are not visible there. Check state over HTTP (`/api/status` shows `sensor.i2c` scan). BME688 answers at 0x77. Display is mirrored-X by default (`DESK_LCD_MIRROR_X`; unconfirmed on the panel). Kconfig bools set to `n` are undefined macros: use `#ifdef`, there is no `IS_ENABLED`.
