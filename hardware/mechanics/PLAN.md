@@ -2,7 +2,7 @@
 
 ## Context
 Case for notifier-v1 (50x36x1.6 mm, ESP32-S3-WROOM, USB-C, BME688 + SHT40) and the round GC9A01 1.28" display module (38 x 45.5 mm PCB, 11.5 mm incl. header).
-Source STEP: `/Users/USER/Documents/worskpace/desk_notifier-hw-sch/hardware/notifier-v1/notifier-v1.step`.
+Source STEP: `hardware/notifier-v1/notifier-v1.step`.
 Case stands on a desk, screen in front, board behind. Needs sensor openings. Fusion is driven over its local MCP.
 Owner answers: tilt back ~15 deg, PLA, display plugs **directly** into the 7-pin socket, USB-C out the back wall, no extras in v1.
 

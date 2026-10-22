@@ -6,6 +6,28 @@ A small desk display on an ESP32-C61. A round 240x240 GC9A01 screen turns throug
 
 It started as the esp_eyes project (animated eyes on two displays) and was cut down to one display. The git history keeps the old work.
 
+## What is in this repo
+One repo holds the whole product: firmware, the custom board and the 3D-printed case.
+
+| Part | Where | State |
+|---|---|---|
+| Firmware (ESP-IDF v6.1, C++23, host-tested core) | [`firmware/`](firmware/), [`docs/`](docs/) | Runs on an ESP32-C61 dev board with a GC9A01 and a BME688. Builds for the ESP32-S3 custom board too (`DESK_BOARD_NOTIFIER_V1`). |
+| Board `notifier-v1` (KiCad 10, 4 layers, 50 x 36 mm, JLCPCB assembly) | [`hardware/`](hardware/README.md) | Generated, routed and gate-checked, fab package builds. **Not ordered yet**: human review in KiCad, JLC placement preview and the display pinout check are still open ([`ORDER.md`](hardware/notifier-v1/ORDER.md)). |
+| Case (Fusion, 3D printed PLA, two parts, snap-fit) | [`hardware/mechanics/`](hardware/mechanics/README.md) | First model with print files and a fit coupon. **Never printed.** |
+| Helper tools (page previews, clip preparation) | [`tools/`](tools/), [`clipprep/`](clipprep/) | Used by the checks. |
+
+## Limitations
+Please read these before building one.
+- **Two MCUs.** The dev-board setup uses the ESP32-C61 (8 MB flash). The custom board uses an ESP32-S3-WROOM-1-N8R2, because C61 and C5 modules had no stock at JLCPCB. Firmware and board are both in the repo, but the combination (firmware on the S3 board) has not been flashed on a real notifier-v1 board, since none exists yet.
+- **The case is untested.** No part of it has been printed. The display module has no 3D model, so the pocket, window and plug alignment rest on assumed dimensions (header 2.54 mm, pin row 3.0 mm above the PCB edge, glass centre 26.5 mm above it, PCB plus glass 5.74 mm). Print `display_dummy.stl` and `coupon_m1.stl` first and compare. The SHT40 height (1.0 mm) is also an assumption. The cover needs one support and the USB-C collar may sit about 0.7 mm short of the connector.
+- **Display orientation is unconfirmed.** The image is mirrored on X by default (`DESK_LCD_MIRROR_X`); flip it in menuconfig if your panel shows it backwards. The pin order of the display module on the board's socket is also still to be checked against a real module.
+- **The air score is not BSEC.** It is a simple estimate from humidity and gas resistance and needs a few minutes of warm-up. The sensor reads a little warm next to the board, so indoor temperature is slightly high.
+- **No firmware security by default.** The HTTP API, the pet page and OTA are open unless you set a token (`auth token`), the connection is plain HTTP, and the device is meant for a trusted home network. Do not expose it to the internet.
+- **Weather and time need the internet** (Open-Meteo, SNTP). Without it the clock stays unset and the weather items disappear. The place defaults to Munich (change it with `POST /api/weather` or `weather at <lat> <lon>`), holidays are Bavarian, and the texts are English.
+- **Pictures are stored but not shown** yet, there is one display, and the project is tuned to a single 240x240 round panel at 10 frames per second on a chip without an FPU.
+- **The hardware generators overwrite KiCad edits.** Change `hardware/gen/*.py`, not the KiCad files, then re-run the pipeline. The router needs tools that `hardware/tools/setup_tools.sh` downloads, and its result differs between runs.
+- **Development on macOS.** The scripts and notes assume macOS and a local ESP-IDF install in `~/esp/esp-idf`.
+
 ## What works today
 - Rotating pages with fades, 10 frames per second. See [docs/pages.md](docs/pages.md).
   - Clock: time (set over the internet), date, indoor and outdoor temperature, today's low, high and chance of rain.
@@ -20,6 +42,7 @@ It started as the esp_eyes project (animated eyes on two displays) and was cut d
 Planned: pictures that stay on screen until acknowledged, Bosch BSEC2 for a proper IAQ value.
 
 ## What you need
+Dev setup (works today), or the custom board in `hardware/` once it is built:
 - ESP32-C61 board (8 MB flash)
 - GC9A01 round display, 240x240, SPI
 - BME688 breakout (I2C)
@@ -84,6 +107,11 @@ It is a simple estimate, not Bosch BSEC. 25 points come from humidity (best at 4
 
 ## For developers
 `scripts/check.sh` runs the host tests (C++23, sanitizers), the Python tests and the firmware build. `--quick` skips the build. `uv run python tools/preview_pages.py` draws all pages as GIFs on your computer (after a host build). Pure logic lives in `firmware/components/*/core` and is tested on the PC. See [CLAUDE.md](CLAUDE.md) for the layout.
+
+## Hardware and case
+- Board: open `hardware/notifier-v1/notifier-v1.kicad_pro` with `hardware/open.sh`. Regenerate with `hardware/tools/pipeline_v1.sh`, check with `scripts/hw-check.sh`, order steps in [`hardware/notifier-v1/ORDER.md`](hardware/notifier-v1/ORDER.md), design notes in [`hardware/PLAN.md`](hardware/PLAN.md). Needs KiCad 10 (`source scripts/kicad-env.sh`).
+- Case: print files and notes in [`hardware/mechanics/`](hardware/mechanics/README.md) (PLA, 0.2 mm layers, Bambu Lab plate included). Print the fit coupon first.
+- Custom-board firmware: `idf.py -B build-s3 -DIDF_TARGET=esp32s3 -DSDKCONFIG=build-s3/sdkconfig build` in `firmware/`.
 
 ## License
 MIT. The BME68x driver in `firmware/components/sensor/third_party` is from Bosch Sensortec (BSD-3-Clause).
