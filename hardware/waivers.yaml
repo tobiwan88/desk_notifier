@@ -1,0 +1,15 @@
+# Accepted ERC/DRC findings. Each entry needs a reason a reviewer would sign off.
+# match: type + substring of any item description. Errors about clearance, shorts, holes or
+# unconnected items are never waivable (checks.py refuses them).
+- type: pin_to_pin
+  item: "U4 Pin 5 [SDO"
+  reason: BME688 SDO tied to +3V3 on purpose (I2C address 0x77, firmware DESK_BME_ADDR).
+- type: silk_edge_clearance
+  item: "of U1 on F.Silkscreen"
+  reason: The module's silkscreen outline continues over the antenna, which overhangs the board edge by design; the fab clips it.
+- type: silk_edge_clearance
+  item: "of J1 on F.Silkscreen"
+  reason: The USB-C footprint marks the board edge line on silkscreen; clipped at the edge.
+- type: silk_edge_clearance
+  item: "of J2 on F.Silkscreen"
+  reason: The display socket's face (fab outline x = 50.03) sits 0.03 mm past the right edge by design (display plugs in from the side); its body silk outline reaches the edge and is clipped there.

@@ -81,17 +81,20 @@ Stats g_stats{};
 std::uint32_t now_ms() { return static_cast<std::uint32_t>(esp_timer_get_time() / 1000); }
 
 // Active-low button with a simple 30 ms debounce; returns true once per press.
-bool button_pressed(std::uint32_t now) {
-    static bool last = false;
-    static std::uint32_t since = 0;
-    if (cfg::kButton < 0) return false;
-    const bool down = gpio_get_level(static_cast<gpio_num_t>(cfg::kButton)) == 0;
-    if (down != last && now - since > 30) {
-        since = now;
-        last = down;
-        return down;
+bool button_pressed([[maybe_unused]] std::uint32_t now) {
+    if constexpr (cfg::kButton < 0) {
+        return false;  // no button on this board (DESK_BTN = -1)
+    } else {
+        static bool last = false;
+        static std::uint32_t since = 0;
+        const bool down = gpio_get_level(static_cast<gpio_num_t>(cfg::kButton)) == 0;
+        if (down != last && now - since > 30) {
+            since = now;
+            last = down;
+            return down;
+        }
+        return false;
     }
-    return false;
 }
 
 void task(void*) {
@@ -100,7 +103,7 @@ void task(void*) {
     if (!fb) fb = static_cast<gfx::Rgb565be*>(heap_caps_malloc(sizeof(gfx::Rgb565be) * gfx::kScreen * gfx::kScreen, MALLOC_CAP_DEFAULT));
     if (!fb) { ESP_LOGE(kTag, "no frame buffer"); vTaskDelete(nullptr); return; }
     const Canvas cv{{fb, static_cast<std::size_t>(gfx::kScreen) * gfx::kScreen}};
-    if (cfg::kButton >= 0) {
+    if constexpr (cfg::kButton >= 0) {
         gpio_config_t io = {};
         io.pin_bit_mask = 1ULL << cfg::kButton;
         io.mode = GPIO_MODE_INPUT;

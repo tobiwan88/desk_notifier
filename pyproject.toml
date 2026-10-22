@@ -27,3 +27,8 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["clipprep", "tools"]
 testpaths = ["clipprep/tests", "tools/tests"]
+
+[tool.uv.workspace]
+members = [
+    "hardware",
+]

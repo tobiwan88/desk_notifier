@@ -31,3 +31,18 @@ soak*.csv
 
 # Original video files (use the small GIF in docs/media instead)
 *.mp4
+
+# Hardware: downloaded tools and generated outputs
+hardware/.tools/
+hardware/out/
+*-backups/
+fp-info-cache
+*.kicad_prl
+*.lck
+firmware/build*/
+hardware/notifier-v1/*.net
+*.dsn
+*.ses
+*.freerouting.log
+*.bak
+_autosave-*
