@@ -46,3 +46,7 @@ hardware/notifier-v1/*.net
 *.freerouting.log
 *.bak
 _autosave-*
+
+# Private notes and patterns
+CLAUDE.local.md
+.privacy-patterns

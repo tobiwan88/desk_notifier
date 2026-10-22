@@ -108,14 +108,14 @@ menu "Desk notifier"
             range 0 2359
             default 2300
         config DESK_DAY_BIRTHDAY
-            int "Birthday as MMDD (315 = 15 March, 0 = none): cake, party hat, garland"
+            int "Birthday as MMDD (0 = none, e.g. 315 = 15 March): cake, party hat, garland"
             range 0 1231
             default 0
         config DESK_DAY_BIRTHDAY_NAME
             string "Name shown on the birthday"
             default ""
         config DESK_DAY_ANNIVERSARY
-            int "Wedding anniversary as MMDD (614 = 14 June, 0 = none): rose, hearts"
+            int "Wedding anniversary as MMDD (0 = none, e.g. 614 = 14 June): rose, hearts"
             range 0 1231
             default 0
     endmenu

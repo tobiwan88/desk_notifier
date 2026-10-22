@@ -20,7 +20,7 @@ Desk notifier on an ESP32-C61: one GC9A01 round display, a BME688 (I2C), SNTP cl
 - Housing (3D printed, Fusion): `hardware/mechanics/` (README.md, PLAN.md, STL/3MF/f3d). Display module dimensions there are assumptions until checked with `display_dummy.stl`.
 
 ## Board
-ESP32-C61 MAC xx:xx:xx:xx:xx:xx, host `desk-xxxxxx` (192.168.1.x). Flash over the UART bridge `/dev/cu.usbserial-XXXX`; the native USB-Serial/JTAG port (the console) did not enumerate on the Mac, so logs are not visible there. Check state over HTTP (`/api/status` shows `sensor.i2c` scan). BME688 answers at 0x77. Display is mirrored-X by default (`DESK_LCD_MIRROR_X`; unconfirmed on the panel). Kconfig bools set to `n` are undefined macros: use `#ifdef`, there is no `IS_ENABLED`.
+Device identifiers (MAC, host name, LAN IP, serial port) live in `CLAUDE.local.md` (gitignored). The native USB-Serial/JTAG port (the console) did not enumerate on the Mac, so logs are not visible there; flash over the UART bridge. Check state over HTTP (`/api/status` shows `sensor.i2c` scan). BME688 answers at 0x77. Display is mirrored-X by default (`DESK_LCD_MIRROR_X`; unconfirmed on the panel). Kconfig bools set to `n` are undefined macros: use `#ifdef`, there is no `IS_ENABLED`.
 GitHub: https://github.com/tobiwan88/desk_notifier (remote `desk`; `origin` is still the local esp_eyes clone source).
 
 ## Squirrel outfits
@@ -31,3 +31,9 @@ Three pages rotate with a fade at CONFIG_DESK_FPS (default 10): clock (+ date, i
 Preview pages on the host: build host tests, then `uv run python tools/preview_pages.py` (GIFs + sheet.png in build/preview; add `matrix` for all weather x mood x day/night x temperature sheets).
 The C61 has no FPU: keep per-pixel work integer (see `draw::fill`), floats only per span/row.
 Next: the clock-page squirrel holding the current activity's prop, real sunrise/sunset for the window light, pushed pictures until ack, BSEC2.
+
+## Private data (this repo is public)
+Never commit: Wi-Fi names/passwords, tokens, MAC addresses, host names, LAN IPs, serial ports, home paths (`/Users/<name>`), real birthdays/anniversaries/names, photos of people or the home, order/account data, Fusion/KiCad files with user metadata. Kconfig defaults for personal values stay at 0 / "" (real values go in the ignored `firmware/sdkconfig`); device notes go in `CLAUDE.local.md`.
+- Before every commit that will be pushed, and before a push: `scripts/privacy-check.sh` (scans tracked files and the staged diff; extra personal strings go in the gitignored `.privacy-patterns`, one extended regex per line). Fix findings, do not suppress them.
+- New binary/CAD exports (`.f3d`, `.3mf`, gerbers, images): check embedded metadata for names and paths before adding.
+- History rewrites for private data need the user's explicit OK; GitHub keeps old commits reachable through pull-request refs until support purges them.
