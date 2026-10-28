@@ -14,6 +14,7 @@ Desk notifier on an ESP32-C61: one GC9A01 round display, a BME688 (I2C), SNTP cl
 
 ## Hardware (hardware/, see hardware/PLAN.md)
 - notifier-v1 PCB (ESP32-S3-WROOM-1-N8R2, 4 layers, JLC-assembled) is generated, not hand-drawn: edit `hardware/gen/notifier_v1.py` (PARTS/NETS) and `hardware/gen/layout_v1.py` (placement), then `hardware/tools/pipeline_v1.sh [--bom]`. Gate: `scripts/hw-check.sh` (in `check.sh`). Order steps: `hardware/notifier-v1/ORDER.md`.
+- Skills: `hw-base` (read first), `kicad-schematic`, `kicad-layout`, `hw-parts` are board-neutral; notifier-v1 facts are in its profile `hardware/notifier-v1/` (`BOARD.md`, `board.yaml`, `critical.yaml`, `parts/`). Numbers come from scripts in `hardware/calc/`.
 - `source scripts/kicad-env.sh` for kicad-cli, `$KICAD_PYTHON` (pcbnew SWIG, Python 3.9) and the symbol/footprint dirs. Routing: KiCadRoutingTools in `hardware/.tools/` (gitignored; clone + `build_router.py`).
 - Firmware for the PCB: `DESK_BOARD_NOTIFIER_V1` (default on S3); `idf.py -B build-s3 -DIDF_TARGET=esp32s3 -DSDKCONFIG=build-s3/sdkconfig build`.
 - KiCad's IPC API runs in the KiCad project manager (KiCad.app), not in the standalone PCB Editor app.

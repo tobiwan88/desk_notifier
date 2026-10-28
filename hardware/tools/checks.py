@@ -3,8 +3,10 @@
 - ERC/DRC from kicad-cli JSON, minus waivers.yaml (never for clearance/short/hole/unconnected)
 - pin map: schematic module pins vs firmware Kconfig defaults for DESK_BOARD_NOTIFIER_V1
 - reserved pins: no S3 strapping/USB/PSRAM pin used for anything but its job
-- BOM: every LCSC part exists, is in stock for QTY boards, Basic/Extended count and cost
-Usage: uv run --package desk-hardware python hardware/tools/checks.py [--bom] [--qty 5]
+- BOM: every LCSC part exists, is in stock for QTY boards, Basic/Extended count and cost; names an in-stock
+  alternate from board.yaml when a part runs short
+- calc: the board-neutral scripts in hardware/calc/ (critical blocks, power design, impedance) on the board profile
+Usage: uv run --package desk-hardware python hardware/tools/checks.py [--bom] [--qty 5] [--calc-only]
 """
 
 import argparse
@@ -21,7 +23,9 @@ sys.path.insert(0, str(ROOT / "hardware" / "gen"))
 sys.path.insert(0, str(ROOT / "hardware" / "tools"))
 import notifier_v1 as design  # noqa: E402
 
-BOARD = ROOT / "hardware/notifier-v1/notifier-v1"
+BOARD_DIR = ROOT / "hardware/notifier-v1"
+BOARD = BOARD_DIR / "notifier-v1"
+CALC = ["critical.py", "buck.py", "impedance.py"]
 NEVER_WAIVE = {"clearance", "shorting_items", "hole_clearance", "hole_to_hole", "unconnected", "drill_out_of_range",
                "track_width", "courtyards_overlap", "copper_edge_clearance", "annular_width", "via_diameter",
                "tracks_crossing", "zones_intersect", "starved_thermal"}
@@ -94,8 +98,18 @@ def check_pins(errors):
             errors.append(f"reserved pin: GPIO{gpio} carries {net}")
 
 
+def check_calc(errors):
+    for script in CALC:
+        r = subprocess.run([sys.executable, str(ROOT / "hardware/calc" / script), str(BOARD_DIR)],
+                           capture_output=True, text=True)
+        print(r.stdout.rstrip())
+        if r.returncode:
+            errors.append(f"calc/{script}: {r.stderr.strip().splitlines()[-1] if r.stderr.strip() else 'FAILED (see above)'}")
+
+
 def check_bom(errors, qty):
     from jlcparts import lookup
+    alternates = (yaml.safe_load((BOARD_DIR / "board.yaml").read_text()) or {}).get("alternates") or {}
     lines, fee, cost = 0, 0, 0.0
     counts = {}
     for ref, (_, _, _, lcsc, _, _) in design.PARTS.items():
@@ -110,7 +124,9 @@ def check_bom(errors, qty):
         need = n * qty
         flag = "" if p["stock"] >= need * 2 else "  <-- LOW STOCK"
         if p["stock"] < need:
-            errors.append(f"BOM: {lcsc} {p['mpn']} stock {p['stock']} < {need}")
+            alt = next((a for a in alternates.get(lcsc, []) if (lookup(a["lcsc"]) or {}).get("stock", 0) >= need), None)
+            hint = f"; in-stock alternate {alt['lcsc']}: {alt['note']}" if alt else "; no in-stock alternate in board.yaml"
+            errors.append(f"BOM: {lcsc} {p['mpn']} stock {p['stock']} < {need}{hint}")
         if p["library"] != "Basic" and not p["preferred"]:
             fee += 1
         cost += (p["price"] or 0) * need
@@ -122,10 +138,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--bom", action="store_true", help="also check live JLC stock (network)")
     ap.add_argument("--qty", type=int, default=5)
+    ap.add_argument("--calc-only", action="store_true", help="only the hardware/calc checks (no kicad-cli needed)")
     a = ap.parse_args()
     errors = []
-    check_pins(errors)
-    check_rules(errors)
+    check_calc(errors)
+    if not a.calc_only:
+        check_pins(errors)
+        check_rules(errors)
     if a.bom:
         check_bom(errors, a.qty)
     for e in errors:

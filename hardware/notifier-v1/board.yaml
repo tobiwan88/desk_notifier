@@ -1,0 +1,52 @@
+# Board profile: the facts the board-neutral hardware skills and hardware/calc/ scripts read.
+# Skills never hard-code a number; it lives here, in critical.yaml or in parts/<MPN>.yaml.
+name: notifier-v1
+pcb: notifier-v1.kicad_pcb
+sch: notifier-v1.kicad_sch
+generators: {schematic: ../gen/notifier_v1.py, layout: ../gen/layout_v1.py}
+pipeline: ../tools/pipeline_v1.sh
+notes: BOARD.md
+
+fab:
+  house: JLCPCB
+  assembly: "JLCPCB PCBA, Standard (J2 is through-hole)"
+  rules: ../rules/jlc-4layer.json       # design floors, keep in sync with router_rules
+  router_rules: ../rules/krt-fab.txt
+  custom_drc: ../rules/notifier.kicad_dru
+
+# JLC04161H-7628, 1.6 mm, 1 oz outer. Numbers from https://jlcpcb.com/impedance (2026-10); no impedance control ordered.
+stackup:
+  name: JLC04161H-7628
+  copper_mm: 0.035
+  soldermask: {thickness_mm: 0.015, er: 3.8}
+  layers:
+    - {name: F.Cu, ref: In1.Cu, dielectric_mm: 0.2104, er: 4.4}   # prepreg 7628
+    - {name: In1.Cu, role: GND plane}
+    - {name: In2.Cu, role: +3V3 plane}
+    - {name: B.Cu, ref: In2.Cu, dielectric_mm: 0.2104, er: 4.4}
+
+net_classes:
+  Default: {track_mm: 0.2, clearance_mm: 0.15}
+  Power: {track_mm: 0.4, clearance_mm: 0.15, nets: [VBUS_IN, VBUS, +3V3, GND, SW]}
+  USB: {track_mm: 0.27, gap_mm: 0.15, nets: [/USB_DP, /USB_DN, /MCU/MCU_USB_DP, /MCU/MCU_USB_DN]}
+
+# BOM: acceptable substitutes per LCSC number. The gate names the first in-stock one when the primary runs short.
+# It never swaps silently: `note` says what else has to change.
+alternates:
+  C2913204:
+    - {lcsc: C2913201, note: "ESP32-S3-WROOM-1 N8R8: octal PSRAM, set CONFIG_SPIRAM_MODE_OCT=y"}
+
+# Regulator design inputs (calc/buck.py). Part numbers come from parts/<card>.yaml, values from the board.
+power:
+  - name: buck
+    ic: U3
+    card: TLV62569
+    inductor: L1
+    inductor_card: CKCS4030-2.2uH
+    divider: {top: R9, bottom: R10}
+    vin_v: [4.75, 5.25]       # USB 2.0 VBUS range (before the polyfuse drop)
+    vout_v: 3.3
+    vout_tol_pct: 3
+    iout_a: 0.5               # load estimate: ESP32-S3 Wi-Fi TX peaks + display + sensors (verify on the bench)
+    cout: [C2, C11]
+    cout_derating: 0.5        # 22 uF 0805 X5R at 3.3 V keeps about 11 uF (verify on the cap's DC-bias curve)

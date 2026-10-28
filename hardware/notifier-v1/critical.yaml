@@ -1,0 +1,55 @@
+# Critical blocks of notifier-v1, declared by intent. hardware/calc/critical.py checks them on the routed board.
+# Pins are REF.PAD. Distances are pad centre to pad centre (mm). Nets use the full KiCad name (/Sheet/NET).
+# `known:` turns a FAIL into a WARN for a deviation already accepted for this revision; say what fixes it.
+# Limits are design targets unless a source is named next to them (then: datasheet + section).
+
+switcher_loop:   # input cap, switch and GND as one small loop; inductor tight to the switch node
+  - name: buck
+    cin: C1
+    vin: U3.4
+    gnd: U3.2
+    max_mm: 3.0
+    sw: U3.3
+    inductor: L1.1
+    sw_max_mm: 3.0
+    known: "C1 GND pad 5.5 mm from U3 GND (input loop too big); move C1 next to U3 pins 2/4 in the next revision"
+
+feedback:        # divider at the FB pin, short FB trace
+  - name: buck_fb
+    pin: U3.5
+    divider: [R9.2, R10.1]
+    max_mm: 3.0
+    net: /Power/FB
+    max_len_mm: 5.0
+
+decoupling:      # each cap at the supply pin it serves
+  - {pin: U1.2, cap: C5.1, max_mm: 4.0}
+  - {pin: U1.2, cap: C6.1, max_mm: 4.0}
+  - {pin: U1.2, cap: C10.1, max_mm: 4.0, known: "C10 1 uF is 8.4 mm from the module 3V3 pin; move it beside C6 in the next revision"}
+  - {pin: U4.8, cap: C7.1, max_mm: 4.0, known: "C7 6.1 mm from BME688 VDD (island space); move closer in the next revision"}
+  - {pin: U4.6, cap: C8.1, max_mm: 4.0, known: "C8 4.1 mm from BME688 VDDIO (island space)"}
+  - {pin: U5.3, cap: C9.1, max_mm: 3.0}
+
+series_termination:   # series R at the driving pin (USB: Espressif S3 schematic checklist "USB")
+  - {source: U1.20, part: R13.1, max_mm: 3.0}   # LCD SCLK
+  - {source: U1.13, part: R11.2, max_mm: 4.0}   # USB D-
+  - {source: U1.14, part: R12.2, max_mm: 4.0}   # USB D+
+
+diff_pair:       # impedance from the stackup (calc/impedance.py), skew and vias from the routed board
+  - name: usb
+    p: /USB_DP
+    n: /USB_DN
+    net_class: USB
+    z_diff: 90
+    tol_ohm: 10
+    max_skew_mm: 5.0
+    max_vias: 2      # D- A7/B7 join needs a 1.4 mm B.Cu jumper (0.5 mm pad pitch); fine at 12 Mbit/s
+
+thermal_distance:   # heat sources away from the climate sensors (footprint centres)
+  - {source: U3, sensor: U4, min_mm: 20}
+  - {source: L1, sensor: U4, min_mm: 20}
+  - {source: U3, sensor: U5, min_mm: 20}
+  - {source: L1, sensor: U5, min_mm: 20}
+
+# Review only (no script yet): return_path (no signal over a plane split), keepout (antenna strip, island, J1 shell
+# are DRC rule areas made in gen/layout_v1.py).

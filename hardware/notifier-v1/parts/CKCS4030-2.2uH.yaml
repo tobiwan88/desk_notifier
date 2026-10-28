@@ -1,0 +1,12 @@
+# Datasheet card (see TLV62569.yaml for the format).
+mpn: CKCS4030-2.2uH
+role: buck inductor (L1)
+lcsc: C354584
+source:
+  url: null               # Cenker product page / datasheet PDF
+  revision: null
+values:
+  l_uh: {value: 2.2, section: null}
+  isat_a: {value: null, section: null}
+  irms_a: {value: null, section: null}
+  dcr_mohm: {value: null, section: null}
