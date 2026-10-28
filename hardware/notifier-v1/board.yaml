@@ -12,7 +12,8 @@ fab:
   assembly: "JLCPCB PCBA, Standard (J2 is through-hole)"
   rules: ../rules/jlc-4layer.json       # design floors, keep in sync with router_rules
   router_rules: ../rules/krt-fab.txt
-  custom_drc: ../rules/notifier.kicad_dru
+  custom_drc: ../rules/notifier.kicad_dru   # edit here; layout_v1.py copies it next to the board
+  same_net_via_to_smd_mm: 0.15             # .kicad_dru rule; route_krt.sh asks KRT for 0.1, finish.py nudges vias to 0.2
 
 # JLC04161H-7628, 1.6 mm, 1 oz outer. Numbers from https://jlcpcb.com/impedance (2026-10); no impedance control ordered.
 stackup:
@@ -20,15 +21,20 @@ stackup:
   copper_mm: 0.035
   soldermask: {thickness_mm: 0.015, er: 3.8}
   layers:
-    - {name: F.Cu, ref: In1.Cu, dielectric_mm: 0.2104, er: 4.4}   # prepreg 7628
-    - {name: In1.Cu, role: GND plane}
-    - {name: In2.Cu, role: +3V3 plane}
-    - {name: B.Cu, ref: In2.Cu, dielectric_mm: 0.2104, er: 4.4}
+    - {name: F.Cu, role: signal, ref: In1.Cu, dielectric_mm: 0.2104, er: 4.4}   # prepreg 7628
+    - {name: In1.Cu, role: plane, net: GND}
+    - {name: In2.Cu, role: plane, net: +3V3}
+    - {name: B.Cu, role: signal, ref: In2.Cu, dielectric_mm: 0.2104, er: 4.4}
 
-net_classes:
-  Default: {track_mm: 0.2, clearance_mm: 0.15}
+net_classes:   # mirrors gen/layout_v1.py (NETCLASS_PATTERNS, rules())
+  Default: {track_mm: 0.2, clearance_mm: 0.15, via_mm: 0.6, drill_mm: 0.3}
+  # Power class is 0.4 mm, but route_krt.sh routes +3V3 and GND tracks at 0.2 (the planes carry their current)
   Power: {track_mm: 0.4, clearance_mm: 0.15, nets: [VBUS_IN, VBUS, +3V3, GND, SW]}
   USB: {track_mm: 0.27, gap_mm: 0.15, nets: [/USB_DP, /USB_DN, /MCU/MCU_USB_DP, /MCU/MCU_USB_DN]}
+
+layout:
+  stitch_pitch_mm: [2, 3]     # GND stitching vias between outer pours (common practice; review)
+  thermal_relief: {spoke_mm: 0.3, gap_mm: 0.25, spokes: 4}   # 4 spokes = hand-solder option
 
 # BOM: acceptable substitutes per LCSC number. The gate names the first in-stock one when the primary runs short.
 # It never swaps silently: `note` says what else has to change.
@@ -49,4 +55,5 @@ power:
     vout_tol_pct: 3
     iout_a: 0.5               # load estimate: ESP32-S3 Wi-Fi TX peaks + display + sensors (verify on the bench)
     cout: [C2, C11]
-    cout_derating: 0.5        # 22 uF 0805 X5R at 3.3 V keeps about 11 uF (verify on the cap's DC-bias curve)
+    cout_derating: {value: 0.5, source: null}   # 22 uF 0805 at 3.3 V ~11 uF (PLAN.md); source = cap DC-bias curve
+    isat_margin: 1.2          # inductor Isat >= peak current x margin (design margin)

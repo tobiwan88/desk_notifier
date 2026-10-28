@@ -40,6 +40,7 @@ diff_pair:       # impedance from the stackup (calc/impedance.py), skew and vias
     p: /USB_DP
     n: /USB_DN
     net_class: USB
+    layer: F.Cu      # impedance is computed on this layer's dielectric
     z_diff: 90
     tol_ohm: 10
     max_skew_mm: 5.0

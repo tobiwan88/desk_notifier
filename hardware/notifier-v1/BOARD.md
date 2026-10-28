@@ -13,8 +13,11 @@ TLV62569 buck to 3.3 V, BME688 on a sensor island, SHT40, 7-pin GC9A01 display h
 - Schematic only: `uv run --package desk-hardware python hardware/gen/notifier_v1.py hardware/notifier-v1` (prints `nets OK` or the mismatches).
 - Full chain: `hardware/tools/pipeline_v1.sh [--bom]`: schematic + net check and placement (`build_v1.sh`), routing (`route_krt.sh`), cleanup and pours (`finish.py`), gate, review renders, fab package.
 - Order step: `hardware/tools/pipeline_v1.sh --fab-only --bom` (committed board as is, clean tree required).
-- Gate: `scripts/hw-check.sh [--bom --qty N]` must print `hardware checks: OK`. Without kicad-cli it runs only the `hardware/calc` checks.
-- Calc checks: `uv run --package desk-hardware python hardware/calc/{critical,buck,impedance}.py hardware/notifier-v1`.
+- Gate: `scripts/hw-check.sh [--bom --qty N]` must print `hardware checks: OK`. Without kicad-cli it prints SKIP and runs only the `hardware/calc` checks. With `--bom` (order time) `buck.py` runs `--strict`: MISSING datasheet values fail.
+- Calc list: `CALC` in `hardware/tools/checks.py` (critical, buck, impedance). One by one: `uv run --package desk-hardware python hardware/calc/<script>.py hardware/notifier-v1`.
+- Stock and price: `uv run --package desk-hardware python hardware/tools/jlcparts.py C123456` or `-s "keyword" -n 20` (fields `library`, `stock`, `price`).
+- Review renders: `out/review/notifier-v1/`; add regions in the `render_review.py` call in `pipeline_v1.sh` as `name=x0,y0,x1,y1`.
+- Fab package (gerbers zip, BOM, CPL): `hardware/out/fab/notifier-v1/`.
 - Routers: `hardware/tools/setup_tools.sh` (git, uv, curl, Java). KRT in `hardware/.tools/`.
 
 ## Generators
@@ -37,20 +40,25 @@ TLV62569 buck to 3.3 V, BME688 on a sensor island, SHT40, 7-pin GC9A01 display h
 - Antenna: overhangs the top edge; `ANTENNA_STRIP` keepout with no copper or vias.
 - USB pair: drawn and locked in `layout_v1.py`. USB-C D+/D- pads are interleaved (A6/B6, A7/B7): D+ joined above the pad row, D- below with a 1.4 mm B.Cu jumper (2 vias, fine at 12 Mbit/s). ESD USBLC6 rotated 270 for flow-through; its VBUS/GND middle pins leave by via. Nothing but GND under J1's metal shell (DRC rule area).
 - SHT40 DFN (0.3 mm pad gap): hand-drawn escape stubs in `layout_v1.py`.
+- Pours: thermal reliefs spoke 0.3 / gap 0.25 (`board.yaml` `layout`); Default vias 0.6/0.3.
+- Same-net via to SMD pad: `.kicad_dru` wants 0.15 mm, `route_krt.sh` passes `--same-net-pad-clearance 0.1` and `finish.py` nudges vias to 0.2; align the router flag with the DRC rule when touching routing.
 - Copper-to-edge floor is 0.3 mm (`rules/jlc-4layer.json`, `rules/krt-fab.txt`); generic 3 mm advice is for boards with panel handling needs, verify if the outline changes.
 - Power tracks 0.4 mm on VBUS_IN/VBUS/SW (DRC min 0.3), +3V3/GND tracks 0.2 mm, planes carry the rest.
 - Known deviations (WARN in `critical.yaml`): buck input cap C1 GND side, C10, C7, C8 further from their pins than wanted. Fix in the next revision.
 
 ## Fab and order
 - Fab floors: clearance 0.127, track 0.127, via 0.45/0.2, hole-to-hole 0.5, edge 0.3 (two files, change both).
-- `fab_package.py`: `ROTATION` corrections (USB-C +180, SOT-223 +180, SOT-23 -90, Bosch LGA +90, Sensirion DFN 270). J1 and U2 were wrong in JLC's preview once: check U1-U5, J1, D1, L1, F1, J2 in the preview.
+- `fab_package.py`: BOM grouped by (LCSC, footprint); CPL rotation = KiCad rotation, bottom side 180 - rotation, plus `ROTATION` corrections from an old community table (USB-C +180, SOT-223 +180, SOT-23 -90, Bosch LGA +90, Sensirion DFN 270). J1 and U2 were wrong in JLC's preview once: check U1-U5, J1, D1, L1, F1, J2 in the preview.
 - BME688 (C3664478) stock fluctuates around 200 and costs about $11.7: the usual order blocker. Re-check right before ordering; assemble 2 boards to save if needed.
 - J2 is through-hole: Standard PCBA.
+- SHT40: JLC lists it as "DFN-4-EP", the KiCad footprint has no centre pad: verify which one the board needs in the placement preview.
 - Human steps: KiCad review; display module pin order vs bottom silkscreen (a VCC/GND swap kills it); JLC placement preview; payment.
 
 ## Pitfalls (this board and this host)
 | Symptom | Cause | Fix |
 |---|---|---|
+| LED or diode reversed, ERC clean | kicad-sch-api 0.5.x rotates pins wrong at 90/270 deg | `schkit.pin_pos`/`pin_away`; net-intent check |
+| Labels all left-justified | kicad-sch-api writes labels left-justified | `schkit.save` right-justifies at 180/270 deg |
 | Router: open EN/GND/VBUS nets left of the module | crowded corner | `pipeline_v1.sh` retries (`KRT_TRIES`) until the gate passes |
 | `uv run` can't import the hardware tools | root project only | `uv run --package desk-hardware` |
 | macOS: `ld: tapi error: malformed file ... libSystem.B.tbd` | CLT SDK vs linker | `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk scripts/check.sh` |

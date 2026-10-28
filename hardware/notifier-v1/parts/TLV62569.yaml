@@ -1,5 +1,6 @@
-# Datasheet card: facts from the OFFICIAL datasheet only, each with its section. null = not read yet / not stated.
-# Scripts read these numbers; a null makes the check report MISSING instead of guessing.
+# Datasheet card: facts from the OFFICIAL datasheet only, each with its section.
+# value null = not read yet (scripts report MISSING); section: not stated = datasheet silent.
+# A value without a section is unsourced (scripts report WARN): find its section before ordering.
 mpn: TLV62569DBV
 role: buck converter (3.3 V rail from VBUS)
 lcsc: C141836

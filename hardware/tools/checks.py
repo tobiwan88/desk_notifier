@@ -5,7 +5,8 @@
 - reserved pins: no S3 strapping/USB/PSRAM pin used for anything but its job
 - BOM: every LCSC part exists, is in stock for QTY boards, Basic/Extended count and cost; names an in-stock
   alternate from board.yaml when a part runs short
-- calc: the board-neutral scripts in hardware/calc/ (critical blocks, power design, impedance) on the board profile
+- calc: (with --bom also buck.py --strict, so no datasheet value may be missing at order time)
+  the board-neutral scripts in hardware/calc/ (critical blocks, power design, impedance) on the board profile
 Usage: uv run --package desk-hardware python hardware/tools/checks.py [--bom] [--qty 5] [--calc-only]
 """
 
@@ -28,7 +29,8 @@ BOARD = BOARD_DIR / "notifier-v1"
 CALC = ["critical.py", "buck.py", "impedance.py"]
 NEVER_WAIVE = {"clearance", "shorting_items", "hole_clearance", "hole_to_hole", "unconnected", "drill_out_of_range",
                "track_width", "courtyards_overlap", "copper_edge_clearance", "annular_width", "via_diameter",
-               "tracks_crossing", "zones_intersect", "starved_thermal"}
+               "tracks_crossing", "zones_intersect", "starved_thermal",
+               "physical_clearance"}  # custom .kicad_dru rules (via in SMD pad) report as physical_clearance
 KCONFIG_NET = {"DESK_LCD_PIN_SCLK": "MCU_LCD_SCLK", "DESK_LCD_PIN_MOSI": "LCD_MOSI", "DESK_LCD_PIN_DC": "LCD_DC",
                "DESK_LCD_PIN_RST": "LCD_RST", "DESK_LCD_PIN_CS": "LCD_CS", "DESK_I2C_SDA": "I2C_SDA",
                "DESK_I2C_SCL": "I2C_SCL"}
@@ -98,9 +100,11 @@ def check_pins(errors):
             errors.append(f"reserved pin: GPIO{gpio} carries {net}")
 
 
-def check_calc(errors):
+def check_calc(errors, strict=False):
+    """strict (order step): MISSING datasheet values fail."""
     for script in CALC:
-        r = subprocess.run([sys.executable, str(ROOT / "hardware/calc" / script), str(BOARD_DIR)],
+        extra = ["--strict"] if strict and script == "buck.py" else []
+        r = subprocess.run([sys.executable, str(ROOT / "hardware/calc" / script), str(BOARD_DIR), *extra],
                            capture_output=True, text=True)
         print(r.stdout.rstrip())
         if r.returncode:
@@ -141,7 +145,7 @@ def main():
     ap.add_argument("--calc-only", action="store_true", help="only the hardware/calc checks (no kicad-cli needed)")
     a = ap.parse_args()
     errors = []
-    check_calc(errors)
+    check_calc(errors, strict=a.bom)
     if not a.calc_only:
         check_pins(errors)
         check_rules(errors)

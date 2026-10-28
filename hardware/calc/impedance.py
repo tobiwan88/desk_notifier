@@ -1,7 +1,7 @@
 """Differential impedance of edge-coupled microstrip over a GND plane: quasi-static 2D finite-difference solve.
 
 Checks every diff_pair in critical.yaml against its net class (board.yaml) and the outer layer of the stackup:
-  impedance.py hardware/<board>                 PASS/FAIL per pair (Zdiff with soldermask vs z_diff +- tol_ohm)
+  impedance.py hardware/<board>                 OK/FAIL per pair (Zdiff with soldermask vs z_diff +- tol_ohm)
   impedance.py hardware/<board> --try 0.25/0.15 explore widths/gaps (mm) on the same stackup
 Self-test (--selftest): wide gap (S=3.0) gives 2x the single-line Z0 (~62 ohm for W 0.27 on JLC04161H-7628).
 Fab calculators (e.g. jlcpcb.com/impedance) are the cross-check: write their inputs and result into the order notes.
@@ -75,6 +75,7 @@ def main():
     a = ap.parse_args()
     prof = load_profile(a.board_dir)
     stack = prof["stackup"]
+    layers = {l["name"]: l for l in stack["layers"]}
     outer = stack["layers"][0]
     if a.selftest:
         z_wide, _ = zdiff(0.27, 3.0, outer, stack)
@@ -90,12 +91,13 @@ def main():
     rows = []
     for e in prof["critical"].get("diff_pair", []):
         nc = prof["net_classes"][e["net_class"]]
-        bare, masked = zdiff(nc["track_mm"], nc["gap_mm"], outer, stack)
+        layer = layers[e.get("layer", outer["name"])]
+        bare, masked = zdiff(nc["track_mm"], nc["gap_mm"], layer, stack)
         ok = abs(masked - e["z_diff"]) <= e["tol_ohm"]
         rows.append(("OK" if ok else "FAIL", f"{e['name']}: Zdiff",
                      f"{masked:.1f} ohm with mask ({bare:.1f} bare), W {nc['track_mm']} S {nc['gap_mm']}, "
-                     f"target {e['z_diff']} +- {e['tol_ohm']}"))
-    fails = report(rows, f"impedance: {a.board_dir} ({stack['name']}, {outer['name']})")
+                     f"{layer['name']}, target {e['z_diff']} +- {e['tol_ohm']}"))
+    fails = report(rows, f"impedance: {a.board_dir} ({stack['name']})")
     print("impedance:", "FAILED" if fails else "OK")
     sys.exit(1 if fails else 0)
 
