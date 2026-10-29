@@ -94,7 +94,7 @@ SILK = [  # (text, x, y, size, layer). 1.0 mm text where it fits (JLC minimum 0.
     ("5V", 33.9, 21.9, 0.8, "F"), ("3V3", 33.6, 24.5, 0.8, "F"),  # JP1: pad 3 (VBUS) on top, pad 1 (3V3) below; ships bridged to 3V3
 ] + [(name, J2_X - 2.4, 26.0 - 2.54 * i, 1.0, "B") for i, name in enumerate(("RST", "CS", "DC", "SDA", "SCL", "GND", "VCC"))]
 
-USB_W, USB_GAP = 0.27, 0.15  # sized for ~91 ohm differential with mask where coupled (tools/impedance.py); the pair is only coupled ~0.5 mm, see the USB block in main()
+USB_W, USB_GAP = 0.27, 0.15  # sized for ~91 ohm differential with mask where coupled (calc/impedance.py); the pair is only coupled ~0.5 mm, see the USB block in main()
 NETCLASS_PATTERNS = {"Power": ["VBUS_IN", "VBUS", "+3V3", "GND", "SW"], "USB": ["/USB_DP", "/USB_DN", "/MCU/MCU_USB_DP", "/MCU/MCU_USB_DN"]}
 
 

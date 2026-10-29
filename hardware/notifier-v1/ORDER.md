@@ -41,7 +41,7 @@ Designator, Mid X, Mid Y, Layer, Rotation. Mounting holes, test pads and the sol
   USB D+/D- are **0.27 mm tracks, 0.15 mm gap** on L1 over the In1 GND plane. They are coupled only for about 0.5 mm
   (elsewhere about 2 mm apart); it is a short (about 13 mm) full-speed pair, so coupling is not critical. A few
   stubs next to J1 are 0.2 mm and the D- A7/B7 join uses two 0.45/0.2 vias and a 1.4 mm B.Cu jumper (edge-coupled microstrip, `h` 0.2104 mm,
-  er 4.4, copper 0.035 mm; 2D field solver `hardware/tools/impedance.py`): Zdiff about 95 ohm bare, about 91 ohm with
+  er 4.4, copper 0.035 mm; 2D field solver `hardware/calc/impedance.py`): Zdiff about 95 ohm bare, about 91 ohm with
   soldermask. To cross-check in JLC's online calculator (jlcpcb.com/impedance): 4 layers, 1.6 mm, JLC04161H-7628,
   differential, L1 reference L2, width 0.27, spacing 0.15.
 - Surface finish **ENIG**: flat pads for the BME688 LGA (0.8 mm pitch) and SHT40 DFN, no HASL meniscus; costs a little

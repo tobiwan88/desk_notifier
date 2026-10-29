@@ -1,0 +1,19 @@
+# Datasheet card: facts from the OFFICIAL datasheet only, each with its section.
+# value null = not read yet (scripts report MISSING); section: not stated = datasheet silent.
+# A value without a section is unsourced (scripts report WARN): find its section before ordering.
+mpn: TLV62569DBV
+role: buck converter (3.3 V rail from VBUS)
+lcsc: C141836
+source:
+  url: https://www.ti.com/lit/ds/symlink/tlv62569.pdf
+  revision: null          # fill in the revision letter when the card is checked against the PDF
+values:
+  vref_v: {value: 0.6, section: null, note: "used by the existing divider design (gen/notifier_v1.py R9/R10)"}
+  fsw_hz: {value: null, section: null}
+  iout_max_a: {value: 2.0, section: null, note: "2 A part (hardware/PLAN.md)"}
+  cout_effective_uf: {value: [10, 47], section: "8.2.2.5"}
+  vin_max_v: {value: null, section: null}
+checklist:   # what the hw-parts skill checks against the schematic; tick with the section that confirms it
+  - "Vout formula and divider: section ?"
+  - "input cap value and placement: section ?"
+  - "layout guidelines (input loop, SW node, FB away from SW): section ?"
