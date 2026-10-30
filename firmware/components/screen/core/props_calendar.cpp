@@ -115,7 +115,7 @@ constexpr std::uint32_t kPot = 0xD9824A, kPotDark = 0x8A4A24, kPotRim = 0xE8985E
 constexpr std::uint32_t kCakePink = 0xFF9EC4, kCakePinkDark = 0xE0679E, kIcing = 0xFFF6F8, kIcingDark = 0xD9C4CC,
                         kCandleCream = 0xFFF4DC, kCandleCreamDark = 0xC9B48A, kAcorn = 0xB37B40,
                         kAcornDark = 0x6E4220, kAcornCap = 0x6E4220, kAcornCapDark = 0x3E2410;
-constexpr std::uint32_t kPretzel = 0xB5703A, kPretzelDark = 0x7A4220, kEggPink = 0xFFB3C6,
+constexpr std::uint32_t kEggPink = 0xFFB3C6,
                         kEggPinkDark = 0xD97E98, kEggBlue = 0xB8E0FF, kEggBlueDark = 0x7AAAD6,
                         kEggYellow = 0xFFF3A3, kEggYellowDark = 0xD6C866, kEggGreen = 0xC5F5C0,
                         kEggGreenDark = 0x7CB878, kWicker = 0xC8914F, kWickerDark = 0x7A4E22, kWickerRim = 0xDDA86A;

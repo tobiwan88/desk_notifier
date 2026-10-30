@@ -10,6 +10,7 @@ namespace sensor {
 struct Reading {
     float temp_c = 0, rh = 0, hpa = 0, gas_ohm = 0;
     bool gas_valid = false;  // heater stable and gas measurement valid
+    bool sht40 = false;      // temp_c / rh come from the SHT40 (the BME688's own are skewed by its heater)
 };
 
 enum class Level : std::uint8_t { WarmingUp, Good, Fair, Stale, Poor };

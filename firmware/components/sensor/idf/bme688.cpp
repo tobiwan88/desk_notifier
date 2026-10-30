@@ -11,6 +11,7 @@
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "sensor/core/sht4x.hpp"
 
 extern "C" {
 #include "bme68x.h"
@@ -21,9 +22,11 @@ namespace {
 
 const char* const kTag = "bme688";
 constexpr std::uint32_t kPeriodMs = 3000;
+constexpr int kShtAddr = 0x44;
 
 i2c_master_bus_handle_t g_bus = nullptr;
 i2c_master_dev_handle_t g_dev = nullptr;
+i2c_master_dev_handle_t g_sht = nullptr;  // SHT40, null when it does not answer
 bme68x_dev g_bme{};
 Tracker g_tracker;
 
@@ -63,7 +66,19 @@ bool configure() {
     return bme68x_set_heatr_conf(BME68X_FORCED_MODE, &heat, &g_bme) == BME68X_OK;
 }
 
+bool sht_read(float& temp_c, float& rh) {
+    if (!g_sht) return false;
+    const std::uint8_t cmd = sht4x::kCmdMeasureHigh;
+    std::uint8_t frame[sht4x::kFrameLen];
+    if (i2c_master_transmit(g_sht, &cmd, 1, 100) != ESP_OK) return false;
+    vTaskDelay(pdMS_TO_TICKS(sht4x::kMeasureMs));
+    if (i2c_master_receive(g_sht, frame, sizeof frame, 100) != ESP_OK) return false;
+    return sht4x::decode(frame, temp_c, rh);
+}
+
 bool sample(Reading& out) {
+    float sht_t = 0, sht_rh = 0;
+    const bool sht_ok = sht_read(sht_t, sht_rh);  // before the BME688 heater pulse
     if (bme68x_set_op_mode(BME68X_FORCED_MODE, &g_bme) != BME68X_OK) return false;
     bme68x_conf conf{};
     (void)bme68x_get_conf(&conf, &g_bme);
@@ -73,8 +88,9 @@ bool sample(Reading& out) {
     std::uint8_t n = 0;
     if (bme68x_get_data(BME68X_FORCED_MODE, &d, &n, &g_bme) != BME68X_OK || n == 0) return false;
     if (!(d.status & BME68X_NEW_DATA_MSK)) return false;
-    out.temp_c = d.temperature;
-    out.rh = d.humidity;
+    out.temp_c = sht_ok ? sht_t : d.temperature;
+    out.rh = sht_ok ? sht_rh : d.humidity;
+    out.sht40 = sht_ok;
     out.hpa = d.pressure / 100.0f;
     out.gas_ohm = d.gas_resistance;
     out.gas_valid = (d.status & BME68X_GASM_VALID_MSK) && (d.status & BME68X_HEAT_STAB_MSK);
@@ -97,9 +113,9 @@ void task(void*) {
             g_snap.errors = ++errors;
         }
         taskEXIT_CRITICAL(&g_mux);
-        if (ok) ESP_LOGI(kTag, "%.2f C  %.1f %%  %.1f hPa  gas %.0f ohm%s  score %d", static_cast<double>(r.temp_c),
+        if (ok) ESP_LOGI(kTag, "%.2f C  %.1f %%  %.1f hPa  gas %.0f ohm%s  score %d  [%s]", static_cast<double>(r.temp_c),
                          static_cast<double>(r.rh), static_cast<double>(r.hpa), static_cast<double>(r.gas_ohm),
-                         r.gas_valid ? "" : " (unstable)", g_snap.quality.score);
+                         r.gas_valid ? "" : " (unstable)", g_snap.quality.score, r.sht40 ? "sht40" : "bme688 only");
         else ESP_LOGW(kTag, "read failed (%d in a row)", errors);
         vTaskDelay(pdMS_TO_TICKS(kPeriodMs));
     }
@@ -125,6 +141,20 @@ bool attach(int addr) {
     return bme68x_init(&g_bme) == BME68X_OK && configure();
 }
 
+void attach_sht() {
+    if (g_sht) return;
+    if (i2c_master_probe(g_bus, kShtAddr, 50) != ESP_OK) {
+        ESP_LOGW(kTag, "no SHT40 at 0x%02x: temperature and humidity come from the BME688 (reads high)", kShtAddr);
+        return;
+    }
+    i2c_device_config_t dc = {};
+    dc.dev_addr_length = I2C_ADDR_BIT_LEN_7;
+    dc.device_address = kShtAddr;
+    dc.scl_speed_hz = 100000;
+    if (i2c_master_bus_add_device(g_bus, &dc, &g_sht) != ESP_OK) g_sht = nullptr;
+    else ESP_LOGI(kTag, "SHT40 up at 0x%02x: temperature and humidity from it", kShtAddr);
+}
+
 void scan() {
     g_scan.clear();
     for (int a = 0x08; a < 0x78; ++a) {
@@ -143,6 +173,7 @@ void init_task(void*) {  // keeps trying until a BME68x answers, then becomes th
         for (int addr : {cfg::kBmeAddr, 0x76, 0x77}) {
             if (attach(addr)) {
                 ESP_LOGI(kTag, "BME68x up at 0x%02x (variant %d)", addr, g_bme.variant_id);
+                attach_sht();
                 task(nullptr);
             }
         }

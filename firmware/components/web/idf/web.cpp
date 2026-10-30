@@ -83,12 +83,13 @@ esp_err_t get_status(httpd_req_t* r) {
 
 esp_err_t get_sensor(httpd_req_t* r) {
     const auto s = sensor::latest();
-    char b[320];
+    char b[360];
     std::snprintf(b, sizeof b,
-        R"({"ok":%s,"temp_c":%.2f,"humidity":%.1f,"pressure_hpa":%.1f,"gas_ohm":%.0f,"gas_valid":%s,"score":%d,"level":"%s","age_ms":%lu})",
+        R"({"ok":%s,"temp_c":%.2f,"humidity":%.1f,"pressure_hpa":%.1f,"gas_ohm":%.0f,"gas_valid":%s,"score":%d,"level":"%s","age_ms":%lu,"temp_src":"%s"})",
         s.ok ? "true" : "false", static_cast<double>(s.reading.temp_c), static_cast<double>(s.reading.rh),
         static_cast<double>(s.reading.hpa), static_cast<double>(s.reading.gas_ohm), s.reading.gas_valid ? "true" : "false",
-        s.quality.score, sensor::level_name(s.quality.level), static_cast<unsigned long>(s.age_ms));
+        s.quality.score, sensor::level_name(s.quality.level), static_cast<unsigned long>(s.age_ms),
+        s.reading.sht40 ? "sht40" : "bme688");
     send_json(r, "200 OK", b);
     return ESP_OK;
 }
