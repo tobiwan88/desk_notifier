@@ -316,7 +316,11 @@ Outfit outfit_for(bool weather_ok, const weather::Forecast& w) noexcept {
     o.ice_cream = w.temp_c >= kHotC;
     o.sunglasses = w.is_day && (w.sky == Sky::Clear || w.sky == Sky::PartlyCloudy);
     o.windy = w.wind_kmh >= kWindyKmh;
-    o.umbrella = o.windy || w.sky == Sky::Drizzle || w.sky == Sky::Rain || w.sky == Sky::Thunder;
+    const auto rainy = [](Sky s) { return s == Sky::Drizzle || s == Sky::Rain || s == Sky::Thunder; };
+    // Raining right now, or a rainy day code that is backed by a real chance of rain (a "drizzle" day at 0 % is dry).
+    const bool rain_now = w.now_code >= 0 && rainy(weather::sky_from_wmo(w.now_code));
+    const bool rain_day = rainy(w.sky) && (w.precip_pct < 0 || w.precip_pct >= kUmbrellaPct);
+    o.umbrella = o.windy || rain_now || rain_day;
     if (o.umbrella) o.ice_cream = false;  // the paws hold the umbrella
     return o;
 }

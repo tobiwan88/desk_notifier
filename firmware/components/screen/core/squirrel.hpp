@@ -38,6 +38,7 @@ struct Outfit {
     bool scarf = false;
 };
 inline constexpr float kColdC = 8.0f, kHotC = 25.0f, kWindyKmh = 30.0f;
+inline constexpr int kUmbrellaPct = 40;  // a rainy day code only counts from this chance of precipitation (-1 = unknown counts)
 [[nodiscard]] Outfit outfit_for(bool weather_ok, const weather::Forecast& w) noexcept;
 
 struct AirData {

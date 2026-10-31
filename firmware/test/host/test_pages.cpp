@@ -205,6 +205,18 @@ TEST_CASE("the squirrel dresses for sun, rain and wind") {
     CHECK_FALSE(screen::outfit_for(true, wx(18, Sky::Cloudy)).sunglasses);
     for (Sky s : {Sky::Drizzle, Sky::Rain, Sky::Thunder}) CHECK(screen::outfit_for(true, wx(15, s)).umbrella);
     CHECK_FALSE(screen::outfit_for(true, wx(-2, Sky::Snow)).umbrella);
+    auto drizzle_day = wx(15, Sky::Drizzle);  // today's code says drizzle...
+    drizzle_day.precip_pct = 0;               // ...but nothing is expected: no umbrella
+    CHECK_FALSE(screen::outfit_for(true, drizzle_day).umbrella);
+    drizzle_day.precip_pct = 39;
+    CHECK_FALSE(screen::outfit_for(true, drizzle_day).umbrella);
+    drizzle_day.precip_pct = 40;
+    CHECK(screen::outfit_for(true, drizzle_day).umbrella);
+    drizzle_day.precip_pct = 0;
+    drizzle_day.now_code = 61;  // but it is raining right now
+    CHECK(screen::outfit_for(true, drizzle_day).umbrella);
+    drizzle_day.now_code = 0;   // clear now, dry day
+    CHECK_FALSE(screen::outfit_for(true, drizzle_day).umbrella);
     CHECK_FALSE(screen::outfit_for(true, wx(15, Sky::Clear)).umbrella);
     CHECK_FALSE(screen::outfit_for(true, wx(15, Sky::Clear, true, 29.9f)).windy);
     CHECK(screen::outfit_for(true, wx(15, Sky::Clear, true, 30)).windy);
