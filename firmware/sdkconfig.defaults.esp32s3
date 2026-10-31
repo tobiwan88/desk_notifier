@@ -2,3 +2,5 @@
 CONFIG_SPIRAM_MODE_QUAD=y
 CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
 CONFIG_DESK_BOARD_NOTIFIER_V1=y
+# quad PSRAM at 80 MHz (flash is 80 MHz too): the frame buffer lives there, 40 MHz made rendering the bottleneck
+CONFIG_SPIRAM_SPEED_80M=y

@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desk Notifier Setup</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--ink:#1c2230;--mute:#667085;--line:#dfe3ea;--acc:#c2410c;--accink:#fff;--ok:#15803d;--bad:#b42318}
+@media (prefers-color-scheme:dark){:root{--bg:#12151c;--card:#1b2029;--ink:#e8ebf1;--mute:#98a2b3;--line:#2b3340;--acc:#fb923c;--accink:#1b1206;--ok:#4ade80;--bad:#f97066}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:34rem;margin:0 auto;padding:16px}
+h1{font-size:1.35rem;margin:8px 0 2px}
+h2{font-size:1rem;margin:0 0 10px}
+p{margin:.3rem 0}
+.sub,.mute{color:var(--mute);font-size:.9rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
+label{display:block;font-size:.85rem;color:var(--mute);margin:10px 0 4px}
+input,select{width:100%;font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px}
+button{font:inherit;border:0;border-radius:8px;padding:11px 14px;background:var(--acc);color:var(--accink);font-weight:600;cursor:pointer}
+button.alt{background:transparent;color:var(--ink);border:1px solid var(--line);font-weight:500}
+button:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.row>*{flex:1 1 auto}
+.nets{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.nets button{padding:6px 10px;font-weight:500;font-size:.9rem}
+.msg{min-height:1.4em;font-size:.9rem;margin:8px 0}
+.ok{color:var(--ok)}.bad{color:var(--bad)}
+a{color:var(--acc)}
+dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0}
+dt{color:var(--mute)}dd{margin:0;word-break:break-all}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<h1>Desk Notifier Setup</h1>
+<p class="sub">Set up Wi-Fi, clock and name over Bluetooth, and find the IP address.</p>
+
+<div class="card" id="unsupported" hidden>
+  <h2>This browser cannot do Bluetooth</h2>
+  <p>Use Chrome or Edge on Android or on a computer. On an iPhone, Safari has no Web Bluetooth: install the Bluefy browser and open this page there.</p>
+</div>
+<div class="card" id="insecure" hidden>
+  <h2>Needs HTTPS</h2>
+  <p>Browsers only allow Bluetooth on pages served over HTTPS (or localhost). Open this page from its https address.</p>
+</div>
+
+<div class="card" id="connectCard">
+  <h2>1. Connect</h2>
+  <p class="mute">Power the notifier, then press the button and pick it from the list (it is named like its hostname, "squirrel" by default). The first time, a 6-digit code appears on its display: type it when your phone asks.</p>
+  <div class="row"><button id="connectBtn">Connect</button></div>
+</div>
+
+<div id="main" hidden>
+  <div class="card">
+    <h2>Status</h2>
+    <dl>
+      <dt>Wi-Fi</dt><dd id="stWifi">…</dd>
+      <dt>IP address</dt><dd id="stIp">…</dd>
+      <dt>Name</dt><dd id="stHost">…</dd>
+      <dt>Clock</dt><dd id="stTime">…</dd>
+      <dt>Firmware</dt><dd id="stVer">…</dd>
+    </dl>
+    <p class="mute" id="stResult"></p>
+  </div>
+
+  <div class="card">
+    <h2>Wi-Fi</h2>
+    <div class="row"><button class="alt" id="scanBtn">Scan for networks</button></div>
+    <div class="nets" id="nets"></div>
+    <label for="ssid">Network name</label>
+    <input id="ssid" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="32">
+    <label for="pass">Password (empty for an open network)</label>
+    <input id="pass" type="password" autocomplete="off" maxlength="63">
+    <div class="row"><button id="wifiBtn">Save and connect</button></div>
+  </div>
+
+  <div class="card">
+    <h2>Clock</h2>
+    <label for="tzSel">Time zone</label>
+    <select id="tzSel"></select>
+    <div class="row">
+      <button class="alt" id="tzDetect">Use this phone's zone</button>
+      <button id="tzBtn">Save</button>
+    </div>
+    <p class="mute">The time itself comes from the internet once Wi-Fi works.</p>
+  </div>
+
+  <div class="card">
+    <h2>Name and restart</h2>
+    <label for="host">Hostname (letters, digits, dashes)</label>
+    <input id="host" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="32">
+    <div class="row"><button id="hostBtn">Save name</button><button class="alt" id="rebootBtn">Restart device</button></div>
+    <p class="mute">A new name is used after a restart.</p>
+  </div>
+</div>
+
+<p class="msg" id="msg" role="status"></p>
+</main>
+
+<script>
+'use strict';
+const UUID = n => `6e2b000${n}-3b7c-4f1e-9a52-5d0a6c1e7b30`;
+const SVC = UUID(1);
+const $ = id => document.getElementById(id);
+
+// POSIX TZ strings: the device needs these, not IANA names. ids = zone names a phone may report.
+const ZONES = [
+  ['Central Europe (Berlin, Paris, Rome, Madrid, Vienna)', 'CET-1CEST,M3.5.0,M10.5.0/3', ['Europe/Berlin','Europe/Paris','Europe/Rome','Europe/Madrid','Europe/Vienna','Europe/Zurich','Europe/Amsterdam','Europe/Brussels','Europe/Stockholm','Europe/Oslo','Europe/Copenhagen','Europe/Prague','Europe/Warsaw','Europe/Budapest']],
+  ['United Kingdom (London)', 'GMT0BST,M3.5.0/1,M10.5.0', ['Europe/London']],
+  ['Ireland (Dublin)', 'IST-1GMT0,M10.5.0,M3.5.0/1', ['Europe/Dublin']],
+  ['Portugal (Lisbon)', 'WET0WEST,M3.5.0/1,M10.5.0', ['Europe/Lisbon']],
+  ['Eastern Europe (Athens, Helsinki, Kyiv)', 'EET-2EEST,M3.5.0/3,M10.5.0/4', ['Europe/Athens','Europe/Helsinki','Europe/Kyiv','Europe/Kiev','Europe/Bucharest','Europe/Sofia']],
+  ['Turkey (Istanbul)', '<+03>-3', ['Europe/Istanbul']],
+  ['Moscow', 'MSK-3', ['Europe/Moscow']],
+  ['US Eastern (New York)', 'EST5EDT,M3.2.0,M11.1.0', ['America/New_York','America/Toronto','America/Detroit']],
+  ['US Central (Chicago)', 'CST6CDT,M3.2.0,M11.1.0', ['America/Chicago','America/Winnipeg']],
+  ['US Mountain (Denver)', 'MST7MDT,M3.2.0,M11.1.0', ['America/Denver','America/Edmonton']],
+  ['US Arizona (Phoenix)', 'MST7', ['America/Phoenix']],
+  ['US Pacific (Los Angeles)', 'PST8PDT,M3.2.0,M11.1.0', ['America/Los_Angeles','America/Vancouver']],
+  ['US Alaska', 'AKST9AKDT,M3.2.0,M11.1.0', ['America/Anchorage']],
+  ['Hawaii', 'HST10', ['Pacific/Honolulu']],
+  ['Mexico City', 'CST6', ['America/Mexico_City']],
+  ['Brazil (Sao Paulo)', '<-03>3', ['America/Sao_Paulo']],
+  ['Argentina (Buenos Aires)', '<-03>3', ['America/Argentina/Buenos_Aires','America/Buenos_Aires']],
+  ['UTC', 'UTC0', ['UTC','Etc/UTC']],
+  ['South Africa', 'SAST-2', ['Africa/Johannesburg']],
+  ['Egypt (Cairo)', 'EET-2EEST,M4.5.5/0,M10.5.4/24', ['Africa/Cairo']],
+  ['West Africa (Lagos)', 'WAT-1', ['Africa/Lagos']],
+  ['East Africa (Nairobi)', 'EAT-3', ['Africa/Nairobi']],
+  ['Gulf (Dubai)', '<+04>-4', ['Asia/Dubai']],
+  ['India', 'IST-5:30', ['Asia/Kolkata','Asia/Calcutta']],
+  ['Thailand (Bangkok)', '<+07>-7', ['Asia/Bangkok']],
+  ['China', 'CST-8', ['Asia/Shanghai']],
+  ['Singapore', '<+08>-8', ['Asia/Singapore']],
+  ['Japan (Tokyo)', 'JST-9', ['Asia/Tokyo']],
+  ['Korea (Seoul)', 'KST-9', ['Asia/Seoul']],
+  ['Australia East (Sydney, Melbourne)', 'AEST-10AEDT,M10.1.0,M4.1.0/3', ['Australia/Sydney','Australia/Melbourne']],
+  ['Australia (Brisbane)', 'AEST-10', ['Australia/Brisbane']],
+  ['Australia (Adelaide)', 'ACST-9:30ACDT,M10.1.0,M4.1.0/3', ['Australia/Adelaide']],
+  ['Australia (Perth)', 'AWST-8', ['Australia/Perth']],
+  ['New Zealand (Auckland)', 'NZST-12NZDT,M9.5.0,M4.1.0/3', ['Pacific/Auckland']],
+];
+
+const dec = new TextDecoder(), enc = new TextEncoder();
+const ch = {};
+let device = null, st = null, queue = Promise.resolve();
+
+const gatt = fn => (queue = queue.then(fn, fn));  // Web Bluetooth allows one GATT operation at a time
+function say(text, cls = '') { const m = $('msg'); m.textContent = text; m.className = 'msg ' + cls; }
+const wait = ms => new Promise(r => setTimeout(r, ms));
+
+function fillZones() {
+  const sel = $('tzSel');
+  ZONES.forEach(([label, posix], i) => sel.add(new Option(label, String(i))));
+  sel.add(new Option('Other (keep what the device has)', 'keep'));
+}
+function zoneIndexFor(posix) { return ZONES.findIndex(z => z[1] === posix); }
+
+async function readStatus() {
+  const v = await gatt(() => ch.status.readValue());
+  st = JSON.parse(dec.decode(v));
+  render();
+  return st;
+}
+
+function render() {
+  const wifi = { connected: `Connected to ${st.ssid} (${st.rssi} dBm)`, connecting: `Connecting to ${st.ssid}…`, none: 'Not set up yet' };
+  $('stWifi').textContent = wifi[st.wifi] || st.wifi;
+  const ip = $('stIp');
+  ip.textContent = '';
+  if (st.ip) {
+    const a = document.createElement('a');
+    a.href = `http://${st.ip}/`;
+    a.textContent = st.ip;
+    ip.append(a, document.createTextNode('  '));
+    const b = document.createElement('a');
+    b.href = `http://${st.host}.local/`;
+    b.textContent = `${st.host}.local`;
+    ip.append(b);
+  } else ip.textContent = '–';
+  $('stHost').textContent = st.host;
+  $('stTime').textContent = st.time ? 'Set' : 'Not set yet (needs Wi-Fi)';
+  $('stVer').textContent = st.v;
+  $('stResult').textContent = st.result && st.result !== 'ready' ? `Last action: ${st.result}` : '';
+  if (!$('ssid').value) $('ssid').value = st.ssid;
+  $('host').placeholder = st.host;
+  const zi = zoneIndexFor(st.tz);
+  if (!$('tzSel').dataset.touched) $('tzSel').value = zi >= 0 ? String(zi) : 'keep';
+}
+
+async function connect() {
+  try {
+    device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SVC] }] });
+    device.addEventListener('gattserverdisconnected', () => {
+      $('main').hidden = true;
+      $('connectCard').hidden = false;
+      say('Disconnected. Press Connect to talk to the notifier again.');
+    });
+    say('Connecting. If your phone asks for a code, type the 6 digits shown on the display.');
+    const server = await device.gatt.connect();
+    const svc = await server.getPrimaryService(SVC);
+    ch.status = await svc.getCharacteristic(UUID(2));
+    ch.config = await svc.getCharacteristic(UUID(3));
+    ch.scan = await svc.getCharacteristic(UUID(4));
+    await readStatus();  // the first read is what makes the phone pair
+    ch.status.addEventListener('characteristicvaluechanged', () => readStatus().catch(() => {}));
+    await gatt(() => ch.status.startNotifications());
+    await gatt(() => ch.scan.startNotifications());
+    $('connectCard').hidden = true;
+    $('main').hidden = false;
+    say('Connected.', 'ok');
+  } catch (e) {
+    if (e.name === 'NotFoundError') say('');  // picker closed
+    else say(`Could not connect: ${e.message}. Wrong or missing code? Try again.`, 'bad');
+  }
+}
+
+async function send(obj) {
+  const data = enc.encode(JSON.stringify(obj));
+  try {
+    await gatt(() => (ch.config.writeValueWithResponse ? ch.config.writeValueWithResponse(data) : ch.config.writeValue(data)));
+    await readStatus();
+    return true;
+  } catch (e) {
+    try { await readStatus(); } catch (_) {}
+    say(`The device refused it${st ? ': ' + st.result : ''}.`, 'bad');
+    return false;
+  }
+}
+
+let scanWait = null;
+async function scan() {
+  const btn = $('scanBtn');
+  btn.disabled = true;
+  say('Looking for networks…');
+  const done = new Promise(res => { scanWait = res; });
+  ch.scan.addEventListener('characteristicvaluechanged', () => scanWait && scanWait(), { once: true });
+  try {
+    await gatt(() => (ch.scan.writeValueWithResponse ? ch.scan.writeValueWithResponse(Uint8Array.of(1)) : ch.scan.writeValue(Uint8Array.of(1))));
+    await Promise.race([done, wait(15000)]);
+    const list = JSON.parse(dec.decode(await gatt(() => ch.scan.readValue())));
+    const box = $('nets');
+    box.textContent = '';
+    list.forEach(n => {
+      const b = document.createElement('button');
+      b.className = 'alt';
+      b.textContent = n.ssid + (n.sec ? '' : ' (open)');
+      b.onclick = () => { $('ssid').value = n.ssid; $('pass').focus(); };
+      box.append(b);
+    });
+    say(list.length ? 'Tap a network, then type its password.' : 'No networks found. Type the name yourself.');
+  } catch (e) {
+    say(`Scan failed: ${e.message}`, 'bad');
+  }
+  btn.disabled = false;
+}
+
+async function saveWifi() {
+  const ssid = $('ssid').value.trim(), pass = $('pass').value;
+  if (!ssid) return say('Enter the network name.', 'bad');
+  if (pass && (pass.length < 8 || pass.length > 63)) return say('A Wi-Fi password has 8 to 63 characters.', 'bad');
+  $('wifiBtn').disabled = true;
+  say('Sending…');
+  if (await send({ ssid, pass })) {
+    say(`Joining ${ssid}…`);
+    for (let i = 0; i < 20; ++i) {
+      await wait(1500);
+      await readStatus().catch(() => {});
+      if (st && st.wifi === 'connected') { say(`Connected. IP address: ${st.ip}`, 'ok'); $('wifiBtn').disabled = false; return; }
+    }
+    say('Could not join. Check the password and that the network is in range, then try again.', 'bad');
+  }
+  $('wifiBtn').disabled = false;
+}
+
+async function saveZone() {
+  const v = $('tzSel').value;
+  if (v === 'keep') return say('Nothing changed.');
+  if (await send({ tz: ZONES[+v][1] })) say('Time zone saved.', 'ok');
+}
+
+function detectZone() {
+  const name = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const i = ZONES.findIndex(z => z[2].includes(name));
+  if (i < 0) return say(`Your zone (${name}) is not in the list: pick the nearest one.`, 'bad');
+  $('tzSel').value = String(i);
+  $('tzSel').dataset.touched = '1';
+  say(`Detected ${name}. Press Save.`);
+}
+
+async function saveHost() {
+  const h = $('host').value.trim();
+  if (!h) return say('Enter a name.', 'bad');
+  if (await send({ hostname: h })) say('Name saved. Restart the device to use it.', 'ok');
+}
+
+async function reboot() {
+  if (await send({ reboot: true })) say('Restarting. Press Connect again in a few seconds.', 'ok');
+}
+
+(function init() {
+  if (!navigator.bluetooth) { $('unsupported').hidden = false; $('connectCard').hidden = true; return; }
+  if (!window.isSecureContext) { $('insecure').hidden = false; $('connectCard').hidden = true; return; }
+  fillZones();
+  $('tzSel').addEventListener('change', e => { e.target.dataset.touched = '1'; });
+  $('connectBtn').onclick = connect;
+  $('scanBtn').onclick = scan;
+  $('wifiBtn').onclick = saveWifi;
+  $('tzBtn').onclick = saveZone;
+  $('tzDetect').onclick = detectZone;
+  $('hostBtn').onclick = saveHost;
+  $('rebootBtn').onclick = reboot;
+})();
+</script>
+</body>
+</html>

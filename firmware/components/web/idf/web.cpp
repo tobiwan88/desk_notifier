@@ -68,12 +68,13 @@ esp_err_t get_status(httpd_req_t* r) {
     char b[1024];
     std::snprintf(b, sizeof b,
         R"({"version":"%s","idf":"%s","hostname":"%s","uptime_s":%lld,"heap_internal":%u,"heap_min":%u,"psram_free":%u,)"
-        R"("frame_ms_avg":%lu,"frame_ms_max":%lu,"rssi":%d,"ip":"%s","time_valid":%s,"auth":"%s","resets":"%s",)"
+        R"("frame_ms_avg":%lu,"frame_ms_max":%lu,"render_ms_avg":%.1f,"blit_ms_avg":%.1f,"rssi":%d,"ip":"%s","time_valid":%s,"auth":"%s","resets":"%s",)"
         R"("sensor":{"ok":%s,"errors":%d,"i2c":"%s"},"alert":%s,"snoozed":%s,"fs_free":%lu,"spi_hz":%d,"page":"%s"})",
         app->version, app->idf_ver, net::hostname().c_str(), static_cast<long long>(esp_timer_get_time() / 1000000),
         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)), static_cast<unsigned>(heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL)),
         static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_SPIRAM)),
-        static_cast<unsigned long>(sc.frame_us_avg / 1000), static_cast<unsigned long>(sc.frame_us_max / 1000), net::rssi(), net::ip().c_str(),
+        static_cast<unsigned long>(sc.frame_us_avg / 1000), static_cast<unsigned long>(sc.frame_us_max / 1000),
+        sc.render_us_avg / 1000.0, sc.blit_us_avg / 1000.0, net::rssi(), net::ip().c_str(),
         clock_sync::valid() ? "true" : "false", g_open ? "open" : "token", settings::get("rst").value_or("").c_str(),
         sn.ok ? "true" : "false", sn.errors, sensor::i2c_scan().c_str(), sc.alert ? "true" : "false", sc.snoozed ? "true" : "false",
         static_cast<unsigned long>(storage::free_bytes()), CONFIG_DESK_LCD_SPI_HZ, screen::page_name(screen::page()));
@@ -83,13 +84,13 @@ esp_err_t get_status(httpd_req_t* r) {
 
 esp_err_t get_sensor(httpd_req_t* r) {
     const auto s = sensor::latest();
-    char b[360];
+    char b[400];
     std::snprintf(b, sizeof b,
-        R"({"ok":%s,"temp_c":%.2f,"humidity":%.1f,"pressure_hpa":%.1f,"gas_ohm":%.0f,"gas_valid":%s,"score":%d,"level":"%s","age_ms":%lu,"temp_src":"%s"})",
+        R"({"ok":%s,"temp_c":%.2f,"humidity":%.1f,"pressure_hpa":%.1f,"gas_ohm":%.0f,"gas_valid":%s,"score":%d,"level":"%s","age_ms":%lu,"temp_src":"%s","bme_temp_c":%.2f})",
         s.ok ? "true" : "false", static_cast<double>(s.reading.temp_c), static_cast<double>(s.reading.rh),
         static_cast<double>(s.reading.hpa), static_cast<double>(s.reading.gas_ohm), s.reading.gas_valid ? "true" : "false",
         s.quality.score, sensor::level_name(s.quality.level), static_cast<unsigned long>(s.age_ms),
-        s.reading.sht40 ? "sht40" : "bme688");
+        s.reading.sht40 ? "sht40" : "bme688", static_cast<double>(s.reading.bme_temp_c));
     send_json(r, "200 OK", b);
     return ESP_OK;
 }

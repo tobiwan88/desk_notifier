@@ -15,11 +15,14 @@ namespace screen {
 struct Stats {
     std::uint32_t frame_us_avg = 0, frame_us_max = 0;
     std::uint32_t frames = 0;
+    std::uint32_t render_us_avg = 0, blit_us_avg = 0;  // the frame time split: drawing into the frame buffer, pushing it to the panel
     bool alert = false;
     bool snoozed = false;
 };
 
 [[nodiscard]] std::expected<void, engine::Err> start() noexcept;
+void bench() noexcept;  // logs the render time of fixed scenes (console `bench`)
+void show_pair_code(std::uint32_t code) noexcept;  // Bluetooth passkey over every page for 60 s, 0 clears it
 void ack() noexcept;   // button or POST /api/ack: snoozes the fresh-air alert
 Stats stats() noexcept;
 void show_page(Page p) noexcept;  // fade to this page (it then rotates on as usual)

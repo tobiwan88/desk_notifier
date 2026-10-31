@@ -1,6 +1,6 @@
 # Desk notifier
 
-A small desk display on an ESP32-C61. A round 240x240 GC9A01 screen turns through three animated pages: a clock with today's forecast for Munich, a cute squirrel that shows the indoor air quality from a BME688 sensor, and the squirrel's day at home, which follows the clock (coffee in the morning, laptop, lunch, reading, sleep). When the air gets bad the squirrel stays on screen and asks you to open a window until you press a button.
+A small desk display on an ESP32-S3. A round 240x240 GC9A01 screen turns through three animated pages: a clock with today's forecast for Munich, a cute squirrel that shows the indoor air quality from a BME688 sensor, and the squirrel's day at home, which follows the clock (coffee in the morning, laptop, lunch, reading, sleep). When the air gets bad the squirrel stays on screen and asks you to open a window until you press a button.
 
 ![The pages](docs/media/pages_tour.gif)
 
@@ -11,14 +11,14 @@ One repo holds the whole product: firmware, the custom board and the 3D-printed 
 
 | Part | Where | State |
 |---|---|---|
-| Firmware (ESP-IDF v6.1, C++23, host-tested core) | [`firmware/`](firmware/), [`docs/`](docs/) | Runs on an ESP32-C61 dev board with a GC9A01 and a BME688. Builds for the ESP32-S3 custom board too (`DESK_BOARD_NOTIFIER_V1`). |
+| Firmware (ESP-IDF v6.1, C++23, host-tested core) | [`firmware/`](firmware/), [`docs/`](docs/) | Runs on the ESP32-S3 custom board (`DESK_BOARD_NOTIFIER_V1`) with a GC9A01, a BME688 and an SHT40; flashed and checked on a real board (sensors, display, Bluetooth setup). |
 | Board `notifier-v1` (KiCad 10, 4 layers, 50 x 36 mm, JLCPCB assembly) | [`hardware/`](hardware/README.md) | Generated, routed and gate-checked, fab package builds. **Not ordered yet**: human review in KiCad, JLC placement preview and the display pinout check are still open ([`ORDER.md`](hardware/notifier-v1/ORDER.md)). |
 | Case (Fusion, 3D printed PLA, two parts, snap-fit) | [`hardware/mechanics/`](hardware/mechanics/README.md) | First model with print files and a fit coupon. **Never printed.** |
 | Helper tools (page previews, clip preparation) | [`tools/`](tools/), [`clipprep/`](clipprep/) | Used by the checks. |
 
 ## Limitations
 Please read these before building one.
-- **Two MCUs.** The dev-board setup uses the ESP32-C61 (8 MB flash). The custom board uses an ESP32-S3-WROOM-1-N8R2, because C61 and C5 modules had no stock at JLCPCB. Firmware and board are both in the repo, but the combination (firmware on the S3 board) has not been flashed on a real notifier-v1 board, since none exists yet.
+- **ESP32-S3 only.** The board uses an ESP32-S3-WROOM-1-N8R2, because C61 and C5 modules had no stock at JLCPCB. The earlier ESP32-C61 breadboard setup is no longer built or tested. The case is still untested (below).
 - **The case is untested.** No part of it has been printed. The display module has no 3D model, so the pocket, window and plug alignment rest on assumed dimensions (header 2.54 mm, pin row 3.0 mm above the PCB edge, glass centre 26.5 mm above it, PCB plus glass 5.74 mm). Print `display_dummy.stl` and `coupon_m1.stl` first and compare. The SHT40 height (1.0 mm) is also an assumption. The cover needs one support and the USB-C collar may sit about 0.7 mm short of the connector.
 - **Display orientation is unconfirmed.** The image is mirrored on X by default (`DESK_LCD_MIRROR_X`); flip it in menuconfig if your panel shows it backwards. The pin order of the display module on the board's socket is also still to be checked against a real module.
 - **The air score is not BSEC.** It is a simple estimate from humidity and gas resistance and needs a few minutes of warm-up. The sensor reads a little warm next to the board, so indoor temperature is slightly high.
@@ -43,7 +43,7 @@ Planned: pictures that stay on screen until acknowledged, Bosch BSEC2 for a prop
 
 ## What you need
 Dev setup (works today), or the custom board in `hardware/` once it is built:
-- ESP32-C61 board (8 MB flash)
+- ESP32-S3 board with 8 MB flash and PSRAM (the notifier-v1 board, or an S3 dev board with the same pins)
 - GC9A01 round display, 240x240, SPI
 - BME688 breakout (I2C)
 - A push button (optional)
@@ -111,7 +111,7 @@ It is a simple estimate, not Bosch BSEC. 25 points come from humidity (best at 4
 ## Hardware and case
 - Board: open `hardware/notifier-v1/notifier-v1.kicad_pro` with `hardware/open.sh`. Regenerate with `hardware/tools/pipeline_v1.sh`, check with `scripts/hw-check.sh`, order steps in [`hardware/notifier-v1/ORDER.md`](hardware/notifier-v1/ORDER.md), design notes in [`hardware/PLAN.md`](hardware/PLAN.md). Needs KiCad 10 (`source scripts/kicad-env.sh`).
 - Case: print files and notes in [`hardware/mechanics/`](hardware/mechanics/README.md) (PLA, 0.2 mm layers, Bambu Lab plate included). Print the fit coupon first.
-- Custom-board firmware: `idf.py -B build-s3 -DIDF_TARGET=esp32s3 -DSDKCONFIG=build-s3/sdkconfig build` in `firmware/`.
+- Firmware: `idf.py build` in `firmware/` (target ESP32-S3). Wi-Fi, time zone and name can be set from a phone over Bluetooth: [`setup/`](setup/README.md).
 
 ## License
 MIT. The BME68x driver in `firmware/components/sensor/third_party` is from Bosch Sensortec (BSD-3-Clause).

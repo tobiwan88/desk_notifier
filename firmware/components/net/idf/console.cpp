@@ -110,6 +110,11 @@ int cmd_sensor(int, char**) {
     return 0;
 }
 int cmd_ack(int, char**) { screen::ack(); return 0; }
+int cmd_bench(int, char**) {
+    screen::bench();
+    std::printf("benchmark queued: the result appears in the log within a second\n");
+    return 0;
+}
 int cmd_page(int argc, char** argv) {  // page clock|air|day|next
     if (argc == 2 && !std::strcmp(argv[1], "next")) { screen::next_page(); return 0; }
     if (argc == 2) if (const auto p = screen::page_from_name(argv[1])) { screen::show_page(*p); return 0; }
@@ -155,6 +160,7 @@ std::expected<void, engine::Err> start_console() noexcept {
         {.command = "status", .help = "show status", .hint = nullptr, .func = cmd_status, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "fsbench", .help = "fsbench <clip>", .hint = nullptr, .func = cmd_fsbench, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "lcd", .help = "lcd pins | init [spi_hz]", .hint = nullptr, .func = cmd_lcd, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
+        {.command = "bench", .help = "time the page renderer (result in the log)", .hint = nullptr, .func = cmd_bench, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "page", .help = "page clock|air|day|next", .hint = nullptr, .func = cmd_page, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "weather", .help = "weather | weather refresh | weather at <lat> <lon> [name]", .hint = nullptr, .func = cmd_weather, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "sensor", .help = "show BME688 reading", .hint = nullptr, .func = cmd_sensor, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},

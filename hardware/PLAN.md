@@ -22,7 +22,7 @@ scripts/hw-check.sh [--bom --qty N]      # the gate alone (also part of scripts/
   modules had zero stock at JLC (all variants). N8R8 (C2913201) is the fallback (octal PSRAM:
   `CONFIG_SPIRAM_MODE_OCT=y`, GPIO35-37 are unused anyway). Antenna overhangs the top edge.
   Firmware: `DESK_BOARD_NOTIFIER_V1` (Kconfig choice, default on S3) sets the pin map;
-  `sdkconfig.defaults.esp32s3`; build with `idf.py -B build-s3 -DIDF_TARGET=esp32s3 -DSDKCONFIG=build-s3/sdkconfig build`.
+  `sdkconfig.defaults.esp32s3`; build with `idf.py build` in `firmware/` (S3 is the default target).
   Silkscreen: the board carries no reference designators (no space; only user labels, pin names and the order number). Refs live on F.Fab/B.Fab; the review pack's `layer_top.png` plots `F.Cu,F.SilkS,F.Fab,Edge.Cuts`, so the small refs in it come from F.Fab. The assembly drawing for debugging is the review pack or the KiCad file. The title is `v1 ${GIT_SHA}`; the project text variable is the worst case `0000000-dirty` so DRC (`silk_overlap`, `silk_over_copper`) gates the widest title (16 chars, ends at x about 28.8, JP1 `5V` starts at 33.0); `fab_package.py` plots with the real SHA. The review pack therefore shows `0000000-dirty`.
   Datasheet fixes: 22 ohm series R11/R12 (C25092) on USB D+/D- at the module (nets `MCU_USB_DP`/`MCU_USB_DN`), 1 uF C10 at 3V3, second 22 uF C11 on the buck output (Espressif checklist, TLV62569 sec 8.2.2.5).
 - **Enclosure orientation**: the board lies flat. The round GC9A01 plugs into the right-angle socket J2 on the RIGHT edge

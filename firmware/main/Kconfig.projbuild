@@ -4,7 +4,7 @@ menu "Desk notifier"
         default DESK_BOARD_NOTIFIER_V1 if IDF_TARGET_ESP32S3
         default DESK_BOARD_BREADBOARD
         config DESK_BOARD_BREADBOARD
-            bool "ESP32-C61 breadboard (display and BME688 on jumper wires)"
+            bool "ESP32-C61 breadboard (display and BME688 on jumper wires; no longer built or tested, the S3 is the only target)"
         config DESK_BOARD_NOTIFIER_V1
             bool "notifier-v1 PCB (ESP32-S3-WROOM-1, hardware/notifier-v1)"
     endchoice

@@ -138,9 +138,9 @@ silk. The assembly drawing for debugging is that review pack (`hardware/out/revi
 ## Bring-up
 1. Visual check; measure 3V3 (TP "3V3") and VBUS to GND for shorts.
 2. USB-C from a current-limited supply or a powered hub: red LED on, 3.3 V on the 3V3 pad.
-3. First delete `firmware/build-s3/sdkconfig` (or run `idf.py -B build-s3 fullclean`) so the Kconfig defaults for notifier-v1
+3. First delete `firmware/sdkconfig` (or run `idf.py fullclean`) so the Kconfig defaults for notifier-v1
    (`DESK_BTN=-1`, pin map) apply instead of an older cached sdkconfig. Flash over the native USB (S3 USB Serial/JTAG):
-   `cd firmware && idf.py -B build-s3 -DIDF_TARGET=esp32s3 -DSDKCONFIG=build-s3/sdkconfig -p /dev/cu.usbmodem* flash monitor`
+   `cd firmware && idf.py -p /dev/cu.usbmodem* flash monitor`
    If it does not enumerate (no buttons on this board): bridge GND-IO0 with tweezers, bridge EN-GND briefly, release IO0. Fallback: UART pads TX/RX/GND with a USB-UART adapter.
-4. Wi-Fi credentials over the console, then `GET /api/status`: `sensor.i2c` must list 0x44 (SHT40) and 0x77 (BME688).
+4. Wi-Fi credentials over the console (or from a phone over Bluetooth: `setup/index.html`), then `GET /api/status`: `sensor.i2c` must list 0x44 (SHT40) and 0x77 (BME688).
 5. Plug in the display (JP1 on 3V3), check orientation and colours (DESK_LCD_MIRROR_X/BGR may differ from the breadboard).

@@ -29,6 +29,14 @@ std::uint32_t g_backoff_ms = 1000;
 
 void retry_cb(TimerHandle_t) { esp_wifi_connect(); }
 
+wifi_config_t sta_config(const std::string& ssid, const std::string& pass) {
+    wifi_config_t wc{};
+    std::strncpy(reinterpret_cast<char*>(wc.sta.ssid), ssid.c_str(), sizeof wc.sta.ssid - 1);
+    std::strncpy(reinterpret_cast<char*>(wc.sta.password), pass.c_str(), sizeof wc.sta.password - 1);
+    wc.sta.threshold.authmode = pass.empty() ? WIFI_AUTH_OPEN : WIFI_AUTH_WPA2_PSK;
+    return wc;
+}
+
 void on_event(void*, esp_event_base_t base, std::int32_t id, void* data) {
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
         esp_wifi_connect();
@@ -79,7 +87,7 @@ std::expected<void, engine::Err> init() noexcept {
     esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, on_event, nullptr);
     esp_wifi_set_storage(WIFI_STORAGE_RAM);
     esp_wifi_set_mode(WIFI_MODE_STA);
-    esp_wifi_set_ps(WIFI_PS_NONE);
+    esp_wifi_set_ps(WIFI_PS_MIN_MODEM);  // the radio sleeps between beacons: less heat next to the sensors
 
     std::string ssid = settings::get("ssid").value_or(CONFIG_DESK_WIFI_SSID);
     std::string pass = settings::get("pass").value_or(CONFIG_DESK_WIFI_PASSWORD);
@@ -88,10 +96,7 @@ std::expected<void, engine::Err> init() noexcept {
         esp_wifi_start();  // started without config: STA_START triggers connect which fails quietly
         return {};
     }
-    wifi_config_t wc{};
-    std::strncpy(reinterpret_cast<char*>(wc.sta.ssid), ssid.c_str(), sizeof wc.sta.ssid - 1);
-    std::strncpy(reinterpret_cast<char*>(wc.sta.password), pass.c_str(), sizeof wc.sta.password - 1);
-    wc.sta.threshold.authmode = pass.empty() ? WIFI_AUTH_OPEN : WIFI_AUTH_WPA2_PSK;
+    wifi_config_t wc = sta_config(ssid, pass);
     esp_wifi_set_config(WIFI_IF_STA, &wc);
     esp_wifi_start();
     return {};
@@ -107,6 +112,21 @@ std::expected<void, engine::Err> start_mdns() noexcept {
     ESP_LOGI(kTag, "mDNS: %s.local", h.c_str());
     return {};
 }
+
+bool apply_wifi(std::string_view ssid, std::string_view pass) noexcept {
+    const std::string s(ssid), p(pass);
+    wifi_config_t wc = sta_config(s, p);
+    if (esp_wifi_set_config(WIFI_IF_STA, &wc) != ESP_OK) return false;
+    settings::set("ssid", s);
+    settings::set("pass", p);
+    g_backoff_ms = 1000;
+    xTimerStop(g_retry, 0);
+    esp_wifi_disconnect();  // the old network goes; the retry timer then joins the new one
+    xTimerChangePeriod(g_retry, pdMS_TO_TICKS(200), 0);
+    return true;
+}
+
+std::string wifi_ssid() noexcept { return settings::get("ssid").value_or(CONFIG_DESK_WIFI_SSID); }
 
 bool connected() noexcept { return g_connected; }
 bool has_credentials() noexcept { return !settings::get("ssid").value_or(CONFIG_DESK_WIFI_SSID).empty(); }

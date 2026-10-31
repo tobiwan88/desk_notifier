@@ -27,6 +27,7 @@
 #include "screen/core/pages.hpp"
 #include "screen/core/fun.hpp"
 #include "screen/core/memory.hpp"
+#include "screen/core/pair_view.hpp"
 #include "sensor/idf/bme688.hpp"
 #include "settings/idf/settings.hpp"
 #include "weather/idf/client.hpp"
@@ -39,8 +40,12 @@ constexpr std::uint32_t kFramePeriodMs = 1000 / CONFIG_DESK_FPS;
 constexpr std::uint32_t kSnoozeMs = 15u * 60u * 1000u;
 
 std::atomic<bool> g_ack{false};
+std::atomic<bool> g_bench{false};
 std::atomic<int> g_show{-1};       // page requested by the API (-1 none, kPageCount = next)
 std::atomic<int> g_page{0};
+std::atomic<std::uint32_t> g_pair_code{0};   // Bluetooth pairing passkey on screen (0 = none)
+std::atomic<std::uint32_t> g_pair_until{0};  // ms timestamp at which it disappears
+constexpr std::uint32_t kPairShowMs = 60u * 1000u;
 
 Rotator::Config rotation_config() {
     Rotator::Config c;
@@ -97,6 +102,27 @@ bool button_pressed([[maybe_unused]] std::uint32_t now) {
     }
 }
 
+// Console `bench`: draws fixed scenes of each page 20 times and logs the time per frame (no panel traffic), for tuning the renderer.
+void run_bench(const Canvas& cv) {
+    Inputs in;
+    in.time_valid = true; in.hour = 14; in.minute = 5; in.weekday = 2; in.day = 14; in.month = 10; in.year = 2026;
+    in.sensor_ok = true; in.quality = {90, sensor::Level::Good}; in.reading.temp_c = 22; in.reading.rh = 45; in.reading.hpa = 960;
+    in.weather_ok = true; in.weather.temp_c = 12; in.weather.is_day = true; in.weather.sky = weather::Sky::PartlyCloudy;
+    in.weather.max_c = 15; in.weather.min_c = 8; in.weather.precip_pct = 10;
+    constexpr int kRuns = 20;
+    std::uint32_t us[kPageCount] = {};
+    for (int p = 0; p < kPageCount; ++p) {
+        const std::int64_t t0 = esp_timer_get_time();
+        for (int i = 0; i < kRuns; ++i) {
+            in.t_ms = 5000u + static_cast<std::uint32_t>(i) * 100u;
+            render_page(cv, static_cast<Page>(p), in);
+        }
+        us[p] = static_cast<std::uint32_t>((esp_timer_get_time() - t0) / kRuns);
+    }
+    ESP_LOGW(kTag, "bench render per frame: clock %lu us, air %lu us, day %lu us", static_cast<unsigned long>(us[0]),
+             static_cast<unsigned long>(us[1]), static_cast<unsigned long>(us[2]));
+}
+
 void task(void*) {
     esp_task_wdt_add(nullptr);
     auto* fb = static_cast<gfx::Rgb565be*>(heap_caps_malloc(sizeof(gfx::Rgb565be) * gfx::kScreen * gfx::kScreen, MALLOC_CAP_SPIRAM));
@@ -139,9 +165,10 @@ void task(void*) {
     bool golden_seen = false, coin_seen = false;
     std::uint32_t plant_tick = 0;
     int plant_saves = 0;
-    std::uint32_t snooze_until = 0, next_frame = 0, sum_us = 0, max_us = 0, n = 0;
+    std::uint32_t snooze_until = 0, next_frame = 0, sum_us = 0, max_us = 0, n = 0, render_ema_us = 0, blit_ema_us = 0;  // the split follows the page on screen (about 16 frames)
     int stalls = 0;
     for (;;) {
+        if (g_bench.exchange(false)) run_bench(cv);
         const std::uint32_t now = now_ms();
         const auto snap = sensor::latest();
         const bool snoozed = static_cast<std::int32_t>(snooze_until - now) > 0;
@@ -253,14 +280,23 @@ void task(void*) {
             const std::int64_t t0 = esp_timer_get_time();
             render_page(cv, frame.page, in);
             draw::dim(cv, frame.brightness);
+            if (const std::uint32_t code = g_pair_code.load(); code != 0 && static_cast<std::int32_t>(g_pair_until.load() - now) > 0) {
+                char digits[12];
+                std::snprintf(digits, sizeof digits, "%06lu", static_cast<unsigned long>(code % 1000000u));
+                render_pair_code(cv, digits);
+            }
+            const std::int64_t t1 = esp_timer_get_time();
             const bool ok = static_cast<bool>(display::blit(cv.px));
-            const auto us = static_cast<std::uint32_t>(esp_timer_get_time() - t0);
+            const std::int64_t t2 = esp_timer_get_time();
+            const auto us = static_cast<std::uint32_t>(t2 - t0);
             stalls = ok ? 0 : stalls + 1;
             if (stalls >= 3) { ESP_LOGE(kTag, "display stalled, rebooting"); esp_restart(); }
             if (n >= 1000) { sum_us = 0; max_us = 0; n = 0; }  // keep the average recent
             sum_us += us; max_us = us > max_us ? us : max_us; ++n;
+            render_ema_us = render_ema_us == 0 ? static_cast<std::uint32_t>(t1 - t0) : render_ema_us - render_ema_us / 16 + static_cast<std::uint32_t>(t1 - t0) / 16;
+            blit_ema_us = blit_ema_us == 0 ? static_cast<std::uint32_t>(t2 - t1) : blit_ema_us - blit_ema_us / 16 + static_cast<std::uint32_t>(t2 - t1) / 16;
             taskENTER_CRITICAL(&g_mux);
-            g_stats = Stats{sum_us / n, max_us, g_stats.frames + 1, alert, snoozed};
+            g_stats = Stats{sum_us / n, max_us, g_stats.frames + 1, render_ema_us, blit_ema_us, alert, snoozed};
             taskEXIT_CRITICAL(&g_mux);
         }
         esp_task_wdt_reset();
@@ -269,6 +305,13 @@ void task(void*) {
 }
 
 }  // namespace
+
+void bench() noexcept { g_bench = true; }
+
+void show_pair_code(std::uint32_t code) noexcept {
+    g_pair_until = now_ms() + kPairShowMs;
+    g_pair_code = code;
+}
 
 std::expected<void, engine::Err> start() noexcept {
     if (xTaskCreate(task, "screen", 6144, nullptr, 8, nullptr) != pdPASS) return std::unexpected(engine::Err::Io);

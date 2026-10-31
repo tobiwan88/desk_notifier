@@ -1,3 +1,4 @@
+#include "ble/idf/ble.hpp"
 #include "display/idf/display.hpp"
 #include "clock/idf/clock.hpp"
 #include "screen/idf/screen_task.hpp"
@@ -79,6 +80,7 @@ extern "C" void app_main(void) {
     if (!net::start_mdns()) ESP_LOGE(kTag, "mdns failed");
     if (!web::start()) ESP_LOGE(kTag, "web failed");
     if (!net::start_console()) ESP_LOGE(kTag, "console failed");
+    if (!ble::start()) ESP_LOGE(kTag, "ble setup service failed");
     xTaskCreate(selftest, "selftest", 3072, nullptr, 3, nullptr);
     ESP_LOGI(kTag, "up: host=%s auth=%s", net::hostname().c_str(), net::open_access() ? "open" : net::token().c_str());
     // app_main returns; the main task is freed (internal RAM is scarce)
