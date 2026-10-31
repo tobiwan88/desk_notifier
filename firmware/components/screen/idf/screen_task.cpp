@@ -1,5 +1,6 @@
 #include "screen/idf/screen_task.hpp"
 
+#include <utility>
 #include <atomic>
 #include <mutex>
 #include <cctype>
@@ -16,6 +17,7 @@
 #include "display/idf/display.hpp"
 #include "driver/gpio.h"
 #include "esp_heap_caps.h"
+#include "esp_memory_utils.h"
 #include "esp_log.h"
 #include "esp_random.h"
 #include "esp_system.h"
@@ -125,10 +127,18 @@ void run_bench(const Canvas& cv) {
 
 void task(void*) {
     esp_task_wdt_add(nullptr);
-    auto* fb = static_cast<gfx::Rgb565be*>(heap_caps_malloc(sizeof(gfx::Rgb565be) * gfx::kScreen * gfx::kScreen, MALLOC_CAP_SPIRAM));
-    if (!fb) fb = static_cast<gfx::Rgb565be*>(heap_caps_malloc(sizeof(gfx::Rgb565be) * gfx::kScreen * gfx::kScreen, MALLOC_CAP_DEFAULT));
-    if (!fb) { ESP_LOGE(kTag, "no frame buffer"); vTaskDelete(nullptr); return; }
-    const Canvas cv{{fb, static_cast<std::size_t>(gfx::kScreen) * gfx::kScreen}};
+    // Two PSRAM frame buffers (the DMA reads one while the next is drawn into the other); one if the second does not fit.
+    constexpr std::size_t kFrameBytes = sizeof(gfx::Rgb565be) * gfx::kScreen * gfx::kScreen;
+    constexpr std::size_t kFramePx = static_cast<std::size_t>(gfx::kScreen) * gfx::kScreen;
+    gfx::Rgb565be* fbs[2] = {};
+    for (auto& f : fbs) f = static_cast<gfx::Rgb565be*>(heap_caps_aligned_alloc(64, kFrameBytes, MALLOC_CAP_SPIRAM));
+    if (!fbs[0]) std::swap(fbs[0], fbs[1]);
+    if (!fbs[0]) fbs[0] = static_cast<gfx::Rgb565be*>(heap_caps_aligned_alloc(64, kFrameBytes, MALLOC_CAP_DEFAULT));
+    if (!fbs[0]) { ESP_LOGE(kTag, "no frame buffer"); vTaskDelete(nullptr); return; }
+    const int nbuf = fbs[1] ? 2 : 1;
+    const Canvas canvases[2] = {Canvas{{fbs[0], kFramePx}}, Canvas{{fbs[nbuf - 1], kFramePx}}};
+    int cur = 0;
+    ESP_LOGI(kTag, "%d frame buffer(s), %s", nbuf, esp_ptr_external_ram(fbs[0]) ? "PSRAM" : "internal RAM");
     if constexpr (cfg::kButton >= 0) {
         gpio_config_t io = {};
         io.pin_bit_mask = 1ULL << cfg::kButton;
@@ -168,7 +178,7 @@ void task(void*) {
     std::uint32_t snooze_until = 0, next_frame = 0, sum_us = 0, max_us = 0, n = 0, render_ema_us = 0, blit_ema_us = 0;  // the split follows the page on screen (about 16 frames)
     int stalls = 0;
     for (;;) {
-        if (g_bench.exchange(false)) run_bench(cv);
+        if (g_bench.exchange(false)) run_bench(canvases[cur]);
         const std::uint32_t now = now_ms();
         const auto snap = sensor::latest();
         const bool snoozed = static_cast<std::int32_t>(snooze_until - now) > 0;
@@ -277,6 +287,7 @@ void task(void*) {
             const auto frame = rot.tick(now, avail, pin_air ? std::optional<Page>(Page::Air) : std::nullopt);
             g_page = static_cast<int>(frame.page);
 
+            const Canvas& cv = canvases[cur];
             const std::int64_t t0 = esp_timer_get_time();
             render_page(cv, frame.page, in);
             draw::dim(cv, frame.brightness);
@@ -286,7 +297,9 @@ void task(void*) {
                 render_pair_code(cv, digits);
             }
             const std::int64_t t1 = esp_timer_get_time();
-            const bool ok = static_cast<bool>(display::blit(cv.px));
+            bool ok = static_cast<bool>(display::present(cv.px));
+            if (nbuf == 1) ok = ok && static_cast<bool>(display::wait_idle(200));  // the only buffer is busy until it is sent
+            else cur ^= 1;
             const std::int64_t t2 = esp_timer_get_time();
             const auto us = static_cast<std::uint32_t>(t2 - t0);
             stalls = ok ? 0 : stalls + 1;
@@ -314,7 +327,7 @@ void show_pair_code(std::uint32_t code) noexcept {
 }
 
 std::expected<void, engine::Err> start() noexcept {
-    if (xTaskCreate(task, "screen", 6144, nullptr, 8, nullptr) != pdPASS) return std::unexpected(engine::Err::Io);
+    if (xTaskCreatePinnedToCore(task, "screen", 6144, nullptr, 8, nullptr, 1) != pdPASS) return std::unexpected(engine::Err::Io);
     return {};
 }
 

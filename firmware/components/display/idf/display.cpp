@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cstring>
 
 #include "config.hpp"
@@ -23,17 +24,31 @@ namespace {
 const char* const kTag = "display";
 constexpr spi_host_device_t kHost = SPI2_HOST;
 constexpr std::size_t kStripBytes = gfx::kScreen * cfg::kStripLines * 2;
+// One SPI transaction carries up to 60 lines, a frame goes out as 4 of them straight from the PSRAM frame buffer (EDMA)
+constexpr std::size_t kMaxTransfer = gfx::kScreen * 60 * 2;
+constexpr std::size_t kQueueDepth = cfg::kStripCount > 4 ? cfg::kStripCount : 4;
+static_assert(kMaxTransfer <= 32768 && kMaxTransfer % 32 == 0 && kStripBytes <= kMaxTransfer, "SPI transfer size");
 
 esp_lcd_panel_io_handle_t g_io = nullptr;
 esp_lcd_panel_handle_t g_panel = nullptr;
-SemaphoreHandle_t g_free = nullptr;  // counts free strip buffers, given from the ISR
+SemaphoreHandle_t g_free = nullptr;        // counts free strip buffers, given from the ISR
+SemaphoreHandle_t g_frame_done = nullptr;  // one give per finished frame (present), from the ISR
+SemaphoreHandle_t g_lock = nullptr;        // serialises present() and reinit()
+std::atomic<int> g_frames_inflight{0};     // frames handed to the driver and not yet finished (ISR decrements)
+int g_unreaped = 0;                        // finished or running frames whose g_frame_done give is not taken yet
 std::array<std::uint16_t*, cfg::kStripCount> g_bufs{};
 std::size_t g_head = 0;  // next buffer to hand out; returns are FIFO
 int g_hz = 0;
 
-extern "C" IRAM_ATTR bool on_color_done(esp_lcd_panel_io_handle_t, esp_lcd_panel_io_event_data_t*, void* ctx) {
+// Strips and frames never run at the same time (fill/blit/reinit wait for idle first), transfers finish in order.
+extern "C" IRAM_ATTR bool on_color_done(esp_lcd_panel_io_handle_t, esp_lcd_panel_io_event_data_t*, void*) {
     BaseType_t woken = pdFALSE;
-    xSemaphoreGiveFromISR(static_cast<SemaphoreHandle_t>(ctx), &woken);
+    if (g_frames_inflight.load() > 0) {
+        g_frames_inflight.fetch_sub(1);
+        xSemaphoreGiveFromISR(g_frame_done, &woken);
+    } else {
+        xSemaphoreGiveFromISR(g_free, &woken);
+    }
     return woken == pdTRUE;
 }
 
@@ -57,11 +72,11 @@ std::expected<void, engine::Err> create_panel(int hz) noexcept {
     io.dc_gpio_num = static_cast<gpio_num_t>(cfg::kLcdPins[2]);
     io.spi_mode = 0;
     io.pclk_hz = static_cast<unsigned>(hz);
-    io.trans_queue_depth = cfg::kStripCount;
+    io.trans_queue_depth = kQueueDepth;
     io.lcd_cmd_bits = 8;
     io.lcd_param_bits = 8;
     io.on_color_trans_done = on_color_done;
-    io.user_ctx = g_free;
+    io.flags.psram_dma_direct = 1;  // a PSRAM frame buffer is sent without a bounce copy
     if (esp_lcd_new_panel_io_spi(static_cast<esp_lcd_spi_bus_handle_t>(kHost), &io, &g_io) != ESP_OK)
         return std::unexpected(engine::Err::Io);
 
@@ -99,7 +114,9 @@ std::expected<void, engine::Err> bring_up() noexcept {
 
 std::expected<void, engine::Err> init() noexcept {
     g_free = xSemaphoreCreateCounting(cfg::kStripCount, cfg::kStripCount);
-    if (!g_free) return std::unexpected(engine::Err::Io);
+    g_frame_done = xSemaphoreCreateCounting(8, 0);
+    g_lock = xSemaphoreCreateMutex();
+    if (!g_free || !g_frame_done || !g_lock) return std::unexpected(engine::Err::Io);
     for (auto& b : g_bufs) {
         b = static_cast<std::uint16_t*>(heap_caps_malloc(kStripBytes, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL));
         if (!b) return std::unexpected(engine::Err::Io);
@@ -111,7 +128,7 @@ std::expected<void, engine::Err> init() noexcept {
     bus.sclk_io_num = cfg::kLcdPins[0];
     bus.quadwp_io_num = -1;
     bus.quadhd_io_num = -1;
-    bus.max_transfer_sz = static_cast<int>(kStripBytes);
+    bus.max_transfer_sz = static_cast<int>(kMaxTransfer);
     if (spi_bus_initialize(kHost, &bus, SPI_DMA_CH_AUTO) != ESP_OK) return std::unexpected(engine::Err::Io);
 
     if (auto r = create_panel(cfg::kSpiHz); !r) return r;
@@ -119,10 +136,15 @@ std::expected<void, engine::Err> init() noexcept {
 }
 
 std::expected<void, engine::Err> reinit(int hz) noexcept {
-    if (auto w = wait_idle(200); !w) return w;
-    destroy_panel();
-    if (auto r = create_panel(hz > 0 ? hz : g_hz); !r) return r;
-    return bring_up();
+    xSemaphoreTake(g_lock, portMAX_DELAY);
+    std::expected<void, engine::Err> r = wait_idle(200);
+    if (r) {
+        destroy_panel();
+        r = create_panel(hz > 0 ? hz : g_hz);
+        if (r) r = bring_up();
+    }
+    xSemaphoreGive(g_lock);
+    return r;
 }
 
 int spi_hz() noexcept { return g_hz; }
@@ -147,6 +169,10 @@ std::expected<void, engine::Err> push(StripBuf&& b, gfx::Rect r) noexcept {
 }
 
 std::expected<void, engine::Err> wait_idle(std::uint32_t timeout_ms) noexcept {
+    while (g_unreaped > 0) {
+        if (xSemaphoreTake(g_frame_done, pdMS_TO_TICKS(timeout_ms)) != pdTRUE) return std::unexpected(engine::Err::DisplayStall);
+        --g_unreaped;
+    }
     std::size_t got = 0;
     std::expected<void, engine::Err> res{};
     for (; got < cfg::kStripCount; ++got) {
@@ -178,6 +204,19 @@ std::expected<void, engine::Err> blit(std::span<const gfx::Rgb565be> frame) noex
         if (auto r = push(std::move(*b), gfx::Rect{0, static_cast<std::int16_t>(y), gfx::kScreen, static_cast<std::int16_t>(h)}); !r) return r;
     }
     return wait_idle(200);
+}
+
+std::expected<void, engine::Err> present(std::span<const gfx::Rgb565be> frame) noexcept {
+    if (frame.size() < static_cast<std::size_t>(gfx::kScreen) * gfx::kScreen) return std::unexpected(engine::Err::Io);
+    xSemaphoreTake(g_lock, portMAX_DELAY);
+    while (g_unreaped > 0 && xSemaphoreTake(g_frame_done, 0) == pdTRUE) --g_unreaped;
+    g_frames_inflight.fetch_add(1);
+    // The address-window commands wait for the previous frame, so on return it is finished and its buffer can be redrawn.
+    const esp_err_t e = esp_lcd_panel_draw_bitmap(g_panel, 0, 0, gfx::kScreen, gfx::kScreen, frame.data());
+    if (e != ESP_OK) g_frames_inflight.fetch_sub(1);
+    else ++g_unreaped;
+    xSemaphoreGive(g_lock);
+    return e == ESP_OK ? std::expected<void, engine::Err>{} : std::unexpected(engine::Err::Io);
 }
 
 }  // namespace display

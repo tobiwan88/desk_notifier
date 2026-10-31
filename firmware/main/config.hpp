@@ -40,7 +40,13 @@ consteval bool none_reserved(const std::array<int, 6>& a) {
 
 static_assert(none_reserved(kLcdPins), "LCD pin on strapping/UART/USB/PSRAM pin");
 static_assert(all_distinct(kLcdPins), "two LCD signals on the same GPIO");
-static_assert(kSpiHz <= 40'000'000, "max 40 MHz on GPIO-matrix pins");
+// 80 MHz needs the S3's SPI2 IOMUX pins (SCLK 12, MOSI 11, CS 10); any other pin goes through the GPIO matrix, max 40 MHz
+#ifdef CONFIG_IDF_TARGET_ESP32S3
+inline constexpr bool kSpiIomux = kLcdPins[0] == 12 && kLcdPins[1] == 11 && kLcdPins[4] == 10;
+#else
+inline constexpr bool kSpiIomux = false;
+#endif
+static_assert(kSpiHz <= 40'000'000 || (kSpiHz <= 80'000'000 && kSpiIomux), "max 40 MHz on GPIO-matrix pins, 80 MHz on the S3 IOMUX pins");
 inline constexpr int kI2cSda = CONFIG_DESK_I2C_SDA;
 inline constexpr int kI2cScl = CONFIG_DESK_I2C_SCL;
 inline constexpr int kBmeAddr = CONFIG_DESK_BME_ADDR;

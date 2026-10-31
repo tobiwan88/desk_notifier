@@ -34,7 +34,7 @@ menu "Desk notifier"
             default -1
     endmenu
     config DESK_LCD_SPI_HZ
-        int "SPI clock (Hz), max 40 MHz"
+        int "SPI clock (Hz), max 40 MHz (80 MHz on the S3 pins SCLK 12, MOSI 11, CS 10)"
         default 20000000
     config DESK_LCD_BGR
         bool "Panel colour order is BGR"

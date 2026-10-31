@@ -27,5 +27,8 @@ void set_backlight(std::uint8_t pct) noexcept;                   // no-op unless
 int spi_hz() noexcept;
 // Pushes a full 240x240 frame (row-major, big-endian RGB565) in strips.
 [[nodiscard]] std::expected<void, engine::Err> blit(std::span<const gfx::Rgb565be> frame) noexcept;
+// Hands a full frame to the SPI DMA and returns once it is queued (the frame buffer is read from PSRAM while it is sent, so
+// do not touch it until the next present() call returned). Needs a 32-byte aligned buffer. Waits for the previous frame.
+[[nodiscard]] std::expected<void, engine::Err> present(std::span<const gfx::Rgb565be> frame) noexcept;
 
 }  // namespace display

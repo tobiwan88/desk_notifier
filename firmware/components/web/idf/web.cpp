@@ -10,6 +10,7 @@
 
 #include "engine/core/errors.hpp"
 #include "clock/idf/clock.hpp"
+#include "display/idf/display.hpp"
 #include "engine/core/names.hpp"
 #include "screen/idf/screen_task.hpp"
 #include "sensor/idf/bme688.hpp"
@@ -77,7 +78,7 @@ esp_err_t get_status(httpd_req_t* r) {
         sc.render_us_avg / 1000.0, sc.blit_us_avg / 1000.0, net::rssi(), net::ip().c_str(),
         clock_sync::valid() ? "true" : "false", g_open ? "open" : "token", settings::get("rst").value_or("").c_str(),
         sn.ok ? "true" : "false", sn.errors, sensor::i2c_scan().c_str(), sc.alert ? "true" : "false", sc.snoozed ? "true" : "false",
-        static_cast<unsigned long>(storage::free_bytes()), CONFIG_DESK_LCD_SPI_HZ, screen::page_name(screen::page()));
+        static_cast<unsigned long>(storage::free_bytes()), display::spi_hz(), screen::page_name(screen::page()));
     send_json(r, "200 OK", b);
     return ESP_OK;
 }
