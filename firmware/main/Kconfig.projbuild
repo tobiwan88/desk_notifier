@@ -119,6 +119,83 @@ menu "Desk notifier"
             range 0 1231
             default 0
     endmenu
+    choice DESK_MASCOT
+        prompt "Mascot (set once: who lives on this desk)"
+        default DESK_MASCOT_SQUIRREL
+        config DESK_MASCOT_SQUIRREL
+            bool "Squirrel: clock, air and day pages, works at a desk"
+        config DESK_MASCOT_BUNNY
+            bool "Bunny: apprentice gardener and gamer"
+        config DESK_MASCOT_STAG
+            bool "Stag: retired and active, leads the backstage crew at the theatre on show nights"
+        config DESK_MASCOT_CAT
+            bool "Lucky cat: retired, walks her small black dog (calico, now and then gold or black)"
+        config DESK_MASCOT_PENGUIN
+            bool "Penguin: retired, loves her garden"
+    endchoice
+    menu "New mascots' day (bunny, stag, lucky cat, penguin; times as HHMM, 630 = 06:30)"
+        visible if !DESK_MASCOT_SQUIRREL
+        config DESK_MASCOT_WAKE
+            int "Wake up (Mon-Fri)"
+            range 0 2359
+            default 545 if DESK_MASCOT_BUNNY
+            default 700 if DESK_MASCOT_STAG
+            default 630
+        config DESK_MASCOT_BED
+            int "Bedtime"
+            range 0 2359
+            default 2300 if DESK_MASCOT_BUNNY
+            default 2230 if DESK_MASCOT_STAG
+            default 2200 if DESK_MASCOT_CAT
+            default 2130
+        config DESK_MASCOT_WEEKEND_LATE_MIN
+            int "Minutes later on Saturday, Sunday and public holidays"
+            range 0 600
+            default 285 if DESK_MASCOT_BUNNY
+            default 30
+        config DESK_BUNNY_WORK_START
+            int "Bunny: work starts" if DESK_MASCOT_BUNNY
+            range 0 2359
+            default 700
+        config DESK_BUNNY_WORK_END
+            int "Bunny: work ends" if DESK_MASCOT_BUNNY
+            range 0 2359
+            default 1600
+        config DESK_STAG_SHOW_DAYS
+            hex "Stag: theatre nights as weekday bits (bit 0 = Sunday .. bit 6 = Saturday; 0x70 = Thu, Fri, Sat)" if DESK_MASCOT_STAG
+            range 0x0 0x7F
+            default 0x70
+        config DESK_STAG_SHOW_START
+            int "Stag: at the theatre from" if DESK_MASCOT_STAG
+            range 0 2359
+            default 1730
+        config DESK_STAG_SHOW_END
+            int "Stag: at the theatre until" if DESK_MASCOT_STAG
+            range 0 2359
+            default 2300
+        config DESK_CAT_EVENING_WALK
+            bool "Lucky cat: a second, shorter dog walk at 17:00" if DESK_MASCOT_CAT
+            default y
+    endmenu
+    menu "Add-ons (the squirrel's extras: on for the squirrel, off for the new mascots unless switched on)"
+        config DESK_ADDON_PET_PAGE
+            bool "Pet web page (/pet, /api/pet) and the reactions on screen"
+            default y if DESK_MASCOT_SQUIRREL
+        config DESK_ADDON_BOND
+            bool "Hearts and coins earned through the pet page"
+            depends on DESK_ADDON_PET_PAGE
+            default y if DESK_MASCOT_SQUIRREL
+        config DESK_ADDON_SHOP
+            bool "Shop (/api/shop): hats, places, decoration, friends bought with coins"
+            depends on DESK_ADDON_BOND
+            default y if DESK_MASCOT_SQUIRREL
+        config DESK_ADDON_VISITORS
+            bool "Visitors: birds, butterflies, hedgehogs and others dropping by"
+            default y if DESK_MASCOT_SQUIRREL
+        config DESK_ADDON_PLANT
+            bool "Window-sill plant that grows on good-air days and wilts on bad ones"
+            default y if DESK_MASCOT_SQUIRREL
+    endmenu
     menu "Weather (Open-Meteo, no API key)"
         config DESK_WEATHER_URL
             string "Forecast endpoint"

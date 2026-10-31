@@ -49,6 +49,59 @@ std::atomic<std::uint32_t> g_pair_code{0};   // Bluetooth pairing passkey on scr
 std::atomic<std::uint32_t> g_pair_until{0};  // ms timestamp at which it disappears
 constexpr std::uint32_t kPairShowMs = 60u * 1000u;
 
+// Who lives on this desk (Kconfig DESK_MASCOT) and which of the squirrel's extras are switched on (DESK_ADDON_*).
+constexpr Mascot kMascot =
+#if defined(CONFIG_DESK_MASCOT_BUNNY)
+    Mascot::Bunny;
+#elif defined(CONFIG_DESK_MASCOT_STAG)
+    Mascot::Stag;
+#elif defined(CONFIG_DESK_MASCOT_CAT)
+    Mascot::Cat;
+#elif defined(CONFIG_DESK_MASCOT_PENGUIN)
+    Mascot::Penguin;
+#else
+    Mascot::Squirrel;
+#endif
+constexpr bool kSquirrel = kMascot == Mascot::Squirrel;
+
+constexpr unsigned kAddons = 0u
+#ifdef CONFIG_DESK_ADDON_PET_PAGE
+    | kAddonPetPage
+#endif
+#ifdef CONFIG_DESK_ADDON_BOND
+    | kAddonBond
+#endif
+#ifdef CONFIG_DESK_ADDON_SHOP
+    | kAddonShop
+#endif
+#ifdef CONFIG_DESK_ADDON_VISITORS
+    | kAddonVisitors
+#endif
+#ifdef CONFIG_DESK_ADDON_PLANT
+    | kAddonPlant
+#endif
+    ;
+constexpr bool kBond = (kAddons & kAddonBond) != 0, kPlant = (kAddons & kAddonPlant) != 0;
+
+// The new mascots' day from Kconfig (the squirrel uses Schedule).
+Profile mascot_profile() {
+    Profile p = default_profile(kMascot);
+    p.wake = CONFIG_DESK_MASCOT_WAKE;
+    p.bed = CONFIG_DESK_MASCOT_BED;
+    p.weekend_late_min = CONFIG_DESK_MASCOT_WEEKEND_LATE_MIN;
+    p.work_start = CONFIG_DESK_BUNNY_WORK_START;
+    p.work_end = CONFIG_DESK_BUNNY_WORK_END;
+    p.show_days = static_cast<unsigned>(CONFIG_DESK_STAG_SHOW_DAYS);
+    p.show_start = CONFIG_DESK_STAG_SHOW_START;
+    p.show_end = CONFIG_DESK_STAG_SHOW_END;
+#ifdef CONFIG_DESK_CAT_EVENING_WALK
+    p.evening_walk = true;
+#else
+    p.evening_walk = false;
+#endif
+    return p;
+}
+
 Rotator::Config rotation_config() {
     Rotator::Config c;
     c.dwell_ms[static_cast<int>(Page::Clock)] = CONFIG_DESK_PAGE_CLOCK_S * 1000u;
@@ -79,6 +132,7 @@ std::optional<int> today() {
 }
 
 void save_bond(const Bond& b) {
+    if constexpr (!kBond) return;  // hearts and coins are switched off: nothing to keep
     char buf[96];
     bond_save(b, buf, sizeof buf);
     settings::set("bond", buf);
@@ -110,6 +164,7 @@ void run_bench(const Canvas& cv) {
     in.time_valid = true; in.hour = 14; in.minute = 5; in.weekday = 2; in.day = 14; in.month = 10; in.year = 2026;
     in.sensor_ok = true; in.quality = {90, sensor::Level::Good}; in.reading.temp_c = 22; in.reading.rh = 45; in.reading.hpa = 960;
     in.weather_ok = true; in.weather.temp_c = 12; in.weather.is_day = true; in.weather.sky = weather::Sky::PartlyCloudy;
+    in.mascot = kMascot; in.profile = mascot_profile(); in.addons = kAddons;
     in.weather.max_c = 15; in.weather.min_c = 8; in.weather.precip_pct = 10;
     constexpr int kRuns = 20;
     std::uint32_t us[kPageCount] = {};
@@ -159,10 +214,11 @@ void task(void*) {
             schedule.birthday_name[i] = static_cast<char>(std::toupper(static_cast<unsigned char>(name[i])));
         schedule.birthday_name[i] = 0;
     }
+    const Profile profile = mascot_profile();
     AirTrend trend;
     {
         const std::lock_guard<std::mutex> lock(g_pet_mx);
-        g_bond = bond_load(settings::get("bond").value_or("").c_str());
+        if constexpr (kBond) g_bond = bond_load(settings::get("bond").value_or("").c_str());
         const std::string name = settings::get("sqname").value_or("");
         std::snprintf(g_name, sizeof g_name, "%s", name.c_str());
     }
@@ -219,10 +275,10 @@ void task(void*) {
             in.weather = wx.forecast;
             rain.update(now, wx.ok, weather::wet(weather::now_sky(wx.forecast)));
             in.since_rain_min = rain.since_min(now);
-            if (in.time_valid && now - plant_tick >= 60000u) {  // the window-sill plant counts the minutes of good air
+            if (kPlant && in.time_valid && now - plant_tick >= 60000u) {  // the window-sill plant counts the minutes of good air
                 plant_tick = now;
                 const bool closed = plant_minute(plant, in.year * 10000 + in.month * 100 + in.day, snap.ok, snap.quality.level);
-                if (closed && plant.grew) {  // a good-air day: a couple of coins (from five hearts)
+                if (closed && plant.grew && kBond) {  // a good-air day: a couple of coins (from five hearts)
                     const std::lock_guard<std::mutex> lock(g_pet_mx);
                     if (level(g_bond) >= kLevels - 1) { earn(g_bond, kCoinsLeaf); save_bond(g_bond); }
                 }
@@ -235,7 +291,7 @@ void task(void*) {
             }
             {  // the friendship and a reaction to a visit
                 const std::lock_guard<std::mutex> lock(g_pet_mx);
-                in.bond = g_bond;
+                in.bond = kBond ? g_bond : Bond{};  // without hearts the mascot has no friendship perks
                 std::memcpy(in.pet_name, g_name, sizeof in.pet_name);
                 const std::uint32_t age = now - g_react_at;
                 if (g_react_id != 0 && age < reaction_ms(g_react.action)) {
@@ -254,11 +310,15 @@ void task(void*) {
                     }
                 }
             }
-            in.plant = plant;
-            const bool golden = fun::golden(now, seed, level(in.bond) >= 3) >= 0;  // the golden acorn: counted once, shown on the air page
+            if constexpr (!(kAddons & kAddonShop)) {  // no shop: nothing bought is worn or shown
+                in.bond.owned_lo = 0; in.bond.owned_hi = 0; in.bond.bought = -1;
+            }
+            if constexpr (kPlant) in.plant = plant;
+            // the golden acorn: counted once, shown on the squirrel's air page
+            const bool golden = kSquirrel && fun::golden(now, seed, level(in.bond) >= 3) >= 0;
             if (golden && !golden_seen) {
                 ++golden_count;
-                {
+                if constexpr (kBond) {
                     const std::lock_guard<std::mutex> lock(g_pet_mx);
                     earn(g_bond, level(g_bond) >= kLevels - 1 ? kCoinsGolden : kCoinsGoldenEarly);
                     save_bond(g_bond);
@@ -267,7 +327,7 @@ void task(void*) {
                 ESP_LOGI(kTag, "golden acorn #%d", golden_count);
             }
             golden_seen = golden;
-            const bool coin = level(in.bond) >= kLevels - 1 && fun::coin_found(now, seed) >= 0;  // found in the grass
+            const bool coin = kBond && kSquirrel && level(in.bond) >= kLevels - 1 && fun::coin_found(now, seed) >= 0;  // found in the grass
             if (coin && !coin_seen) {
                 const std::lock_guard<std::mutex> lock(g_pet_mx);
                 earn(g_bond, kCoinsFound);
@@ -277,14 +337,18 @@ void task(void*) {
             in.golden_count = golden_count;
             in.schedule = schedule;
             in.seed = seed;
+            in.mascot = kMascot;
+            in.profile = profile;
+            in.addons = kAddons;
 
             unsigned avail = 0;
             if (CONFIG_DESK_PAGE_CLOCK_S > 0) avail |= 1u << static_cast<int>(Page::Clock);
-            if (CONFIG_DESK_PAGE_AIR_S > 0) avail |= 1u << static_cast<int>(Page::Air);
+            if (CONFIG_DESK_PAGE_AIR_S > 0 && kSquirrel) avail |= 1u << static_cast<int>(Page::Air);  // the new mascots show the air on the home (clock) page
             if (CONFIG_DESK_PAGE_DAY_S > 0 && in.time_valid) avail |= 1u << static_cast<int>(Page::Day);
-            // bad air: the squirrel stays on screen until the alert is acknowledged
-            const bool pin_air = alert || in.react.active || (golden && CONFIG_DESK_PAGE_AIR_S > 0);
-            const auto frame = rot.tick(now, avail, pin_air ? std::optional<Page>(Page::Air) : std::nullopt);
+            // bad air: the mascot stays on screen until the alert is acknowledged
+            const bool pin = alert || in.react.active || (golden && CONFIG_DESK_PAGE_AIR_S > 0);
+            const Page pin_page = kSquirrel ? Page::Air : Page::Clock;
+            const auto frame = rot.tick(now, avail, pin ? std::optional<Page>(pin_page) : std::nullopt);
             g_page = static_cast<int>(frame.page);
 
             const Canvas& cv = canvases[cur];

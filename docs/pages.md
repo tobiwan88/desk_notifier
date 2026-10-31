@@ -2,7 +2,7 @@
 
 ![All pages and moods](media/pages.png)
 
-The display turns through three pages and fades between them. It draws 10 frames per second, so the pictures move.
+The display turns through three pages and fades between them. This page is about the squirrel; the bunny, stag, lucky cat and penguin have their own two pages ([mascots.md](mascots.md)). It draws 10 frames per second, so the pictures move.
 
 | Page | Shows | Time on screen |
 |---|---|---|
