@@ -20,7 +20,7 @@ Level level_for(int score) noexcept {
 Quality Tracker::update(const Reading& r) noexcept {
     if (!r.gas_valid || r.gas_ohm <= 0) return {0, Level::WarmingUp};
     if (n_ == 0 || r.gas_ohm > baseline_) baseline_ = r.gas_ohm;
-    else baseline_ -= (baseline_ - r.gas_ohm) * 0.002f;  // forget old highs slowly
+    else baseline_ -= (baseline_ - r.gas_ohm) * kForget;  // forget old highs slowly
     if (n_ < 1'000'000) ++n_;
     const float ratio = std::clamp(r.gas_ohm / baseline_, 0.0f, 1.0f);
     const int score = std::clamp(humidity_points(r.rh) + static_cast<int>(75.0f * ratio + 0.5f), 0, 100);

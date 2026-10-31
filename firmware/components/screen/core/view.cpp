@@ -43,7 +43,7 @@ void render_background(const Canvas& cv, const HomeData& d) noexcept {
     for (int y = 0; y < gfx::kScreen; ++y) {
         const int h = h0 + (h1 - h0) * y / (gfx::kScreen - 1);
         const gfx::Rgb565be c = hue_color(h, 70 + 35 * y / gfx::kScreen);
-        for (int x = 0; x < gfx::kScreen; ++x) cv.px[static_cast<std::size_t>(y) * gfx::kScreen + x] = c;
+        fill_px(cv.px.data() + static_cast<std::size_t>(y) * gfx::kScreen, gfx::kScreen, c);
     }
 }
 

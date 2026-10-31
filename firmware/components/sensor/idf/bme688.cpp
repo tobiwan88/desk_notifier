@@ -21,7 +21,11 @@ namespace sensor {
 namespace {
 
 const char* const kTag = "bme688";
-constexpr std::uint32_t kPeriodMs = 3000;
+constexpr std::int64_t kGasPeriodUs = static_cast<std::int64_t>(kGasPeriodMs) * 1000;
+constexpr std::int64_t kShtPeriodUs = 30'000'000;       // temperature and humidity change slowly: every 30 s
+constexpr std::int64_t kShtStaleUs = 3 * kShtPeriodUs;  // after that the BME688's own (skewed) values are better than none
+constexpr std::int64_t kHeaterGuardUs = 2'000'000;      // keep the SHT40 reading clear of the gas heater pulse (it warms the board)
+constexpr std::int64_t kGasBusyUs = 600'000;            // one forced measurement incl. the 150 ms heater pulse
 constexpr int kShtAddr = 0x44;
 
 i2c_master_bus_handle_t g_bus = nullptr;
@@ -76,9 +80,7 @@ bool sht_read(float& temp_c, float& rh) {
     return sht4x::decode(frame, temp_c, rh);
 }
 
-bool sample(Reading& out) {
-    float sht_t = 0, sht_rh = 0;
-    const bool sht_ok = sht_read(sht_t, sht_rh);  // before the BME688 heater pulse
+bool sample_gas(Reading& out) {
     if (bme68x_set_op_mode(BME68X_FORCED_MODE, &g_bme) != BME68X_OK) return false;
     bme68x_conf conf{};
     (void)bme68x_get_conf(&conf, &g_bme);
@@ -88,39 +90,77 @@ bool sample(Reading& out) {
     std::uint8_t n = 0;
     if (bme68x_get_data(BME68X_FORCED_MODE, &d, &n, &g_bme) != BME68X_OK || n == 0) return false;
     if (!(d.status & BME68X_NEW_DATA_MSK)) return false;
-    out.temp_c = sht_ok ? sht_t : d.temperature;
-    out.rh = sht_ok ? sht_rh : d.humidity;
-    out.sht40 = sht_ok;
+    out.temp_c = d.temperature;  // the caller swaps in the SHT40 values when it has fresh ones
+    out.rh = d.humidity;
+    out.bme_temp_c = d.temperature;
     out.hpa = d.pressure / 100.0f;
     out.gas_ohm = d.gas_resistance;
     out.gas_valid = (d.status & BME68X_GASM_VALID_MSK) && (d.status & BME68X_HEAT_STAB_MSK);
     return true;
 }
 
+// Two independent schedules in one task: the gas measurement every kGasPeriodMs, the SHT40 every 30 s, and the SHT40
+// is held back whenever it would land within kHeaterGuardUs of a gas pulse.
 void task(void*) {
     int errors = 0;
+    float sht_t = 0, sht_rh = 0;
+    std::int64_t sht_at = -kShtStaleUs;
+    const std::int64_t t0 = esp_timer_get_time();
+    std::int64_t next_sht = t0, next_gas = t0 + kGasPeriodUs / 2, gas_end = t0 - kHeaterGuardUs;
     for (;;) {
-        Reading r;
-        const bool ok = sample(r);
-        taskENTER_CRITICAL(&g_mux);
-        if (ok) {
-            g_snap.reading = r;
-            g_snap.quality = g_tracker.update(r);
-            g_snap.ok = true;
-            g_snap.errors = errors = 0;
-            g_last_ok_us = esp_timer_get_time();
-        } else {
-            g_snap.errors = ++errors;
+        std::int64_t now = esp_timer_get_time();
+        if (now >= next_sht) {
+            if (next_gas - now < kHeaterGuardUs) {  // a gas pulse is due or just started
+                next_sht = next_gas + kGasBusyUs + kHeaterGuardUs;
+            } else if (now - gas_end < kHeaterGuardUs) {
+                next_sht = gas_end + kHeaterGuardUs;
+            } else {
+                float t = 0, rh = 0;
+                if (sht_read(t, rh)) {
+                    sht_t = t; sht_rh = rh; sht_at = now;
+                    taskENTER_CRITICAL(&g_mux);
+                    if (g_snap.ok) { g_snap.reading.temp_c = t; g_snap.reading.rh = rh; g_snap.reading.sht40 = true; }
+                    taskEXIT_CRITICAL(&g_mux);
+                    ESP_LOGI(kTag, "%.2f C  %.1f %%  (sht40)", static_cast<double>(t), static_cast<double>(rh));
+                } else if (g_sht) {
+                    ESP_LOGW(kTag, "SHT40 read failed");
+                }
+                next_sht = now + kShtPeriodUs;
+            }
         }
-        taskEXIT_CRITICAL(&g_mux);
-        if (ok) ESP_LOGI(kTag, "%.2f C  %.1f %%  %.1f hPa  gas %.0f ohm%s  score %d  [%s]", static_cast<double>(r.temp_c),
-                         static_cast<double>(r.rh), static_cast<double>(r.hpa), static_cast<double>(r.gas_ohm),
-                         r.gas_valid ? "" : " (unstable)", g_snap.quality.score, r.sht40 ? "sht40" : "bme688 only");
-        else ESP_LOGW(kTag, "read failed (%d in a row)", errors);
-        vTaskDelay(pdMS_TO_TICKS(kPeriodMs));
+        now = esp_timer_get_time();
+        if (now >= next_gas) {
+            Reading r;
+            const bool ok = sample_gas(r);
+            gas_end = esp_timer_get_time();
+            next_gas += kGasPeriodUs;
+            if (next_gas < gas_end) next_gas = gas_end + kGasPeriodUs;
+            if (ok) {
+                const bool fresh = now - sht_at < kShtStaleUs;
+                r.sht40 = fresh;
+                if (fresh) { r.temp_c = sht_t; r.rh = sht_rh; }
+            }
+            taskENTER_CRITICAL(&g_mux);
+            if (ok) {
+                g_snap.reading = r;
+                g_snap.quality = g_tracker.update(r);
+                g_snap.ok = true;
+                g_snap.errors = errors = 0;
+                g_last_ok_us = gas_end;
+            } else {
+                g_snap.errors = ++errors;
+            }
+            taskEXIT_CRITICAL(&g_mux);
+            if (ok) ESP_LOGI(kTag, "%.2f C  %.1f %%  %.1f hPa  gas %.0f ohm%s  score %d  [%s, bme %.2f C]", static_cast<double>(r.temp_c),
+                             static_cast<double>(r.rh), static_cast<double>(r.hpa), static_cast<double>(r.gas_ohm),
+                             r.gas_valid ? "" : " (unstable)", g_snap.quality.score, r.sht40 ? "sht40" : "bme688 only", static_cast<double>(r.bme_temp_c));
+            else ESP_LOGW(kTag, "read failed (%d in a row)", errors);
+        }
+        now = esp_timer_get_time();
+        const std::int64_t wake = next_sht < next_gas ? next_sht : next_gas;
+        vTaskDelay(wake > now ? pdMS_TO_TICKS((wake - now + 999) / 1000) + 1 : 1);
     }
-
-}  // namespace
+}
 
 std::string g_scan;  // addresses that ACKed on the bus (diagnostics)
 
@@ -207,7 +247,7 @@ Snapshot latest() noexcept {
     const std::int64_t last = g_last_ok_us;
     taskEXIT_CRITICAL(&g_mux);
     s.age_ms = last ? static_cast<std::uint32_t>((esp_timer_get_time() - last) / 1000) : 0;
-    if (s.ok && s.age_ms > 4 * kPeriodMs) s.ok = false;
+    if (s.ok && s.age_ms > 4 * kGasPeriodMs) s.ok = false;
     return s;
 }
 

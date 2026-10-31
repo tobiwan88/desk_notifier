@@ -49,13 +49,17 @@ inline Rgb565be mix(Rgb565be dst, Rgb565be src, int a) noexcept {
 struct Span { float x0 = 0, x1 = 0; };
 struct Pt { float x, y; };
 
+// floor/ceil to int without the libm call (exact for values in int range; floorf/ceilf are slow library calls)
+inline int floor_i(float v) noexcept { const int i = static_cast<int>(v); return i - (v < static_cast<float>(i)); }
+inline int ceil_i(float v) noexcept { const int i = static_cast<int>(v); return i + (v > static_cast<float>(i)); }
+
 // Generic convex rasterizer. `alpha` 0..256 is the shape opacity.
 template <class SpanFn>
 void fill(const Canvas& cv, float top, float bottom, Rgb565be c, int alpha, const SpanFn& span_at) noexcept {
     if (alpha <= 0) return;
     constexpr int kSub = 4;
-    const int y0 = std::max(0, static_cast<int>(std::floor(top)));
-    const int y1 = std::min(gfx::kScreen - 1, static_cast<int>(std::ceil(bottom)));
+    const int y0 = std::max(0, floor_i(top));
+    const int y1 = std::min(gfx::kScreen - 1, ceil_i(bottom));
     for (int y = y0; y <= y1; ++y) {
         const gfx::Chord ch = gfx::kChord[static_cast<std::size_t>(y)];
         if (ch.x1 <= ch.x0) continue;
@@ -73,11 +77,11 @@ void fill(const Canvas& cv, float top, float bottom, Rgb565be c, int alpha, cons
             }
         }
         if (!any) continue;
-        const int px0 = std::max(static_cast<int>(std::floor(lo)), static_cast<int>(ch.x0));
-        const int px1 = std::min(static_cast<int>(std::ceil(hi)), static_cast<int>(ch.x1));
+        const int px0 = std::max(floor_i(lo), static_cast<int>(ch.x0));
+        const int px1 = std::min(ceil_i(hi), static_cast<int>(ch.x1));
         int f0 = 1 << 20, f1 = -(1 << 20);
-        if (all && in_hi > in_lo) { f0 = static_cast<int>(std::ceil(in_lo)); f1 = static_cast<int>(std::floor(in_hi)); }
-        // edge coverage in 24.8 fixed point: integer math per pixel (the C61 has no FPU)
+        if (all && in_hi > in_lo) { f0 = ceil_i(in_lo); f1 = floor_i(in_hi); }
+        // edge coverage in 24.8 fixed point: integer math per pixel
         std::int32_t sx0[kSub], sx1[kSub];
         for (int k = 0; k < kSub; ++k) {
             const bool on = s[k].x1 > s[k].x0;
@@ -85,20 +89,24 @@ void fill(const Canvas& cv, float top, float bottom, Rgb565be c, int alpha, cons
             sx1[k] = on ? static_cast<std::int32_t>(std::min(s[k].x1, 241.0f) * 256.0f) : 0;
         }
         Rgb565be* row = cv.px.data() + static_cast<std::size_t>(y) * gfx::kScreen;
-        for (int x = px0; x < px1; ++x) {
-            if (x >= f0 && x < f1) {
-                row[x] = alpha >= 256 ? c : mix(row[x], c, alpha);
-                continue;
+        // [px0, i0) and [i1, px1) are partly covered, [i0, i1) is solid
+        const int i0 = std::clamp(f0, px0, px1), i1 = std::clamp(f1, i0, px1);
+        const auto edge = [&](int xa, int xb) {
+            for (int x = xa; x < xb; ++x) {
+                const std::int32_t l = x << 8, r = l + 256;
+                std::int32_t cov = 0;
+                for (int k = 0; k < kSub; ++k) {
+                    const std::int32_t o = std::min(r, sx1[k]) - std::max(l, sx0[k]);
+                    if (o > 0) cov += o;
+                }
+                const int a = static_cast<int>((cov * alpha) >> 10);  // cov max 4 * 256
+                if (a > 0) row[x] = mix(row[x], c, a);
             }
-            const std::int32_t l = x << 8, r = l + 256;
-            std::int32_t cov = 0;
-            for (int k = 0; k < kSub; ++k) {
-                const std::int32_t o = std::min(r, sx1[k]) - std::max(l, sx0[k]);
-                if (o > 0) cov += o;
-            }
-            const int a = static_cast<int>((cov * alpha) >> 10);  // cov max 4 * 256
-            if (a > 0) row[x] = mix(row[x], c, a);
-        }
+        };
+        edge(px0, i0);
+        if (alpha >= 256) fill_px(row + i0, i1 - i0, c);
+        else for (int x = i0; x < i1; ++x) row[x] = mix(row[x], c, alpha);
+        edge(i1, px1);
     }
 }
 

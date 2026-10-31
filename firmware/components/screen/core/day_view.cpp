@@ -97,10 +97,11 @@ void wall(const Canvas& cv, const Room& r) {
         gfx::Rgb565be* row = cv.px.data() + static_cast<std::size_t>(y) * gfx::kScreen;
         if (y >= static_cast<int>(kWinY0) && y < static_cast<int>(kWinY1)) {
             const int x0 = ch.x0, x1 = ch.x1;
-            std::fill(row + x0, row + std::clamp(static_cast<int>(kWinX0), x0, x1), c);
-            std::fill(row + std::clamp(static_cast<int>(kWinX1), x0, x1), row + x1, c);
+            const int wa = std::clamp(static_cast<int>(kWinX0), x0, x1), wb = std::clamp(static_cast<int>(kWinX1), x0, x1);
+            fill_px(row + x0, wa - x0, c);
+            fill_px(row + wb, x1 - wb, c);
         } else {
-            std::fill(row + ch.x0, row + ch.x1, c);
+            fill_px(row + ch.x0, ch.x1 - ch.x0, c);
         }
     }
 }

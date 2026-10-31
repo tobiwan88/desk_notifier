@@ -2,8 +2,10 @@
 #pragma once
 
 #include <array>
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <span>
 #include <string_view>
 
@@ -11,14 +13,24 @@
 
 namespace screen {
 
+// n pixels of one colour, two per 32-bit store (the S3 has no 16-bit-store bonus: halving the stores halves the time).
+inline void fill_px(gfx::Rgb565be* p, int n, gfx::Rgb565be c) noexcept {
+    if (n <= 0) return;
+    if (reinterpret_cast<std::uintptr_t>(p) & 2u) { *p++ = c; --n; }
+    const std::uint32_t pair = (static_cast<std::uint32_t>(c) << 16) | c;
+    for (; n >= 2; n -= 2, p += 2) std::memcpy(p, &pair, sizeof pair);
+    if (n > 0) *p = c;
+}
+
 struct Canvas {
     std::span<gfx::Rgb565be> px;  // kScreen x kScreen, row-major
     void set(int x, int y, gfx::Rgb565be c) const noexcept {
         if (x >= 0 && y >= 0 && x < gfx::kScreen && y < gfx::kScreen) px[static_cast<std::size_t>(y) * gfx::kScreen + x] = c;
     }
     void rect(int x, int y, int w, int h, gfx::Rgb565be c) const noexcept {
-        for (int j = 0; j < h; ++j)
-            for (int i = 0; i < w; ++i) set(x + i, y + j, c);
+        const int x0 = std::max(x, 0), x1 = std::min(x + w, static_cast<int>(gfx::kScreen));
+        const int y0 = std::max(y, 0), y1 = std::min(y + h, static_cast<int>(gfx::kScreen));
+        for (int j = y0; j < y1; ++j) fill_px(px.data() + static_cast<std::size_t>(j) * gfx::kScreen + x0, x1 - x0, c);
     }
 };
 
