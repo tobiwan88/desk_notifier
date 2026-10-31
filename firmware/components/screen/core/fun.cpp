@@ -179,6 +179,7 @@ int rainbow_alpha(const Inputs& in) noexcept {
 }
 
 unsigned allowed_visitors(Page p, const Inputs& in) noexcept {
+    if (!(in.addons & kAddonVisitors)) return 0;
     const auto& w = in.weather;
     const bool dry_day = in.weather_ok && w.is_day && !weather::wet(w.sky) && w.wind_kmh < 30;
     const bool clear_night = in.weather_ok && !w.is_day && (w.sky == weather::Sky::Clear || w.sky == weather::Sky::PartlyCloudy);

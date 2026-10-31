@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "screen/core/draw.hpp"
+#include "screen/core/mascot_view.hpp"
 #include "screen/core/shop.hpp"
 #include "screen/core/squirrel.hpp"
 #include "screen/core/view.hpp"
@@ -78,6 +79,11 @@ void render_clock(const Canvas& cv, const Inputs& in) noexcept {
 }
 
 void render_page(const Canvas& cv, Page p, const Inputs& in) noexcept {
+    if (in.mascot != Mascot::Squirrel) {  // the new mascots: the home page (clock + air) and their day
+        if (p == Page::Day) render_mascot_day(cv, in);
+        else render_mascot_home(cv, in);
+        return;
+    }
     switch (p) {
         case Page::Clock: render_clock(cv, in); return;
         case Page::Day: render_day(cv, in); return;
