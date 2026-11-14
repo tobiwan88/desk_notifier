@@ -355,7 +355,7 @@ void caption(const Canvas& cv, const Scene& sc, const Inputs& in, const char* sa
         lines[n++] = sleeps;
         lines[n++] = what;
     }
-    if (in.plant.grew) lines[n++] = "NEW LEAF!";
+    if (in.plant.grew && (in.addons & kAddonPlant)) lines[n++] = "NEW LEAF!";
     if (const char* o = occasion_label(sc.occasion, in); o && std::string_view(o) != std::string_view(lines[0])) lines[n++] = o;
     if (sc.occasion == Occasion::Birthday && in.schedule.birthday_name[0] && n < 6) lines[n++] = in.schedule.birthday_name;
     if (sc.occasion == Occasion::Anniversary && n < 6) lines[n++] = "LOVE YOU!";
@@ -445,7 +445,7 @@ void render_day(const Canvas& cv, const Inputs& in) noexcept {
         if (shop_item(look.window).art == 0) P::fairy_lights(cv, kWinX0 - 8, kWinX1 + 8, kWinY0 - 7, t);
         else if (!window_open) P::curtains(cv, win, t);
     }
-    P::memory_plant(cv, kWinX0 + 10, kWinY1 + 2, 1.3f, t, in.plant.leaves, in.plant.droop, in.plant.flower);
+    if (in.addons & kAddonPlant) P::memory_plant(cv, kWinX0 + 10, kWinY1 + 2, 1.3f, t, in.plant.leaves, in.plant.droop, in.plant.flower);
     if (vis.who == fun::Visitor::Snail) {
         const float k = vis.k - std::sin(2 * kPi * vis.k * 3) / (2 * kPi * 3) * 0.8f;
         P::snail(cv, kWinX1 - 2 - k * (kWinX1 - kWinX0 - 16), kWinY1 + 2, 0.8f, -1, t);

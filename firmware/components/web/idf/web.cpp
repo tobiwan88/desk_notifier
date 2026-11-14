@@ -309,7 +309,7 @@ esp_err_t post_ota(httpd_req_t* r) {
 
 // ---- the pet page: open to everyone on the local network, no token ------------------------------------------
 
-void pet_json(std::string& out, const screen::Bond& b, const char* name, bool time_valid) {
+[[maybe_unused]] void pet_json(std::string& out, const screen::Bond& b, const char* name, bool time_valid) {
     const int lvl = screen::level(b);
     char buf[400];
     std::string done = "[", gifts = "[";
@@ -329,7 +329,7 @@ void pet_json(std::string& out, const screen::Bond& b, const char* name, bool ti
 }
 
 // {"open":..,"coins":..,"offer":[{id,name,shelf,price,season}],"owned":[ids],"wearing":[ids]}
-void shop_json(std::string& out, const screen::ShopStatus& s) {
+[[maybe_unused]] void shop_json(std::string& out, const screen::ShopStatus& s) {
     char buf[200];
     std::snprintf(buf, sizeof buf, R"({"open":%s,"coins":%d,"coins_total":%d,"hearts":%d,"time_valid":%s,"offer":[)",
                   screen::shop_open(s.bond) ? "true" : "false", s.bond.coins, s.bond.coins_total, screen::level(s.bond) + 1,
@@ -352,7 +352,7 @@ void shop_json(std::string& out, const screen::ShopStatus& s) {
     out += "]}";
 }
 
-esp_err_t get_shop(httpd_req_t* r) {
+[[maybe_unused]] esp_err_t get_shop(httpd_req_t* r) {
     std::string out;
     shop_json(out, screen::shop_status());
     send_json(r, "200 OK", out.c_str());
@@ -360,7 +360,7 @@ esp_err_t get_shop(httpd_req_t* r) {
 }
 
 // {"buy":"tophat"}: buys one of today's six. Always answers 200 with a friendly message when it does not work out.
-esp_err_t post_shop(httpd_req_t* r) {
+[[maybe_unused]] esp_err_t post_shop(httpd_req_t* r) {
     char body[96]{};
     const int n = r->content_len > 0 ? httpd_req_recv(r, body, std::min<std::size_t>(r->content_len, sizeof body - 1)) : 0;
     const std::string_view b(body, static_cast<std::size_t>(std::max(n, 0)));
@@ -389,14 +389,14 @@ esp_err_t post_shop(httpd_req_t* r) {
 extern const char pet_html_start[] asm("_binary_pet_html_start");
 extern const char pet_html_end[] asm("_binary_pet_html_end");
 
-esp_err_t get_pet_page(httpd_req_t* r) {
+[[maybe_unused]] esp_err_t get_pet_page(httpd_req_t* r) {
     httpd_resp_set_type(r, "text/html; charset=utf-8");
     httpd_resp_set_hdr(r, "Cache-Control", "no-cache");
     httpd_resp_send(r, pet_html_start, pet_html_end - pet_html_start - 1);
     return ESP_OK;
 }
 
-esp_err_t get_pet(httpd_req_t* r) {
+[[maybe_unused]] esp_err_t get_pet(httpd_req_t* r) {
     const auto s = screen::pet_status();
     std::string out = "{";
     pet_json(out, s.bond, s.name, s.time_valid);
@@ -406,7 +406,7 @@ esp_err_t get_pet(httpd_req_t* r) {
 }
 
 // {"action":"feed","item":"hazelnut"} | {"action":"gift","item":"shell"} | {"action":"party"} | {"name":"Nutty"}
-esp_err_t post_pet(httpd_req_t* r) {
+[[maybe_unused]] esp_err_t post_pet(httpd_req_t* r) {
     char body[128]{};
     const int n = r->content_len > 0 ? httpd_req_recv(r, body, std::min<std::size_t>(r->content_len, sizeof body - 1)) : 0;
     const std::string_view b(body, static_cast<std::size_t>(std::max(n, 0)));
@@ -475,11 +475,15 @@ std::expected<void, engine::Err> start() noexcept {
     const httpd_uri_t routes[] = {
         {.uri = "/", .method = HTTP_GET, .handler = get_root, .user_ctx = nullptr},
         {.uri = "/clip_encoder.js", .method = HTTP_GET, .handler = get_encoder, .user_ctx = nullptr},
+#ifdef CONFIG_DESK_ADDON_PET_PAGE  // Kconfig add-ons: the pet page, and the shop on top of it
         {.uri = "/pet", .method = HTTP_GET, .handler = get_pet_page, .user_ctx = nullptr},
         {.uri = "/api/pet", .method = HTTP_GET, .handler = get_pet, .user_ctx = nullptr},
         {.uri = "/api/pet", .method = HTTP_POST, .handler = post_pet, .user_ctx = nullptr},
+#endif
+#ifdef CONFIG_DESK_ADDON_SHOP
         {.uri = "/api/shop", .method = HTTP_GET, .handler = get_shop, .user_ctx = nullptr},
         {.uri = "/api/shop", .method = HTTP_POST, .handler = post_shop, .user_ctx = nullptr},
+#endif
         {.uri = "/api/status", .method = HTTP_GET, .handler = get_status, .user_ctx = nullptr},
         {.uri = "/api/sensor", .method = HTTP_GET, .handler = get_sensor, .user_ctx = nullptr},
         {.uri = "/api/ack", .method = HTTP_POST, .handler = post_ack, .user_ctx = nullptr},

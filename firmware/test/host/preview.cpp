@@ -311,5 +311,78 @@ int main(int argc, char** argv) {
         }
         std::fclose(f);
     }
+    // the new mascots (`mascots`, or everything): the home page per air mood and coat, then one clip per act of
+    // their week, found by walking Sunday 11 .. Saturday 17 October 2026 in 15-minute steps (dry, then rainy)
+    bool want_mascots = argc == 2;
+    for (int a = 2; a < argc; ++a) want_mascots |= std::strcmp(argv[a], "mascots") == 0;
+    if (want_mascots) {
+        auto clip = [&](const std::string& name, screen::Page page, const screen::Inputs& base, int frames) {
+            std::FILE* f = std::fopen((std::string(argv[1]) + "/" + name + ".rgb").c_str(), "wb");
+            if (!f) return;
+            screen::Inputs in = base;
+            for (int i = 0; i < frames; ++i) {
+                std::fill(fb.begin(), fb.end(), gfx::Rgb565be{0});
+                in.t_ms = 100000u + static_cast<std::uint32_t>(i) * 100u;
+                in.second = i / 10;
+                screen::render_page({fb}, page, in);
+                write_frame(f, fb);
+            }
+            std::fclose(f);
+        };
+        struct Mood { const char* name; sensor::Level lvl; int score; };
+        static const Mood kMoods[] = {{"very_good", sensor::Level::Good, 88}, {"good", sensor::Level::Fair, 62},
+                                      {"okay", sensor::Level::Stale, 41}, {"bad", sensor::Level::Poor, 22},
+                                      {"sleepy", sensor::Level::WarmingUp, 0}};
+        for (int mi = 1; mi < screen::kMascotCount; ++mi) {
+            const auto who = static_cast<screen::Mascot>(mi);
+            const std::string nm = std::string("m_") + screen::mascot_name(who);
+            screen::Inputs base = base_inputs();
+            base.mascot = who;
+            base.profile = screen::default_profile(who);
+            base.schedule.birthday = 0;
+            for (const Mood& m : kMoods) {
+                screen::Inputs in = base;
+                at(in, 2026, 10, 12, 9, 41);
+                in.quality = {m.score, m.lvl};
+                in.alert = m.lvl == sensor::Level::Poor;
+                clip(nm + "_home_" + m.name, screen::Page::Clock, in, 30);
+            }
+            {
+                screen::Inputs in = base;
+                at(in, 2026, 10, 12, 9, 41);
+                in.weather = {-2.0f, true, 3, weather::Sky::Cloudy, 1, -5, 10};
+                clip(nm + "_home_cold", screen::Page::Clock, in, 20);
+                in.weather = {29.0f, true, 0, weather::Sky::Clear, 31, 18, 0};
+                clip(nm + "_home_hot", screen::Page::Clock, in, 20);
+            }
+            if (who == screen::Mascot::Cat) {  // one day of each coat
+                bool seen[3] = {};
+                for (int d = 1; d <= 60; ++d) {
+                    const int mo = d <= 31 ? 10 : 11, dd = d <= 31 ? d : d - 31;
+                    const auto c = screen::cat_coat(screen::cal::day_number(2026, mo, dd));
+                    if (seen[static_cast<int>(c)]) continue;
+                    seen[static_cast<int>(c)] = true;
+                    screen::Inputs in = base;
+                    at(in, 2026, mo, dd, 10, 0);
+                    clip(nm + "_coat_" + screen::coat_name(c), screen::Page::Clock, in, 10);
+                }
+            }
+            bool done[screen::kActCount] = {};
+            for (int pass = 0; pass < 2; ++pass) {
+                for (int d = 11; d <= 17; ++d)
+                    for (int q = 0; q < 96; ++q) {
+                        screen::Inputs in = base;
+                        at(in, 2026, 10, d, q / 4, (q % 4) * 15 + 5);
+                        if (pass == 1) in.weather = {9.1f, in.hour >= 7 && in.hour < 19, 63, weather::Sky::Rain, 11, 6, 80};
+                        else in.weather.is_day = in.hour >= 7 && in.hour < 19;
+                        const bool off = in.weekday == 0 || in.weekday == 6;
+                        const auto act = screen::routine_for(who, in.profile, true, in.weekday, in.hour, in.minute, off, pass == 0);
+                        if (done[static_cast<int>(act)]) continue;
+                        done[static_cast<int>(act)] = true;
+                        clip(nm + "_" + screen::act_name(act), screen::Page::Day, in, 30);
+                    }
+            }
+        }
+    }
     return 0;
 }
