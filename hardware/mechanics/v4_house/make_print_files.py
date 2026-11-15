@@ -1,9 +1,7 @@
-"""Print files for housing v4 House (A-frame v4b): Bambu Studio plates as 3MF plus per-object STLs.
+"""Print file for housing v4 House (A-frame v4c): one Bambu Studio plate with the whole housing (3MF) plus per-object STLs.
 
-Plate 1 (main colour, e.g. warm grey): FACE and BODY in print orientation.
-Plate 2 (roof colour, e.g. terracotta): the roof CAP in print orientation (rim down, tilted 9.2 deg).
-Plate 3 (coupon): the BODY and roof CAP between depths Y 29 and 46 (assembled frame), which holds one
-  left/right pair of roof click fingers (centred Y 38) and the matching roof grooves, to try the click.
+housing_v4c.3mf: FACE (front down), BODY (rear down) and the roof CAP (rim down, tilted 9.2 deg so the rim is flat), each a
+separate object so the roof can get its own filament (AMS) or be printed after a filament change. Fits a 180 x 180 bed.
 
 Run: uv run --with manifold3d --with trimesh --with numpy --with networkx --with lxml --with shapely --with rtree python -I make_print_files.py
 """
@@ -18,8 +16,6 @@ STL = os.path.join(HERE, "stl")
 OUT = os.path.join(HERE, "print")
 PLATE = 180.0      # fits the smallest Bambu bed (A1 mini 180 x 180); X1/P1/A1 are 256
 GAP = 8.0          # spacing between objects (room for brims)
-COUPON_Y0, COUPON_Y1 = 29.0, 46.0   # click coupon band: one finger pair (aframe_b.py F_YC 38) and its roof grooves
-FRONT_BAND_Y1 = 16.0                 # body front band for the FACE arm coupon (arms reach Y 10.6, grooves behind)
 
 
 def load(name, kind="print"):
@@ -86,44 +82,16 @@ def write_plate(fname, placed):
     print(f"wrote {fname}.3mf and {len(placed)} STLs")
 
 
-def band_slice(tm, y0, y1):
-    """Keep the assembled part between depths y0 and y1 (Y is depth, front = 0, rear = max Y).
-    It stands on its rear cut face (Y = y1), the same direction the BODY prints (rear face down)."""
-    lo, hi = tm.bounds
-    box = Manifold.cube([hi[0] - lo[0] + 20, y1 - y0, hi[2] - lo[2] + 20]).translate([lo[0] - 10, y0, lo[2] - 10])
-    part = to_trimesh(to_manifold(tm) ^ box)
-    # rotate -90 deg about X: z' = -y, so the rear cut face (max Y) becomes the bed
-    part.apply_transform(trimesh.transformations.rotation_matrix(-np.pi / 2, [1, 0, 0]))
-    return drop_to_bed(part)
-
-
 def main():
     os.makedirs(OUT, exist_ok=True)
-    face, body, cap = (drop_to_bed(load(n)) for n in ("face", "body", "cap"))
-
-    print("plate 1 (main colour):")
-    for n, t in (("face", face), ("body", body)):
+    for f in os.listdir(OUT):                      # old plates (v4b coupons) go, PRINT.md stays
+        if f.endswith((".3mf", ".stl")):
+            os.remove(os.path.join(OUT, f))
+    parts = [(n, drop_to_bed(load(src))) for n, src in (("face", "face"), ("body", "body"), ("roof", "cap"))]
+    print("housing plate:")
+    for n, t in parts:
         report(n, t)
-    write_plate("plate1_house", arrange([("face", face), ("body", body)]))
-
-    print("plate 2 (roof colour):")
-    report("roof", cap)
-    write_plate("plate2_roof", arrange([("roof", cap)]))
-
-    print("plate 3 (roof click coupon):")
-    cb = band_slice(load("body", "assembled"), COUPON_Y0, COUPON_Y1)
-    cc = band_slice(load("cap", "assembled"), COUPON_Y0, COUPON_Y1)
-    for n, t in (("body_click", cb), ("roof_click", cc)):
-        report(n, t)
-    write_plate("plate3_click_coupon", arrange([("body_click", cb), ("roof_click", cc)]))
-
-    print("plate 4 (FACE arms + display pocket coupon):")
-    # the full FACE carries the display pocket with its crush ribs and the 3 arms (aframe_b.py ARM_Y0..ARM_Y1 = 0.4..10.6);
-    # the front band of the BODY holds the floor grooves the arm hooks snap into
-    fb = band_slice(load("body", "assembled"), 0.0, FRONT_BAND_Y1)
-    for n, t in (("face", face), ("body_front", fb)):
-        report(n, t)
-    write_plate("plate4_face_coupon", arrange([("face", face), ("body_front", fb)]))
+    write_plate("housing_v4c", arrange(parts))
 
 
 if __name__ == "__main__":

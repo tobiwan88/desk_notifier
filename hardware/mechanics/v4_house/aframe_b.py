@@ -5,6 +5,11 @@ BODY (house up to a split plane 12 mm under the eave: floor, walls, integral rea
 ROOF (second colour: the two slopes + rounded ridge + the gable top; lifts off by hand; prints eave rim down, flat, no support).
 The split plane P(y) = eave height - SKIRT falls to the back with the eave; the roof edge is the main line of the object.
 Frame (brief frame, no tilt): X width, Y depth (front 0, back +), Z up, mm.
+v4c (after the first v4b print): the board parts come from the real KiCad board (pcb/export_pcb.py -> pcb/pcb_board_frame.npz) and
+are checked here (overlap, gaps, slide-in sweep); USB hole on J1 (X 14.85, not centred); board slot 2.6 high (1.9 over the last 6 mm,
+no crush bump), 0.6 side clearance; body +1.5 mm per side (antenna gap 2.2); rear wall inner face 0.5 behind the board so the FACE
+seats and the arms latch; FACE press fit by crush ribs on the registration ring (RIB_I); intake and side vents moved to the sensor
+side (+X, rear right).
 Run: uv run --with manifold3d --with trimesh --with numpy --with matplotlib python -I aframe_b.py
 """
 import math
@@ -25,15 +30,15 @@ R_WIN, WIN_CH = 16.7, 0.5
 R_RING = R_CAV + 1.68
 Y_FRONT, Y_CAV = -0.25, 1.35            # front face; plate rear face = FACE/BODY joint (plate 1.6 thick)
 Y_J = Y_CAV
-Y_REAR_OUT, Y_REAR_IN = 63.6, 60.61
+Y_REAR_OUT, Y_REAR_IN = 63.6, 60.96     # inner face 0.5 behind the PCB rear edge (60.46): the FACE can seat fully, J1 sits in the plug hole
 CH_SEAM, CH_BED = 0.6, 1.0
 CH_REAR_IN, CH_REAR_Y = 0.7, 1.2
 Z_BOT, Z_FI = -1.2, 1.4                 # underside (floor 2.6 thick: ballast low, J2 tails 1.9 -> 0.5 clear)
-Z_ESP_TOP, Z_J2_TOP, Z_TAIL, Z_USB_TOP = 8.32, 7.76, 1.9, 8.45
+Z_J2_TOP = 7.76                         # display header top (display model; board parts come from pcb/)
 TAB_POCKET_W = TAB_W + 2 * CLR
 Y_BOSS = 5.0
 
-HW_F, HW_R = 26.7, 23.4
+HW_F, HW_R = 28.2, 24.9                 # v4c: +1.5 per side (antenna gap 0.67 -> 2.2; the board cannot move in X, J2 centres the display)
 Y_T0 = 46.0
 PITCH = 46.0                            # >45 so that the slopes lean less than 45 deg from vertical when the roof prints eave down
 MARGIN = 3.2
@@ -70,16 +75,38 @@ F_BUMP, F_LEAD, F_RET = 0.5, 25.0, 30.0
 F_TIPW, F_SLOPE = 3.0, 1.73             # tip width; plan slope: finger height grows 1 per 1 of print height (45 deg)
 F_YC = (20.0, 38.0)
 
-Z_SHELF, Z_RIB = 3.60, 5.50
-Z_JAW = 7.0
-USB_X, USB_Z = 20.85, 6.8
-USB_HOLE = (12.8, 7.8)
+Z_SHELF = 3.60                          # cradle shelf top = PCB underside (- 0.01)
+PCB_T, PCB_T_MAX = 1.6, 1.76            # board thickness, nominal and fab worst case (+10 %)
+Z_RIB = Z_SHELF + PCB_T + 1.0           # jaw underside along the slide: 1.0 free above a 1.6 board (v4b: 0.29, with a 0.08 mm crush bump)
+Z_RIB_R = Z_SHELF + 1.9                 # last 6 mm at the rear: 0.3 free, locates the USB end; no bump
+Y_RAMP0, Y_RAMP1 = 52.0, 55.0           # jaw ramps down from Z_RIB to Z_RIB_R between these depths
+Z_JAW = 7.5
+SIDE_CLR = 0.6                          # PCB edge to the cradle side walls (v4b 0.3 / 0.4)
+
+# real PCB (pcb/export_pcb.py, from hardware/notifier-v1): board frame x along the 50 mm edge from the USB edge, y along the
+# 36 mm edge from the antenna edge, z up from the underside. Housing X = PCB_X0 - y, Y = PCB_Y0 - x, Z = Z_SHELF + 0.01 + z.
+PCB_NPZ = os.path.join(OUT, "pcb", "pcb_board_frame.npz")
+PCB_X0, PCB_Y0 = 38.85, 60.46           # J2 centre lands on X 20.47 (window CX 20.5)
+_pcb = np.load(PCB_NPZ)
+PCB = {k: np.c_[PCB_X0 - _pcb[k][:, 1], PCB_Y0 - _pcb[k][:, 0], Z_SHELF + 0.01 + _pcb[k][:, 2]] for k in _pcb.files}
+# SHT40 (U5) has no 3D model in the KiCad library: 1.5 x 1.5 x 0.55 DFN at its footprint (layout_v1.py U5 (3.6, 11.2))
+PCB["U5"] = np.array([(PCB_X0 - y, PCB_Y0 - x, Z_SHELF + 0.01 + z) for x in (2.85, 4.35) for y in (10.45, 11.95) for z in (1.51, 2.15)])
+_j1lo, _j1hi = PCB["J1"].min(0), PCB["J1"].max(0)
+USB_X = float(_j1lo[0] + _j1hi[0]) / 2  # 14.85: J1 is 6 mm left of the board centre (seen from the front)
+USB_Z = float(_j1hi[2]) - 1.63          # shell 3.26 high: centre 1.63 under its top
+USB_FACE_Y = float(_j1hi[1])            # receptacle face (0.25 out of the board edge)
+USB_HOLE = (13.2, 8.0)                  # plug overmold has to enter: J1 face sits 2.9 inside the rear face
 USB_FUNNEL = 0.8                        # 45 deg lead-in funnel on the rear face (flat spot)
 SLOT_W = 1.8
 EXHAUST = dict(xs=[CX + 3.4 * k for k in range(-3, 4)], z0=31.0, z1=40.0)    # in the roof's rear gable
-INTAKE = dict(xs=[5.5, 8.9, 12.3, 30.0, 33.4, 36.8], z0=7.6, z1=14.0)         # in the body's rear wall, beside the sensor corner
+INTAKE = dict(xs=[25.6, 29.0, 32.4, 35.8, 39.2], z0=7.6, z1=14.0)            # in the body's rear wall, right of the plug: BME688/SHT40 corner (X 33-39, Y 49-54)
 RIDGE_SLOTS = [(12.0, 22.0), (27.0, 37.0), (42.0, 52.0)]                      # along the ridge, under the roof's top
-SIDE_VENT = dict(zs=[7.8, 10.9, 14.0], y0=46.5, y1=58.5)                          # 3 slots in the left wall, long axis along Y (vertical in print)
+SIDE_VENT = dict(zs=[7.8, 10.9, 14.0], y0=46.5, y1=58.5, x0=43.0)                # 3 slots in the right wall (sensor side), long axis along Y (vertical in print)
+# FACE press fit: crush ribs on the outside of the registration ring, pressing into the BODY side walls
+RIB_I = 0.20                            # interference per rib, PLA (stiff, brittle: ribs shave rather than squash); coupon variants 0.10 / 0.30
+RIB_W, RIB_ZS = 1.0, (11.0, 15.5, 20.0)  # rib width; centres on each side wall
+RIB_Y0, RIB_Y1, RIB_Y2 = Y_J + 0.3, 6.5, 8.0   # full height Y0..Y1, lead-in taper to zero at Y2 (the leading end)
+RING_OFF = 1.88                         # ring outer face: offset from the outer section (body inner wall at WALL = 1.68)
 BALLAST = dict(x0=6.0, x1=35.0, y0=14.0, y1=44.0, d=1.0)                       # underside recess for an 8 g steel plate, 45 deg ends
 PLAQUE = dict(cx=CX, cz=8.5, w=30.0, h=8.0, r=3.0)                           # debossed frame on the front, below the door
 
@@ -290,15 +317,11 @@ PLUG_LEN = 16.0
 
 def build_internals():
     I = {}
-    I["board"] = box(2.85, 38.85, 10.46, 60.46, 3.61, 5.12)
-    I["low_parts"] = box(4.4, 37.3, 11.0, 59.0, 5.12, 6.6)
-    I["esp_shield"] = box(19.35, 38.85, 26.46, 44.46, 5.12, Z_ESP_TOP)
-    I["antenna"] = box(38.85, 44.85, 26.46, 44.46, 5.2, 6.2)
-    I["j2_socket"] = box(12.5, 28.5, 10.46, 14.5, 5.12, Z_J2_TOP)
-    I["j2_tails"] = box(14.0, 27.0, 11.0, 14.0, Z_TAIL, 3.61)
-    I["usb_recept"] = box(16.35, 25.35, 54.0, 60.46, 5.15, Z_USB_TOP)
-    I["usb_shell"] = box(20.85 - 4.47, 20.85 + 4.47, 60.46, 61.91, 6.8 - 1.63, 6.8 + 1.63)
-    I["usb_plug"] = box(20.85 - 6.0, 20.85 + 6.0, 61.91, 61.91 + PLUG_LEN, 6.8 - 3.5, 6.8 + 3.5)
+    I["board"] = pcb_board(PCB_T)
+    for r in pcb_refs():
+        I[f"pcb_{r}"] = M.hull_points(PCB[r])
+    # plug overmold 12 x 7 (most cables), mated: overmold face 0.0 behind the receptacle face
+    I["usb_plug"] = box(USB_X - 6.0, USB_X + 6.0, USB_FACE_Y, USB_FACE_Y + PLUG_LEN, USB_Z - 3.5, USB_Z + 3.5)
     glass = ext_y(circ(CX, ZC, R_MOD), 1.6, 3.1)
     pcb = ext_y(union(circ(CX, ZC, R_MOD), sq(CX - TAB_W / 2, CX + TAB_W / 2, TAB_Z0, ZC)), 3.1, 4.7)
     I["display"] = union(glass, pcb)
@@ -316,12 +339,22 @@ def build_clearance():
                       sq(CX - TAB_W / 2 - CLR, CX + TAB_W / 2 + CLR, TAB_Z0 - CLR, ZC)), 3.1, 4.7 + CLR)
     C["display+0.25"] = union(glass, pcb)
     C["tab_glass+0.25"] = box(CX - TAB_W / 2 - CLR, CX + TAB_W / 2 + CLR, 1.6, 3.1, TAB_Z0 - CLR, TAB_Z0 + 11.0 + CLR)
-    C["antenna+0.5"] = box(38.35, 45.35, 25.96, 44.96, 4.7, 6.7)
-    C["esp_shield+0.5"] = box(19.35, 38.85, 25.96, 44.96, 5.12, Z_ESP_TOP + 0.5)
-    C["j2_socket+0.3"] = box(12.2, 28.8, 10.46, 14.8, 5.12, Z_J2_TOP + 0.3)
-    C["j2_tails+0.3"] = box(13.7, 27.3, 10.7, 14.3, Z_TAIL - 0.3, 3.61)
-    C["usb_recept+0.3"] = box(16.05, 25.65, 54.0, 60.46, 5.15, Z_USB_TOP + 0.3)
     return C
+
+
+def pcb_refs():
+    return sorted(k for k in PCB if k != "board")
+
+
+def pcb_board(t):
+    """Bare PCB as a slab of thickness t on the shelf (outline hull: the sensor notch is ignored, conservative)."""
+    b = PCB["board"]
+    return box(b[:, 0].min(), b[:, 0].max(), b[:, 1].min(), b[:, 1].max(), Z_SHELF + 0.01, Z_SHELF + 0.01 + t)
+
+
+def pcb_assembly(t=PCB_T_MAX):
+    """Board (worst-case thickness) + every part hull: the thing that slides into the BODY."""
+    return union(pcb_board(t), *[M.hull_points(PCB[r]) for r in pcb_refs()])
 
 
 def hook_profile():
@@ -678,7 +711,7 @@ def build_housing():
         face = face - ext_y(ring, y0, y1)
     # registration lip: ring that enters the BODY with 0.2 clearance, only on the walls (above Z 9, below the split)
     yr = [Y_J - 0.2, 4.7, 8.0]
-    ring3 = (loft_off(yr, 1.88) - loft_off(yr, 3.14)) ^ box(-100, 200, -10, 100, 9.0, p_at(8.0) - 1.0)
+    ring3 = (loft_off(yr, RING_OFF) - loft_off(yr, 3.14)) ^ box(-100, 200, -10, 100, 9.0, p_at(8.0) - 1.0)
     face = face + ring3
     # snap arms (C4c numbers)
     spec = [(3.91, +1), (16.26, +1), (37.89, -1)]
@@ -695,6 +728,8 @@ def build_housing():
         lip.append(box(xa, xb, ARM_Y0, 6.0, ARM_Z0, 8.0))
     lip.append(box(15.0, 16.26, 0.2, ARM_Y1, ARM_Z0, 3.5))
     face = face + union(*lip) + union(*arm_solids)
+    face_base = face
+    face = face_base + face_ribs(RIB_I)
 
     # ============ BODY
     cav_ys = [0.5, Y_J + CH_SEAM] + [y for y in ys[1:] if y <= Y_REAR_IN + 1e-9]
@@ -703,15 +738,19 @@ def build_housing():
     k = 1 / math.sqrt(2)
 
     def jaw(xa, xb, y0, y1):
-        j = box(xa, xb, y0, y1, Z_RIB, Z_JAW)
-        xm = xa + 0.9
-        pts = [(x, y, z) for (x, z) in ((xm - 0.6, Z_RIB + 0.01), (xm + 0.6, Z_RIB + 0.01), (xm - 0.2, Z_RIB - 0.38), (xm + 0.2, Z_RIB - 0.38)) for y in (y0, y1)]
-        return (j + M.hull_points(np.array(pts))).trim_by_plane((0, k, k), (y0 + Z_JAW) * k)
+        """Hold-down lip over the board edge: Z_RIB high along the slide, ramps to Z_RIB_R over the last mm (USB end); no crush bump.
+        45 deg entry chamfer at the front end."""
+        pieces = [box(xa, xb, y0, Y_RAMP0, Z_RIB, Z_JAW),
+                  prism_yz([(Y_RAMP0, Z_RIB), (Y_RAMP1, Z_RIB_R), (Y_RAMP1, Z_JAW), (Y_RAMP0, Z_JAW)], xa, xb),
+                  box(xa, xb, Y_RAMP1, y1, Z_RIB_R, Z_JAW)]
+        return union(*pieces).trim_by_plane((0, k, k), (y0 + Z_JAW) * k)
 
     Y_C0, Y_C1 = 11.2, 61.0
-    cr_ = [box(0.95, 4.85, Y_C0, Y_C1, Z_FI - 0.2, Z_SHELF), box(0.95, 2.55, Y_C0, Y_C1, Z_SHELF - 0.1, Z_JAW), jaw(2.5, 4.3, Y_C0, Y_C1),
-           box(36.85, 40.85, Y_C0, Y_C1, Z_FI - 0.2, Z_SHELF),
-           box(39.25, 40.85, 45.2, Y_C1, Z_SHELF - 0.1, Z_JAW), jaw(37.5, 40.85, 45.2, Y_C1)]
+    bx0, bx1 = PCB["board"][:, 0].min(), PCB["board"][:, 0].max()
+    xl, xr_ = bx0 - SIDE_CLR, bx1 + SIDE_CLR                    # cradle side walls
+    cr_ = [box(xl - 1.6, 4.85, Y_C0, Y_C1, Z_FI - 0.2, Z_SHELF), box(xl - 1.6, xl, Y_C0, Y_C1, Z_SHELF - 0.1, Z_JAW), jaw(xl - 0.05, 4.3, Y_C0, Y_C1),
+           box(36.85, xr_ + 1.6, Y_C0, Y_C1, Z_FI - 0.2, Z_SHELF),
+           box(xr_, xr_ + 1.6, 45.2, Y_C1, Z_SHELF - 0.1, Z_JAW), jaw(37.9, xr_ + 0.05, 45.2, Y_C1)]   # right lip 0.95 over the board: C5 (X <= 37.4, 1 mm high) passes beside it
     body = body + (union(*cr_) ^ body_out)
 
     # floor rails for the arm hooks + ridge, then the pocket behind the ridge
@@ -725,16 +764,16 @@ def build_housing():
     # intake slots (rear wall, beside the sensor corner) and USB plug pocket with a 45 deg funnel on the rear face
     cutters = [box(x - SLOT_W / 2, x + SLOT_W / 2, Y_REAR_IN - 0.3, Y_REAR_OUT + 1, INTAKE["z0"], INTAKE["z1"]) for x in INTAKE["xs"]]
     body = body - union(*cutters)
-    hole = rrect(USB_X, USB_Z, USB_HOLE[0], USB_HOLE[1], 0.5)
+    hole = rrect(USB_X, USB_Z, USB_HOLE[0], USB_HOLE[1], 1.0)
     body = body - ext_y(hole, Y_REAR_IN - 0.3, Y_REAR_OUT + 2.0)
-    fun_o = np.asarray(rrect(USB_X, USB_Z, USB_HOLE[0] + 2 * USB_FUNNEL, USB_HOLE[1] + 2 * USB_FUNNEL, 0.5 + USB_FUNNEL).to_polygons()[0])
+    fun_o = np.asarray(rrect(USB_X, USB_Z, USB_HOLE[0] + 2 * USB_FUNNEL, USB_HOLE[1] + 2 * USB_FUNNEL, 1.0 + USB_FUNNEL).to_polygons()[0])
     fun_i = np.asarray(hole.to_polygons()[0])
     fpts = [(x, Y_REAR_OUT + 0.02, z) for x, z in fun_o] + [(x, Y_REAR_OUT - USB_FUNNEL, z) for x, z in fun_i]
     body = body - M.hull_points(np.array(fpts))
-    # side intake at the sensor corner (left wall) and a ballast recess in the underside
+    # side intake at the sensor corner (right wall) and a ballast recess in the underside
     for zc_ in SIDE_VENT["zs"]:
         ya_, yb_, h_ = SIDE_VENT["y0"], SIDE_VENT["y1"], SLOT_W / 2
-        body = body - prism_yz([(yb_, zc_ - h_), (yb_, zc_ + h_), (ya_ + 1.0, zc_ + h_), (ya_, zc_), (ya_ + 1.0, zc_ - h_)], -20.0, 0.4)
+        body = body - prism_yz([(yb_, zc_ - h_), (yb_, zc_ + h_), (ya_ + 1.0, zc_ + h_), (ya_, zc_), (ya_ + 1.0, zc_ - h_)], SIDE_VENT["x0"], 80.0)
     by0, by1, bx0, bx1, bd = BALLAST["y0"], BALLAST["y1"], BALLAST["x0"], BALLAST["x1"], BALLAST["d"]
     rl = bd * 1.2
     body = body - prism_yz([(by0, Z_BOT - 0.01), (by1, Z_BOT - 0.01), (by1 - rl, Z_BOT + bd), (by0 + rl, Z_BOT + bd)], bx0, bx1)
@@ -767,7 +806,30 @@ def build_housing():
     out = {}
     for nm, m in (("face", face), ("body", body), ("cap", cap)):
         out[nm] = finalize(keep(m).simplify(0.004))
-    return out, dict(plate=plate, body_out=body_out, cap_out=cap_out, body_nb=finalize(keep(body_nb).simplify(0.004)), dzt=dzt, flat_w=flat_w)
+    face_var = {i: finalize(keep(face_base + face_ribs(i)).simplify(0.004)) for i in RIB_VARIANTS}
+    return out, dict(plate=plate, body_out=body_out, cap_out=cap_out, body_nb=finalize(keep(body_nb).simplify(0.004)), dzt=dzt, flat_w=flat_w,
+                     face_base=finalize(keep(face_base).simplify(0.004)), face_var=face_var)
+
+
+RIB_VARIANTS = (0.10, 0.30)
+
+
+def face_ribs(interf):
+    """Crush ribs on the FACE registration ring, both side walls: radial from inside the ring to `interf` past the BODY inner wall.
+    Run along Y (vertical when the FACE prints front down); the leading end (Y2) tapers to the ring surface (lead-in)."""
+    out = []
+    for side in (-1, 1):
+        x_ring = CX + side * (HW_F - RING_OFF)
+        x_wall = CX + side * (HW_F - WALL)
+        x_in = x_ring - side * 0.3
+        x_out = x_wall + side * interf
+        for zc in RIB_ZS:
+            z0, z1 = zc - RIB_W / 2, zc + RIB_W / 2
+            ych = RIB_Y0 + abs(x_out - x_ring)           # 45 deg start (bottom end in print), no mid-air ledge
+            pts = [(x, y, z) for y in (ych, RIB_Y1) for x in (x_in, x_out) for z in (z0, z1)]
+            pts += [(x, y, z) for y in (RIB_Y0, RIB_Y2) for x in (x_in, x_ring) for z in (z0, z1)]
+            out.append(M.hull_points(np.array(pts)))
+    return union(*out)
 
 
 # ------------------------------------------------------------------ main
@@ -801,14 +863,38 @@ def main():
     print("with clearances grown:")
     for k, v in C.items():
         print(f"  {k:16s} {(housing ^ v).volume():.6f}")
-    print("smallest gap housing -> internal part (mm):")
-    for k in ("board", "esp_shield", "antenna", "display", "tab_glass", "header", "j2_socket", "j2_tails", "usb_recept", "usb_shell", "usb_plug", "low_parts"):
+    print("smallest gap housing -> display / plug (mm):")
+    for k in ("display", "tab_glass", "header", "usb_plug"):
         print(f"  {k:12s} {housing.min_gap(I[k], 3.0):.3f}")
+    print("real PCB (pcb/pcb_board_frame.npz) vs housing: overlap mm^3 / smallest gap mm (parts closer than 1.0 mm):")
+    pcb_bad = 0.0
+    for r in pcb_refs():
+        h = I[f"pcb_{r}"]
+        ov, gp = (housing ^ h).volume(), housing.min_gap(h, 1.0)
+        pcb_bad += ov
+        if ov > 1e-6 or gp < 1.0:
+            lo, hi = PCB[r].min(0), PCB[r].max(0)
+            print(f"  {r:4s} overlap {ov:.4f}  gap {gp:.2f}  (X {lo[0]:.1f}..{hi[0]:.1f} Y {lo[1]:.1f}..{hi[1]:.1f} Z {lo[2]:.1f}..{hi[2]:.1f})")
+    bb_ = pcb_board(PCB_T_MAX)
+    print(f"  board {PCB_T_MAX} thick: overlap {(housing ^ bb_).volume():.4f}  (all parts overlap total {pcb_bad:.4f})")
+    b = PCB["board"]
+    print(f"  board X {b[:, 0].min():.2f}..{b[:, 0].max():.2f}: side gaps to the cradle walls {SIDE_CLR} / {SIDE_CLR}; slot height {Z_RIB - Z_SHELF:.2f} "
+          f"(free {Z_RIB - Z_SHELF - PCB_T:.2f} at 1.6, {Z_RIB - Z_SHELF - PCB_T_MAX:.2f} at {PCB_T_MAX}), rear {Z_RIB_R - Z_SHELF:.2f} from Y {Y_RAMP1}")
+    print(f"  rear: PCB edge {b[:, 1].max():.2f} -> rear wall {Y_REAR_IN:.2f} = {Y_REAR_IN - b[:, 1].max():.2f} float; J1 face {USB_FACE_Y:.2f} inside the plug hole")
+    u1 = PCB["U1"]
+    print(f"  antenna X {u1[:, 0].max():.2f} -> inner wall X {CX + HW_F - WALL:.2f} = {CX + HW_F - WALL - u1[:, 0].max():.2f}")
+    print(f"  USB hole centre X {USB_X:.2f} Z {USB_Z:.2f} = J1 shell centre (from the KiCad model); J1 face {Y_REAR_OUT - USB_FACE_Y:.2f} inside the rear face")
+    asm = pcb_assembly()
+    sweep = [(dy, (asm.translate((0, -dy, 0)) ^ parts["body"]).volume()) for dy in np.arange(0.0, 62.0, 0.5)]
+    worst = max(sweep, key=lambda t: t[1])
+    print(f"  slide-in (board {PCB_T_MAX} + all parts moved out to the front in 0.5 mm steps, BODY only): max overlap {worst[1]:.4f} mm^3 at {worst[0]:.1f} mm")
     print("part vs part overlap (mm^3):")
     ks = list(parts)
     for i in range(len(ks)):
         for j in range(i + 1, len(ks)):
             print(f"  {ks[i]} x {ks[j]}: {(parts[ks[i]] ^ parts[ks[j]]).volume():.6f}")
+    print(f"  face without ribs x body: {(aux['face_base'] ^ parts['body']).volume():.6f}; ribs (interference {RIB_I}) x body: "
+          f"{(face_ribs(RIB_I) ^ parts['body']).volume():.3f} (by design)")
     env = union(aux["plate"], aux["body_out"], aux["cap_out"])
     print("internal volume outside the outer envelope (only the plug may stick out):")
     for k, v in I.items():
@@ -830,11 +916,11 @@ def main():
             if zmin - zt < best[0]:
                 best = (zmin - zt, float(yy))
         return best
-    for k, zt, xr, yr in (("esp_shield", Z_ESP_TOP, (19.35, 38.85), (26.46, 44.46)), ("usb_recept", Z_USB_TOP, (16.35, 25.35), (54.0, 60.46)),
-                          ("j2_socket", Z_J2_TOP, (12.5, 28.5), (10.46, 14.5))):
-        cc, yy = ceil_over(xr[0], xr[1], yr[0], yr[1], zt)
-        print(f"ceiling clearance over {k} (measured on the housing, min along Y): {cc:.2f} mm at Y {yy:.2f}")
-    print(f"antenna to housing: {housing.min_gap(I['antenna'], 5.0):.3f} mm (needs 0.5), inner wall x {CX + HW_F - WALL:.2f} vs antenna 44.85")
+    for r in ("U1", "J1", "J2"):
+        lo, hi = PCB[r].min(0), PCB[r].max(0)
+        cc, yy = ceil_over(lo[0], hi[0], lo[1], min(hi[1], Y_REAR_IN - 0.01), hi[2])
+        print(f"ceiling clearance over {r} (measured on the housing, min along Y): {cc:.2f} mm at Y {yy:.2f}")
+    print(f"antenna to housing: {housing.min_gap(I['pcb_U1'], 5.0):.3f} mm (needs 0.5)")
     print(f"walls by construction: slopes {WALL}, skirt {WALL_SKIRT}, body {WALL}, floor {Z_FI - Z_BOT:.2f}, rear wall {Y_REAR_OUT - Y_REAR_IN:.2f}, front plate {Y_J - Y_FRONT:.2f}")
 
     rear_in = sec_cs(Y_REAR_OUT, 2.5)
@@ -847,10 +933,10 @@ def main():
         print(f"vent {nm}: {len(V['xs'])} slots {SLOT_W} x {V['z1'] - V['z0']:.1f} = {a:.0f} mm2, outside rear outline-2.5: {bad:.3f} mm2")
     ridge_a = sum((b - a) * SLOT_W for a, b in RIDGE_SLOTS)
     side_a = len(SIDE_VENT["zs"]) * SLOT_W * (SIDE_VENT["y1"] - SIDE_VENT["y0"])
-    print(f"vent side (left wall, sensor corner): {len(SIDE_VENT['zs'])} slots {SLOT_W} x {SIDE_VENT['y1']-SIDE_VENT['y0']:.1f} = {side_a:.0f} mm2")
+    print(f"vent side (right wall, sensor corner): {len(SIDE_VENT['zs'])} slots {SLOT_W} x {SIDE_VENT['y1']-SIDE_VENT['y0']:.1f} = {side_a:.0f} mm2")
     sa = side_a + len(INTAKE["xs"]) * SLOT_W * (INTAKE["z1"] - INTAKE["z0"]) + len(EXHAUST["xs"]) * SLOT_W * (EXHAUST["z1"] - EXHAUST["z0"]) + ridge_a
     print(f"vent ridge (roof, high): {len(RIDGE_SLOTS)} slots {SLOT_W} x {RIDGE_SLOTS[0][1]-RIDGE_SLOTS[0][0]:.0f} = {ridge_a:.0f} mm2; total slots {sa:.0f} mm2 + plug pocket ring {USB_HOLE[0]*USB_HOLE[1]-12*7:.0f} mm2")
-    print(f"USB: plug pocket {USB_HOLE[0]} x {USB_HOLE[1]} through the 3.0 wall, rear face flat spot with {USB_FUNNEL} x 45 deg funnel (opening {USB_HOLE[0]+2*USB_FUNNEL:.1f} x {USB_HOLE[1]+2*USB_FUNNEL:.1f}); plug gap {housing.min_gap(I['usb_plug'], 3.0):.2f} mm")
+    print(f"USB: plug pocket {USB_HOLE[0]} x {USB_HOLE[1]} through the {Y_REAR_OUT - Y_REAR_IN:.2f} wall, rear face flat spot with {USB_FUNNEL} x 45 deg funnel (opening {USB_HOLE[0]+2*USB_FUNNEL:.1f} x {USB_HOLE[1]+2*USB_FUNNEL:.1f}); plug gap {housing.min_gap(I['usb_plug'], 3.0):.2f} mm")
 
     bb = housing.bounding_box()
     size = np.array(bb[3:]) - np.array(bb[:3])
@@ -886,6 +972,17 @@ def main():
             rl.merge_vertices()
             print(f"  {k:6s} {nm:9s} bad edges {bad}  watertight(reloaded) {rl.is_watertight} winding {rl.is_winding_consistent} "
                   f"shells {n_components(rl)} faces {len(rl.faces)} volume {rl.volume:.1f}  extents {np.round(rl.extents, 1).tolist()}")
+
+    for i, v in aux["face_var"].items():
+        pr, _, _ = print_mesh(to_trimesh(v), "face")
+        cl, bad = clean_stl(pr)
+        fn = os.path.join(OUT, "stl", f"aframe_b_face_rib{int(round(i * 100)):03d}_print.stl")
+        cl.export(fn)
+        print(f"  face variant rib interference {i}: bad edges {bad} -> {os.path.basename(fn)}")
+    full = trimesh.load(os.path.join(OUT, "pcb", "notifier_v1_pcb_board_frame.stl"), process=False)
+    v = full.vertices
+    trimesh.Trimesh(np.c_[PCB_X0 - v[:, 1], PCB_Y0 - v[:, 0], Z_SHELF + 0.01 + v[:, 2]], full.faces[:, ::-1], process=False).export(
+        os.path.join(OUT, "pcb", "notifier_v1_pcb_housing_frame.stl"))
 
     print("\nprint orientation analysis:")
     for k in parts:
