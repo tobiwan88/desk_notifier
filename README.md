@@ -1,25 +1,67 @@
 # Desk notifier
 
-A small desk display on an ESP32-S3. A round 240x240 GC9A01 screen turns through three animated pages: a clock with today's forecast for Munich, a cute squirrel that shows the indoor air quality from a BME688 sensor, and the squirrel's day at home, which follows the clock (coffee in the morning, laptop, lunch, reading, sleep). When the air gets bad the squirrel stays on screen and asks you to open a window until you press a button.
+![CI](https://github.com/tobiwan88/desk_notifier/actions/workflows/ci.yml/badge.svg)
+![License: MIT](https://img.shields.io/badge/license-MIT-blue)
+![ESP-IDF v6.1](https://img.shields.io/badge/ESP--IDF-v6.1-blue)
+
+A desk display where a mascot shows how good the air is. ESP32-S3, round 240x240 screen, BME688 air sensor.
 
 ![The pages](docs/media/pages_tour.gif)
 
-It started as the esp_eyes project (animated eyes on two displays) and was cut down to one display. The git history keeps the old work.
+![Left to right: firmware screenshot (bad-air alert), PCB render, case render](docs/media/overview.png)
+
+- **Clock page**: time, date, in/out temperature, today's forecast.
+- **Air page**: the mascot's mood follows the indoor air level. Bad air keeps the alert on screen. Press the button (or call the API) to snooze it for 15 minutes.
+- **Day page**: the mascot's day at home. It follows the clock (coffee, work, lunch, reading, sleep).
+- Everything is in one repo: firmware, custom PCB, 3D-printed case.
+
+It started as the esp_eyes project (animated eyes on two displays). The git history keeps the old work.
 
 ## What is in this repo
-One repo holds the whole product: firmware, the custom board and the 3D-printed case.
-
 | Part | Where | State |
 |---|---|---|
-| Firmware (ESP-IDF v6.1, C++23, host-tested core) | [`firmware/`](firmware/), [`docs/`](docs/) | Runs on the ESP32-S3 custom board (`DESK_BOARD_NOTIFIER_V1`) with a GC9A01, a BME688 and an SHT40; flashed and checked on a real board (sensors, display, Bluetooth setup). |
-| Board `notifier-v1` (KiCad 10, 4 layers, 50 x 36 mm, JLCPCB assembly) | [`hardware/`](hardware/README.md) | Generated, routed and gate-checked, fab package builds. **Not ordered yet**: human review in KiCad, JLC placement preview and the display pinout check are still open ([`ORDER.md`](hardware/notifier-v1/ORDER.md)). |
-| Case (Fusion, 3D printed PLA, two parts, snap-fit) | [`hardware/mechanics/`](hardware/mechanics/README.md) | First model with print files and a fit coupon. **Never printed.** |
+| Firmware (ESP-IDF v6.1, C++23, host-tested core) | [`firmware/`](firmware/), [`docs/`](docs/) | Runs on a standard ESP32-S3 dev kit with a GC9A01, a BME688 and an SHT40 (sensors, display, Bluetooth setup checked). |
+| Board `notifier-v1` (KiCad 10, 4 layers, 50 x 36 mm, JLCPCB assembly) | [`hardware/`](hardware/README.md) | Generated, routed and gate-checked, fab package builds. **Ordered and works**: human review in KiCad, JLC placement preview and the display pinout check are still open ([`ORDER.md`](hardware/notifier-v1/ORDER.md)). |
+| Case: A-frame "house" (3 printed parts, no screws) | [`hardware/mechanics/v4_house/`](hardware/mechanics/v4_house/README.md) | v4b printed. v4c fixes modelled, **v4 not yet printed**. Older shells in [`hardware/mechanics/`](hardware/mechanics/README.md) were never printed. |
 | Helper tools (page previews, clip preparation) | [`tools/`](tools/), [`clipprep/`](clipprep/) | Used by the checks. |
+
+## Built with AI, reviewed by a human
+Most of this repo was written with an AI coding assistant (Claude Code): firmware, KiCad generators, case scripts. The rules for the AI are in [`CLAUDE.md`](CLAUDE.md). A human made the design decisions. The final human review of the board in KiCad is still open (see table).
+
+### What the AI did well
+- Display, sensor and Wi-Fi glue code.
+- Host tests for the pure logic.
+- Page animations and the preview tools.
+- Generated schematic and layout scripts.
+
+### What went wrong, and who found it
+| Problem | Found by | Fix |
+|---|---|---|
+| First power design used a linear regulator (about 0.6 W) next to the air sensor. It would warm the sensor. | Fresh-context AI review | Buck converter |
+| An LED came out reversed, ERC was clean. A library symbol had its pins rotated. | ERC missed it; the net-intent check now catches it | Net-intent check against the netlist |
+| The autorouter put vias into pads and changed the fab rules. | Custom DRC rule | Router flags pinned, DRC rule kept |
+
+### Known gaps
+- Generators overwrite edits made in KiCad (see Limitations).
+- API and OTA are open until you set a token (see Limitations).
+
+### Rules
+- Pure logic lives in `core/` folders with no ESP-IDF includes. It is tested on the PC (ASan, UBSan, `-Werror`).
+- Hardware goes through a script gate (`scripts/hw-check.sh`): ERC, DRC, net intent, pin map vs. Kconfig.
+- Numbers come from scripts in `hardware/calc/`, not from the AI's memory.
+- A fresh-context review for each design step.
+
+Design notes and lessons: [`hardware/PLAN.md`](hardware/PLAN.md).
 
 ## Limitations
 Please read these before building one.
-- **ESP32-S3 only.** The board uses an ESP32-S3-WROOM-1-N8R2, because C61 and C5 modules had no stock at JLCPCB. The earlier ESP32-C61 breadboard setup is no longer built or tested. The case is still untested (below).
-- **The case is untested.** No part of it has been printed. The display module has no 3D model, so the pocket, window and plug alignment rest on assumed dimensions (header 2.54 mm, pin row 3.0 mm above the PCB edge, glass centre 26.5 mm above it, PCB plus glass 5.74 mm). Print `display_dummy.stl` and `coupon_m1.stl` first and compare. The SHT40 height (1.0 mm) is also an assumption. The cover needs one support and the USB-C collar may sit about 0.7 mm short of the connector.
+- **ESP32-S3 only.** The board uses an ESP32-S3-WROOM-1-N8R2.
+- **The case is not final.** Only v4b is printed ([`v4_house/README.md`](hardware/mechanics/v4_house/README.md)). Its faults:
+  - The front fell out.
+  - The USB-C hole missed the connector.
+  - The board was too tight.
+
+  The v4c model fixes these. v4c is not printed yet. The display module has no 3D model, so window and plug alignment rest on assumed dimensions. A caliper check of the bare board is open. Older shells in `hardware/mechanics/` were never printed.
 - **Display orientation is unconfirmed.** The image is mirrored on X by default (`DESK_LCD_MIRROR_X`); flip it in menuconfig if your panel shows it backwards. The pin order of the display module on the board's socket is also still to be checked against a real module.
 - **The air score is not BSEC.** It is a simple estimate from humidity and gas resistance and needs a few minutes of warm-up. The sensor reads a little warm next to the board, so indoor temperature is slightly high.
 - **No firmware security by default.** The HTTP API, the pet page and OTA are open unless you set a token (`auth token`), the connection is plain HTTP, and the device is meant for a trusted home network. Do not expose it to the internet.
@@ -111,7 +153,7 @@ It is a simple estimate, not Bosch BSEC. 25 points come from humidity (best at 4
 
 ## Hardware and case
 - Board: open `hardware/notifier-v1/notifier-v1.kicad_pro` with `hardware/open.sh`. Regenerate with `hardware/tools/pipeline_v1.sh`, check with `scripts/hw-check.sh`, order steps in [`hardware/notifier-v1/ORDER.md`](hardware/notifier-v1/ORDER.md), design notes in [`hardware/PLAN.md`](hardware/PLAN.md). Needs KiCad 10 (`source scripts/kicad-env.sh`).
-- Case: print files and notes in [`hardware/mechanics/`](hardware/mechanics/README.md) (PLA, 0.2 mm layers, Bambu Lab plate included). Print the fit coupon first.
+- Case: print files and notes in [`hardware/mechanics/v4_house/`](hardware/mechanics/v4_house/README.md) (PLA, Bambu Lab plate in `print/`). Older designs: [`hardware/mechanics/`](hardware/mechanics/README.md).
 - Firmware: `idf.py build` in `firmware/` (target ESP32-S3). Wi-Fi, time zone and name can be set from a phone over Bluetooth: [`setup/`](setup/README.md).
 
 ## License
