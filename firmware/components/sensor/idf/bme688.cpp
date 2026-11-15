@@ -3,6 +3,7 @@
 #include <array>
 #include <cstdio>
 #include <cstring>
+#include <ctime>
 #include <string>
 
 #include "config.hpp"
@@ -12,6 +13,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "sensor/core/sht4x.hpp"
+#include "settings/idf/settings.hpp"
 
 extern "C" {
 #include "bme68x.h"
@@ -33,6 +35,32 @@ i2c_master_dev_handle_t g_dev = nullptr;
 i2c_master_dev_handle_t g_sht = nullptr;  // SHT40, null when it does not answer
 bme68x_dev g_bme{};
 Tracker g_tracker;
+VocIndex g_voc;                      // only the sampling task touches it
+constexpr const char* kVocKey = "vocidx";  // NVS (namespace "eyes"): the learned mean/std, see core/vocindex.hpp
+
+// SNTP time, or 0 while the clock has not been set (a date before late 2023 means it has not).
+std::int64_t unix_now() {
+    const std::time_t t = std::time(nullptr);
+    return t > 1'700'000'000 ? static_cast<std::int64_t>(t) : 0;
+}
+
+void voc_load() {
+    const auto text = settings::get(kVocKey);
+    VocSaved s;
+    if (text && parse_saved(text->c_str(), s)) {
+        g_voc.offer(s);
+        ESP_LOGI(kTag, "VOC state found in NVS (mean %.0f, std %.0f), restored once the clock is set", static_cast<double>(s.mean), static_cast<double>(s.std));
+    }
+}
+
+void voc_save_if_due(std::int64_t unix_s) {
+    VocSaved s;
+    if (!g_voc.take_save(unix_s, s)) return;
+    char buf[96];
+    if (format_saved(s, buf, sizeof buf) == 0) return;
+    if (settings::set(kVocKey, buf)) ESP_LOGI(kTag, "VOC state saved (mean %.0f, std %.0f)", static_cast<double>(s.mean), static_cast<double>(s.std));
+    else ESP_LOGW(kTag, "VOC state not saved (NVS write failed)");
+}
 
 portMUX_TYPE g_mux = portMUX_INITIALIZER_UNLOCKED;
 Snapshot g_snap{};
@@ -102,6 +130,7 @@ bool sample_gas(Reading& out) {
 // Two independent schedules in one task: the gas measurement every kGasPeriodMs, the SHT40 every 30 s, and the SHT40
 // is held back whenever it would land within kHeaterGuardUs of a gas pulse.
 void task(void*) {
+    voc_load();
     int errors = 0;
     float sht_t = 0, sht_rh = 0;
     std::int64_t sht_at = -kShtStaleUs;
@@ -140,10 +169,16 @@ void task(void*) {
                 r.sht40 = fresh;
                 if (fresh) { r.temp_c = sht_t; r.rh = sht_rh; }
             }
+            const std::int64_t unix_s = unix_now();
+            int voc = 0;
+            if (ok) voc = g_voc.update(r, unix_s);  // outside the critical section: only this task touches g_voc
             taskENTER_CRITICAL(&g_mux);
             if (ok) {
                 g_snap.reading = r;
                 g_snap.quality = g_tracker.update(r);
+                g_snap.voc_index = voc;
+                g_snap.voc_learning = g_voc.learning();
+                g_snap.voc_restored = g_voc.restored();
                 g_snap.ok = true;
                 g_snap.errors = errors = 0;
                 g_last_ok_us = gas_end;
@@ -151,9 +186,13 @@ void task(void*) {
                 g_snap.errors = ++errors;
             }
             taskEXIT_CRITICAL(&g_mux);
-            if (ok) ESP_LOGI(kTag, "%.2f C  %.1f %%  %.1f hPa  gas %.0f ohm%s  score %d  [%s, bme %.2f C]", static_cast<double>(r.temp_c),
-                             static_cast<double>(r.rh), static_cast<double>(r.hpa), static_cast<double>(r.gas_ohm),
-                             r.gas_valid ? "" : " (unstable)", g_snap.quality.score, r.sht40 ? "sht40" : "bme688 only", static_cast<double>(r.bme_temp_c));
+            if (ok) {
+                ESP_LOGI(kTag, "%.2f C  %.1f %%  %.1f hPa  gas %.0f ohm%s  score %d  voc %d%s  [%s, bme %.2f C]", static_cast<double>(r.temp_c),
+                         static_cast<double>(r.rh), static_cast<double>(r.hpa), static_cast<double>(r.gas_ohm),
+                         r.gas_valid ? "" : " (unstable)", g_snap.quality.score, voc, g_voc.learning() ? " (learning)" : "",
+                         r.sht40 ? "sht40" : "bme688 only", static_cast<double>(r.bme_temp_c));
+                voc_save_if_due(unix_s);
+            }
             else ESP_LOGW(kTag, "read failed (%d in a row)", errors);
         }
         now = esp_timer_get_time();
@@ -233,7 +272,7 @@ std::expected<void, engine::Err> start() noexcept {
     bc.glitch_ignore_cnt = 7;
     bc.flags.enable_internal_pullup = true;
     if (i2c_new_master_bus(&bc, &g_bus) != ESP_OK) return std::unexpected(engine::Err::Io);
-    if (xTaskCreate(init_task, "bme688", 4096, nullptr, 3, nullptr) != pdPASS) return std::unexpected(engine::Err::Io);
+    if (xTaskCreate(init_task, "bme688", 6144, nullptr, 3, nullptr) != pdPASS) return std::unexpected(engine::Err::Io);
     return {};
 }
 
