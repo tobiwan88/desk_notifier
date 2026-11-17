@@ -22,7 +22,7 @@ It started as the esp_eyes project (animated eyes on two displays). The git hist
 |---|---|---|
 | Firmware (ESP-IDF v6.1, C++23, host-tested core) | [`firmware/`](firmware/), [`docs/`](docs/) | Runs on a standard ESP32-S3 dev kit with a GC9A01, a BME688 and an SHT40 (sensors, display, Bluetooth setup checked). |
 | Board `notifier-v1` (KiCad 10, 4 layers, 50 x 36 mm, JLCPCB assembly) | [`hardware/`](hardware/README.md) | Generated, routed and gate-checked, fab package builds. **Ordered and works**: human review in KiCad, JLC placement preview and the display pinout check are still open ([`ORDER.md`](hardware/notifier-v1/ORDER.md)). |
-| Case: A-frame "house" (3 printed parts, no screws) | [`hardware/mechanics/v4_house/`](hardware/mechanics/v4_house/README.md) | v4b printed. v4c fixes modelled, **v4 not yet printed**. Older shells in [`hardware/mechanics/`](hardware/mechanics/README.md) were never printed. |
+| Case: A-frame "house" (3 printed parts, no screws) | [`hardware/mechanics/v4_house/`](hardware/mechanics/v4_house/README.md) | v4b and v4c printed. v4d (screen fit, board stilts) modelled, **not yet printed**. Older shells in [`hardware/mechanics/`](hardware/mechanics/README.md) were never printed. |
 | Helper tools (page previews, clip preparation) | [`tools/`](tools/), [`clipprep/`](clipprep/) | Used by the checks. |
 
 ## Built with AI, reviewed by a human
@@ -56,12 +56,11 @@ Design notes and lessons: [`hardware/PLAN.md`](hardware/PLAN.md).
 ## Limitations
 Please read these before building one.
 - **ESP32-S3 only.** The board uses an ESP32-S3-WROOM-1-N8R2.
-- **The case is not final.** Only v4b is printed ([`v4_house/README.md`](hardware/mechanics/v4_house/README.md)). Its faults:
-  - The front fell out.
-  - The USB-C hole missed the connector.
-  - The board was too tight.
+- **The case is not final.** v4b and v4c are printed ([`v4_house/README.md`](hardware/mechanics/v4_house/README.md)).
+  - v4b: the front fell out, the USB-C hole missed the connector, the board was too tight. v4c fixed these: board and front fit.
+  - v4c: the screen was tight in its pocket, sat about 6 mm behind the front and leaned back. The display model missed the 2.54 mm header spacer and had the pin row 2.5 mm too high.
 
-  The v4c model fixes these. v4c is not printed yet. The display module has no 3D model, so window and plug alignment rest on assumed dimensions. A caliper check of the bare board is open. Older shells in `hardware/mechanics/` were never printed.
+  v4d fixes this and is not printed yet: the display now comes from the seller's dimension drawing, the board is placed from the display's header (2.5 mm higher, 3.2 mm further forward, case 3.2 mm shorter), the pocket is 0.5 mm wider and two stilts support the board. There is still no 3D model of the display. A caliper check of the bare board is open. Older shells in `hardware/mechanics/` were never printed.
 - **Display orientation is unconfirmed.** The image is mirrored on X by default (`DESK_LCD_MIRROR_X`); flip it in menuconfig if your panel shows it backwards. The pin order of the display module on the board's socket is also still to be checked against a real module.
 - **The air score is not BSEC.** It is a simple estimate from humidity and gas resistance and needs a few minutes of warm-up. The sensor reads a little warm next to the board, so indoor temperature is slightly high.
 - **No firmware security by default.** The HTTP API, the pet page and OTA are open unless you set a token (`auth token`), the connection is plain HTTP, and the device is meant for a trusted home network. Do not expose it to the internet.

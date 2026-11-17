@@ -10,6 +10,11 @@ are checked here (overlap, gaps, slide-in sweep); USB hole on J1 (X 14.85, not c
 no crush bump), 0.6 side clearance; body +1.5 mm per side (antenna gap 2.2); rear wall inner face 0.5 behind the board so the FACE
 seats and the arms latch; FACE press fit by crush ribs on the registration ring (RIB_I); intake and side vents moved to the sensor
 side (+X, rear right).
+v4d (after the v4c print, seller drawing of the display module): the display hangs on J2, so J2 sets where it sits. The model
+had no 2.54 mm header spacer and put the pin row 2.5 mm above the J2 pins: the real screen sat 3.2 mm behind and 2.5 mm under
+its pocket, hit the pocket floor and tipped back. Now the board is placed from the display (Z_SHELF and PCB_Y0 from the pin
+row and the header stack, asserted against the KiCad J2 model): board 2.48 up, 3.19 forward, body 3.19 shorter; display pocket
+0.5 wider (CLR_POCKET), its crush ribs 0.05 into the PCB.
 Run: uv run --with manifold3d --with trimesh --with numpy --with matplotlib python -I aframe_b.py
 """
 import math
@@ -24,22 +29,28 @@ SEG = 64
 # ------------------------------------------------------------------ parameters
 CX, ZC = 20.5, 33.7
 R_MOD, TAB_W, TAB_Z0, CLR = 19.0, 23.0, 7.2, 0.25
-R_CAV = R_MOD + CLR
+CLR_POCKET = 0.5                        # v4d: display pocket clearance per side (v4c 0.25 was tight in the print)
+R_CAV = R_MOD + CLR_POCKET
+# display module (seller drawing): glass front -> PCB back 3.0 (11.5 total allows 3.2, modelled 3.1), header spacer 2.54, pins 5.76
+# past it, pin row 1.76 above the PCB bottom edge (TAB_Z0). The header spacer bottoms on the J2 face.
+Y_GLASS, DISP_T, HDR_SPACER, PIN_ROW = 1.6, 3.1, 2.54, 1.76
+Y_DISP_BACK = Y_GLASS + DISP_T
+Z_PINS = TAB_Z0 + PIN_ROW               # 8.96: J2 pin height in the housing
+DY = -3.19                              # v4d: board (and rear wall) moved forward against v4c, so J2 meets the header spacer
 R_DISC = R_CAV + 2.0
 R_WIN, WIN_CH = 16.7, 0.5
 R_RING = R_CAV + 1.68
 Y_FRONT, Y_CAV = -0.25, 1.35            # front face; plate rear face = FACE/BODY joint (plate 1.6 thick)
 Y_J = Y_CAV
-Y_REAR_OUT, Y_REAR_IN = 63.6, 60.96     # inner face 0.5 behind the PCB rear edge (60.46): the FACE can seat fully, J1 sits in the plug hole
+Y_REAR_OUT, Y_REAR_IN = 63.6 + DY, 60.96 + DY     # inner face 0.5 behind the PCB rear edge (60.46): the FACE can seat fully, J1 sits in the plug hole
 CH_SEAM, CH_BED = 0.6, 1.0
 CH_REAR_IN, CH_REAR_Y = 0.7, 1.2
 Z_BOT, Z_FI = -1.2, 1.4                 # underside (floor 2.6 thick: ballast low, J2 tails 1.9 -> 0.5 clear)
-Z_J2_TOP = 7.76                         # display header top (display model; board parts come from pcb/)
-TAB_POCKET_W = TAB_W + 2 * CLR
+TAB_POCKET_W = TAB_W + 2 * CLR_POCKET
 Y_BOSS = 5.0
 
 HW_F, HW_R = 28.2, 24.9                 # v4c: +1.5 per side (antenna gap 0.67 -> 2.2; the board cannot move in X, J2 centres the display)
-Y_T0 = 46.0
+Y_T0 = 46.0 + DY
 PITCH = 46.0                            # >45 so that the slopes lean less than 45 deg from vertical when the roof prints eave down
 MARGIN = 3.2
 ZE_F = ZC + (R_DISC + MARGIN - HW_F * math.sin(math.radians(PITCH))) / math.cos(math.radians(PITCH))
@@ -75,19 +86,25 @@ F_BUMP, F_LEAD, F_RET = 0.5, 25.0, 30.0
 F_TIPW, F_SLOPE = 3.0, 1.73             # tip width; plan slope: finger height grows 1 per 1 of print height (45 deg)
 F_YC = (20.0, 38.0)
 
-Z_SHELF = 3.60                          # cradle shelf top = PCB underside (- 0.01)
+J2_PIN_Z = 2.87                         # J2 pin row above the PCB underside (1.6 board + 1.27; KiCad PinSocket_1x07 Horizontal)
+Z_SHELF = Z_PINS - J2_PIN_Z - 0.01     # 6.08 (v4c 3.60): cradle shelf top = PCB underside (- 0.01)
 PCB_T, PCB_T_MAX = 1.6, 1.76            # board thickness, nominal and fab worst case (+10 %)
 Z_RIB = Z_SHELF + PCB_T + 1.0           # jaw underside along the slide: 1.0 free above a 1.6 board (v4b: 0.29, with a 0.08 mm crush bump)
 Z_RIB_R = Z_SHELF + 1.9                 # last 6 mm at the rear: 0.3 free, locates the USB end; no bump
-Y_RAMP0, Y_RAMP1 = 52.0, 55.0           # jaw ramps down from Z_RIB to Z_RIB_R between these depths
-Z_JAW = 7.5
-SIDE_CLR = 0.6                          # PCB edge to the cradle side walls (v4b 0.3 / 0.4)
+Y_RAMP0, Y_RAMP1 = 52.0 + DY, 55.0 + DY           # jaw ramps down from Z_RIB to Z_RIB_R between these depths
+Z_JAW = Z_SHELF + 3.9
+STILT_X, STILT_W = (12.0, 29.0), 1.2       # v4d: floor rails under the board (edge ledges at X 2.85-4.85 / 36.85-38.85)
+STILT_Y0 = 19.0                         # behind the J2 tails (X 11.6-29.4, Y <= 17.4, down to Z 4.4)
+STILT_Y1 = 57.0                         # floor end of the rear slope (top ends 4.9 earlier); the USB plug overmold starts at Y 57.5
+SIDE_CLR = 0.6                         # PCB edge to the cradle side walls (v4b 0.3 / 0.4)
 
 # real PCB (pcb/export_pcb.py, from hardware/notifier-v1): board frame x along the 50 mm edge from the USB edge, y along the
 # 36 mm edge from the antenna edge, z up from the underside. Housing X = PCB_X0 - y, Y = PCB_Y0 - x, Z = Z_SHELF + 0.01 + z.
 PCB_NPZ = os.path.join(OUT, "pcb", "pcb_board_frame.npz")
-PCB_X0, PCB_Y0 = 38.85, 60.46           # J2 centre lands on X 20.47 (window CX 20.5)
+PCB_X0, PCB_Y0 = 38.85, 60.46 + DY      # J2 centre lands on X 20.47 (window CX 20.5); J2 face on the header spacer (checked below)
 _pcb = np.load(PCB_NPZ)
+assert abs((PCB_Y0 - _pcb["J2"][:, 0].max()) - (Y_DISP_BACK + HDR_SPACER)) < 0.02, "J2 face must meet the display header spacer"
+assert abs(_pcb["J2"][:, 2].max() - (J2_PIN_Z + 1.265)) < 0.02, "J2 pin height (socket body 2.54 tall, pins in its middle)"
 PCB = {k: np.c_[PCB_X0 - _pcb[k][:, 1], PCB_Y0 - _pcb[k][:, 0], Z_SHELF + 0.01 + _pcb[k][:, 2]] for k in _pcb.files}
 # SHT40 (U5) has no 3D model in the KiCad library: 1.5 x 1.5 x 0.55 DFN at its footprint (layout_v1.py U5 (3.6, 11.2))
 PCB["U5"] = np.array([(PCB_X0 - y, PCB_Y0 - x, Z_SHELF + 0.01 + z) for x in (2.85, 4.35) for y in (10.45, 11.95) for z in (1.51, 2.15)])
@@ -99,9 +116,9 @@ USB_HOLE = (13.2, 8.0)                  # plug overmold has to enter: J1 face si
 USB_FUNNEL = 0.8                        # 45 deg lead-in funnel on the rear face (flat spot)
 SLOT_W = 1.8
 EXHAUST = dict(xs=[CX + 3.4 * k for k in range(-3, 4)], z0=31.0, z1=40.0)    # in the roof's rear gable
-INTAKE = dict(xs=[25.6, 29.0, 32.4, 35.8, 39.2], z0=7.6, z1=14.0)            # in the body's rear wall, right of the plug: BME688/SHT40 corner (X 33-39, Y 49-54)
+INTAKE = dict(xs=[25.6, 29.0, 32.4, 35.8, 39.2], z0=9.6, z1=14.6)            # in the body's rear wall, right of the plug: BME688/SHT40 corner (X 33-39, Y 49-54)
 RIDGE_SLOTS = [(12.0, 22.0), (27.0, 37.0), (42.0, 52.0)]                      # along the ridge, under the roof's top
-SIDE_VENT = dict(zs=[7.8, 10.9, 14.0], y0=46.5, y1=58.5, x0=43.0)                # 3 slots in the right wall (sensor side), long axis along Y (vertical in print)
+SIDE_VENT = dict(zs=[9.0, 11.8, 14.6], y0=46.5 + DY, y1=58.5 + DY, x0=43.0)                # 3 slots in the right wall (sensor side), long axis along Y (vertical in print)
 # FACE press fit: crush ribs on the outside of the registration ring, pressing into the BODY side walls
 RIB_I = 0.20                            # interference per rib, PLA (stiff, brittle: ribs shave rather than squash); coupon variants 0.10 / 0.30
 RIB_W, RIB_ZS = 1.0, (11.0, 15.5, 20.0)  # rib width; centres on each side wall
@@ -322,23 +339,26 @@ def build_internals():
         I[f"pcb_{r}"] = M.hull_points(PCB[r])
     # plug overmold 12 x 7 (most cables), mated: overmold face 0.0 behind the receptacle face
     I["usb_plug"] = box(USB_X - 6.0, USB_X + 6.0, USB_FACE_Y, USB_FACE_Y + PLUG_LEN, USB_Z - 3.5, USB_Z + 3.5)
-    glass = ext_y(circ(CX, ZC, R_MOD), 1.6, 3.1)
-    pcb = ext_y(union(circ(CX, ZC, R_MOD), sq(CX - TAB_W / 2, CX + TAB_W / 2, TAB_Z0, ZC)), 3.1, 4.7)
+    yg, yp = Y_GLASS, Y_DISP_BACK - 1.6
+    glass = ext_y(circ(CX, ZC, R_MOD), yg, yp)
+    pcb = ext_y(union(circ(CX, ZC, R_MOD), sq(CX - TAB_W / 2, CX + TAB_W / 2, TAB_Z0, ZC)), yp, Y_DISP_BACK)
     I["display"] = union(glass, pcb)
-    I["header"] = box(13.5, 27.5, 4.7, 10.46, 7.2, Z_J2_TOP)
+    # header spacer 7 x 2.54 wide, 2.54 deep, on the pin row; the pins past it are inside J2
+    I["header"] = box(CX - 8.89, CX + 8.89, Y_DISP_BACK, Y_DISP_BACK + HDR_SPACER - 0.01, Z_PINS - 1.27, Z_PINS + 1.27)
     # worst case: the lower tab (23 x 11) carries full glass thickness
-    I["tab_glass"] = box(CX - TAB_W / 2, CX + TAB_W / 2, 1.6, 3.1, TAB_Z0, TAB_Z0 + 11.0)
+    I["tab_glass"] = box(CX - TAB_W / 2, CX + TAB_W / 2, yg, yp, TAB_Z0, TAB_Z0 + 11.0)
     return I
 
 
 def build_clearance():
     C = {}
     r = R_MOD + CLR
-    glass = ext_y(circ(CX, ZC, r), 1.6 - CLR, 3.1)
+    yg, yp = Y_GLASS, Y_DISP_BACK - 1.6
+    glass = ext_y(circ(CX, ZC, r), yg - CLR, yp)
     pcb = ext_y(union(circ(CX, ZC, r),
-                      sq(CX - TAB_W / 2 - CLR, CX + TAB_W / 2 + CLR, TAB_Z0 - CLR, ZC)), 3.1, 4.7 + CLR)
+                      sq(CX - TAB_W / 2 - CLR, CX + TAB_W / 2 + CLR, TAB_Z0 - CLR, ZC)), yp, Y_DISP_BACK + CLR)
     C["display+0.25"] = union(glass, pcb)
-    C["tab_glass+0.25"] = box(CX - TAB_W / 2 - CLR, CX + TAB_W / 2 + CLR, 1.6, 3.1, TAB_Z0 - CLR, TAB_Z0 + 11.0 + CLR)
+    C["tab_glass+0.25"] = box(CX - TAB_W / 2 - CLR, CX + TAB_W / 2 + CLR, yg, yp, TAB_Z0 - CLR, TAB_Z0 + 11.0 + CLR)
     return C
 
 
@@ -686,12 +706,12 @@ def build_housing():
     # ============ FACE
     face = plate
     tw = TAB_POCKET_W / 2 + 1.68
-    face = face + ext_y(circ(CX, ZC, R_RING), Y_J - 0.1, Y_BOSS) + ext_y(sq(CX - tw, CX + tw, TAB_Z0 - CLR - 1.65, ZC), Y_J - 0.1, Y_BOSS)
+    face = face + ext_y(circ(CX, ZC, R_RING), Y_J - 0.1, Y_BOSS) + ext_y(sq(CX - tw, CX + tw, TAB_Z0 - CLR_POCKET - 1.65, ZC), Y_J - 0.1, Y_BOSS)
     face = face - ext_y(circ(CX, ZC, R_CAV), Y_J, Y_BOSS + 0.5)
-    face = face - ext_y(sq(CX - TAB_POCKET_W / 2, CX + TAB_POCKET_W / 2, TAB_Z0 - CLR, ZC), Y_J, Y_J + 8.0)
+    face = face - ext_y(sq(CX - TAB_POCKET_W / 2, CX + TAB_POCKET_W / 2, TAB_Z0 - CLR_POCKET, ZC), Y_J, Y_J + 8.0)
     face = face - cyl_y(CX, ZC, R_WIN + WIN_CH, R_WIN, Y_FRONT - 0.01, Y_FRONT + WIN_CH)
     face = face - cyl_y(CX, ZC, R_WIN, R_WIN, Y_FRONT + WIN_CH - 0.01, Y_J + 0.1)
-    # display crush ribs (friction hold before the house is closed): 3 x trapezoid 0.8 base x 0.35 high, 0.10 interference on the 38.0 mm PCB,
+    # display crush ribs (friction hold before the house is closed): 3 x trapezoid 0.8 base, 0.05 interference on the 38.0 mm PCB (v4d; v4c 0.10 was tight),
     # at 90 / 210 / 330 deg (top, and clear of the glass-tab zone at the bottom), running along Y (vertical in print), lead-in taper at the rear end
     for ang in (90, 210, 330):
         a = math.radians(ang)
@@ -701,7 +721,7 @@ def build_housing():
             return (CX + r * math.cos(th), y, ZC + r * math.sin(th))
         pts = []
         for y in (Y_J - 0.05, Y_BOSS - 0.9):
-            pts += [pt(R_CAV + 0.15, a - hw_, y), pt(R_CAV + 0.15, a + hw_, y), pt(R_CAV - 0.35, a - hn_, y), pt(R_CAV - 0.35, a + hn_, y)]
+            pts += [pt(R_CAV + 0.15, a - hw_, y), pt(R_CAV + 0.15, a + hw_, y), pt(R_MOD - 0.05, a - hn_, y), pt(R_MOD - 0.05, a + hn_, y)]
         pts += [pt(R_CAV + 0.15, a - hw_, Y_BOSS), pt(R_CAV + 0.15, a + hw_, Y_BOSS), pt(R_CAV, a, Y_BOSS)]
         face = face + M.hull_points(np.array(pts))
     # name plaque: debossed rounded frame below the door (3 layer steps, 45 deg, bridges 0.6 mm only)
@@ -745,12 +765,18 @@ def build_housing():
                   box(xa, xb, Y_RAMP1, y1, Z_RIB_R, Z_JAW)]
         return union(*pieces).trim_by_plane((0, k, k), (y0 + Z_JAW) * k)
 
-    Y_C0, Y_C1 = 11.2, 61.0
+    Y_C0, Y_C1 = 11.2, 61.0 + DY             # front end stays behind the FACE arms (ARM_Y1 10.6): the board overhangs it by 3.9
     bx0, bx1 = PCB["board"][:, 0].min(), PCB["board"][:, 0].max()
     xl, xr_ = bx0 - SIDE_CLR, bx1 + SIDE_CLR                    # cradle side walls
     cr_ = [box(xl - 1.6, 4.85, Y_C0, Y_C1, Z_FI - 0.2, Z_SHELF), box(xl - 1.6, xl, Y_C0, Y_C1, Z_SHELF - 0.1, Z_JAW), jaw(xl - 0.05, 4.3, Y_C0, Y_C1),
            box(36.85, xr_ + 1.6, Y_C0, Y_C1, Z_FI - 0.2, Z_SHELF),
-           box(xr_, xr_ + 1.6, 45.2, Y_C1, Z_SHELF - 0.1, Z_JAW), jaw(37.9, xr_ + 0.05, 45.2, Y_C1)]   # right lip 0.95 over the board: C5 (X <= 37.4, 1 mm high) passes beside it
+           box(xr_, xr_ + 1.6, 45.2 + DY, Y_C1, Z_SHELF - 0.1, Z_JAW), jaw(37.9, xr_ + 0.05, 45.2 + DY, Y_C1)]   # right lip 0.95 over the board: C5 (X <= 37.4, 1 mm high) passes beside it
+    # v4d: stilts under the board: 2 floor rails along Y (vertical in print), top 0.05 under the board, behind the J2 tails.
+    # (No hold-down at the right front: the ESP32 antenna overhangs the right edge and sweeps that space during slide-in.)
+    # Front top: 1 mm 45 deg lead-in. Rear end: 45 deg slope (faces down when the BODY prints rear down), clear of the USB plug.
+    for xs in STILT_X:
+        st = box(xs - STILT_W / 2, xs + STILT_W / 2, STILT_Y0, STILT_Y1, Z_FI - 0.2, Z_SHELF - 0.05)
+        cr_.append(st.trim_by_plane((0, k, -k), (STILT_Y0 - Z_SHELF + 1.0) * k).trim_by_plane((0, -k, -k), -(STILT_Y1 + Z_FI - 0.2) * k))
     body = body + (union(*cr_) ^ body_out)
 
     # floor rails for the arm hooks + ridge, then the pocket behind the ridge
@@ -1016,10 +1042,10 @@ def main():
     poly = hull2d(foot)
     print(f"\nshell mass (PETG {RHO_PETG*1e3:.2f} g/cm3, 100 % solid as modelled): {mass_shell:.1f} g, shell CoM {np.round(mom/mass_shell, 1).tolist()}")
     print(f"flat foot polygon x {poly[:,0].min():.1f}..{poly[:,0].max():.1f} y {poly[:,1].min():.1f}..{poly[:,1].max():.1f}  table z {z0:.2f}")
-    for label, extra in (("12 g at board centre", [((20.85, 35.46, 4.4), 12.0)]),
-                         ("5 g display + 7 g board", [((CX, 3.0, ZC), 5.0), ((20.85, 35.46, 4.4), 7.0)]),
-                         ("12 g + 6.8 g steel plate in the ballast recess", [((20.85, 35.46, 4.4), 12.0), ((20.5, 29.0, Z_BOT + 0.5), 6.8)]),
-                         ("5 g display + 7 g board + 6.8 g steel plate", [((CX, 3.0, ZC), 5.0), ((20.85, 35.46, 4.4), 7.0), ((20.5, 29.0, Z_BOT + 0.5), 6.8)])):
+    for label, extra in (("12 g at board centre", [((20.85, PCB_Y0 - 25.0, Z_SHELF + 0.8), 12.0)]),
+                         ("5 g display + 7 g board", [((CX, 3.0, ZC), 5.0), ((20.85, PCB_Y0 - 25.0, Z_SHELF + 0.8), 7.0)]),
+                         ("12 g + 6.8 g steel plate in the ballast recess", [((20.85, PCB_Y0 - 25.0, Z_SHELF + 0.8), 12.0), ((20.5, 29.0, Z_BOT + 0.5), 6.8)]),
+                         ("5 g display + 7 g board + 6.8 g steel plate", [((CX, 3.0, ZC), 5.0), ((20.85, PCB_Y0 - 25.0, Z_SHELF + 0.8), 7.0), ((20.5, 29.0, Z_BOT + 0.5), 6.8)])):
         mass, mm = mass_shell, mom.copy()
         for pos, g in extra:
             mass += g

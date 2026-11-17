@@ -1,6 +1,6 @@
-"""Print file for housing v4 House (A-frame v4c): one Bambu Studio plate with the whole housing (3MF) plus per-object STLs.
+"""Print file for housing v4 House (A-frame v4d): one Bambu Studio plate with the whole housing (3MF) plus per-object STLs.
 
-housing_v4c.3mf: FACE (front down), BODY (rear down) and the roof CAP (rim down, tilted 9.2 deg so the rim is flat), each a
+housing_v4d.3mf: FACE (front down), BODY (rear down) and the roof CAP (rim down, tilted 9.2 deg so the rim is flat), each a
 separate object so the roof can get its own filament (AMS) or be printed after a filament change. Fits a 180 x 180 bed.
 
 Run: uv run --with manifold3d --with trimesh --with numpy --with networkx --with lxml --with shapely --with rtree python -I make_print_files.py
@@ -91,7 +91,7 @@ def main():
     print("housing plate:")
     for n, t in parts:
         report(n, t)
-    write_plate("housing_v4c", arrange(parts))
+    write_plate("housing_v4d", arrange(parts))
 
 
 if __name__ == "__main__":
