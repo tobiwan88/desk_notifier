@@ -7,6 +7,7 @@
 
 #include "engine/core/types.hpp"
 #include "sensor/core/airq.hpp"
+#include "sensor/core/vocindex.hpp"
 
 namespace sensor {
 
@@ -14,6 +15,9 @@ struct Snapshot {
     bool ok = false;              // at least one good sample and the last one is recent
     Reading reading{};
     Quality quality{};
+    int voc_index = 0;            // Sensirion-style VOC index 1..500 (100 = typical for this room), 0 while masked or unavailable
+    bool voc_learning = true;     // first ~1.5 h without a restored state
+    Restore voc_restored = Restore::None;
     std::uint32_t age_ms = 0;
     int errors = 0;               // consecutive failures since the last good sample
 };
