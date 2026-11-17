@@ -29,6 +29,21 @@ std::uint32_t g_backoff_ms = 1000;
 
 void retry_cb(TimerHandle_t) { esp_wifi_connect(); }
 
+// Name prefix for the default hostname: the mascot Kconfig choice (see mascot.hpp).
+const char* mascot_prefix() noexcept {
+#if defined(CONFIG_DESK_MASCOT_BUNNY)
+    return "bunny";
+#elif defined(CONFIG_DESK_MASCOT_STAG)
+    return "stag";
+#elif defined(CONFIG_DESK_MASCOT_CAT)
+    return "cat";
+#elif defined(CONFIG_DESK_MASCOT_PENGUIN)
+    return "penguin";
+#else
+    return "squirrel";
+#endif
+}
+
 wifi_config_t sta_config(const std::string& ssid, const std::string& pass) {
     wifi_config_t wc{};
     std::strncpy(reinterpret_cast<char*>(wc.sta.ssid), ssid.c_str(), sizeof wc.sta.ssid - 1);
@@ -59,7 +74,14 @@ void on_event(void*, esp_event_base_t base, std::int32_t id, void* data) {
 }  // namespace
 
 std::string hostname() noexcept {
-    return settings::get("hostname").value_or(CONFIG_DESK_HOSTNAME);
+    if (auto h = settings::get("hostname")) return *h;
+    if (CONFIG_DESK_HOSTNAME[0]) return CONFIG_DESK_HOSTNAME;
+    // Empty Kconfig: one name per board, the mascot plus the last 3 bytes of the Wi-Fi MAC
+    std::uint8_t mac[6] = {};
+    esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    char name[32];
+    std::snprintf(name, sizeof name, "%s-%02x%02x%02x", mascot_prefix(), mac[3], mac[4], mac[5]);
+    return name;
 }
 
 bool open_access() noexcept {

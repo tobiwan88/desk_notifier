@@ -11,7 +11,7 @@
 namespace net {
 
 [[nodiscard]] std::expected<void, engine::Err> init() noexcept;          // NVS creds, else Kconfig; reconnect with backoff
-[[nodiscard]] std::expected<void, engine::Err> start_mdns() noexcept;    // hostname eyes-<MAC3> (or NVS), service _eyes._tcp
+[[nodiscard]] std::expected<void, engine::Err> start_mdns() noexcept;    // hostname (NVS, Kconfig, else <mascot>-<MAC3>), service _eyes._tcp
 [[nodiscard]] std::expected<void, engine::Err> start_console() noexcept;
 bool apply_wifi(std::string_view ssid, std::string_view pass) noexcept;  // saves and joins that network now
 std::string wifi_ssid() noexcept;  // the configured network (NVS, else Kconfig)

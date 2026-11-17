@@ -59,6 +59,21 @@ int cmd_hostname(int argc, char** argv) {
     std::printf("saved; reboot to apply\n");
     return 0;
 }
+// Copies the squirrel's state between boards (values as printed by `squirrel`); reboot after setting so the screen task reloads it.
+int cmd_squirrel(int argc, char** argv) {
+    constexpr const char* kKeys[] = {"bond", "plant", "sqname", "golden"};
+    if (argc == 1) {
+        for (const char* k : kKeys) std::printf("%s=%s\n", k, settings::get(k).value_or("").c_str());
+        return 0;
+    }
+    bool known = false;
+    for (const char* k : kKeys) known |= argc >= 4 && std::strcmp(argv[1], "set") == 0 && std::strcmp(argv[2], k) == 0;
+    if (!known) { std::printf("usage: squirrel | squirrel set <bond|plant|sqname|golden> <value...>\n"); return 1; }
+    std::string v;
+    for (int i = 3; i < argc; ++i) { if (i > 3) v += ' '; v += argv[i]; }
+    std::printf(settings::set(argv[2], v) ? "saved %s; reboot to apply\n" : "failed to save %s\n", argv[2]);
+    return 0;
+}
 int cmd_status(int, char**) {
     std::printf("resets: %s\n", settings::get("rst").value_or("").c_str());
     const auto st = screen::stats();
@@ -157,6 +172,7 @@ std::expected<void, engine::Err> start_console() noexcept {
         {.command = "token", .help = "token show | set <t> | new", .hint = nullptr, .func = cmd_token, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "auth", .help = "auth open|token", .hint = nullptr, .func = cmd_auth, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "hostname", .help = "hostname [name]", .hint = nullptr, .func = cmd_hostname, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
+        {.command = "squirrel", .help = "squirrel | set <bond|plant|sqname|golden> <value...>", .hint = nullptr, .func = cmd_squirrel, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "status", .help = "show status", .hint = nullptr, .func = cmd_status, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "fsbench", .help = "fsbench <clip>", .hint = nullptr, .func = cmd_fsbench, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},
         {.command = "lcd", .help = "lcd pins | init [spi_hz]", .hint = nullptr, .func = cmd_lcd, .argtable = nullptr, .func_w_context = nullptr, .context = nullptr},

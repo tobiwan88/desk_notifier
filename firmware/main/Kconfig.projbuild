@@ -215,8 +215,8 @@ menu "Desk notifier"
             default 20
     endmenu
     config DESK_HOSTNAME
-        string "Network hostname (mDNS name and DHCP name, overridable via UART console)"
-        default "squirrel"
+        string "Network hostname (mDNS name and DHCP name, overridable via UART console; empty = <mascot>-<last 3 MAC bytes>, unique per board)"
+        default ""
     config DESK_TZ
         string "POSIX timezone"
         default "CET-1CEST,M3.5.0,M10.5.0/3"
